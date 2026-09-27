@@ -2,7 +2,7 @@
 
 ## [Unreleased][unreleased]
 
-## [0.2.2][] - 2026-09-27
+## [0.2.3][] - 2026-09-27
 
 - Add brief and full commit lists, toggled with `v`
 - Select a commit from the list to view its diff
@@ -129,8 +129,8 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.2...HEAD
-[0.2.2]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.2
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/tshemsedinov/reslop/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tshemsedinov/reslop/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/tshemsedinov/reslop/compare/v0.1.8...v0.1.9
