@@ -716,6 +716,10 @@ test('listCommits is newest first with author date and hash', () => {
     assert.match(listed[0].shortSha, /^[0-9a-f]{7,}$/);
     assert.match(listed[0].when, /^\d{4}-\d{2}-\d{2}/);
     assert.match(listed[0].refs, /HEAD -> main/);
+    assert.equal(listed[0].added, 1);
+    assert.equal(listed[0].removed, 1);
+    assert.equal(listed[1].added, 1);
+    assert.equal(listed[1].removed, 0);
   } finally {
     repo.cleanup();
   }

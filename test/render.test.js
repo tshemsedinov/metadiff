@@ -824,6 +824,180 @@ test('viewed commit is marked like the current branch', () => {
   assert.ok(!hash.includes(bg(THEME.ctxBg)));
 });
 
+test('full view puts uncommitted changes on the first line', () => {
+  const view = {
+    pane: 'commits',
+    commitView: 'full',
+    commits: [
+      {
+        pending: true,
+        subject: 'uncommitted changes',
+        sha: '',
+        shortSha: '',
+        date: '',
+        refs: '',
+        added: 4,
+        removed: 1,
+      },
+    ],
+    commitCursor: 0,
+    repoName: 'demo',
+    counts: { staged: 1, unstaged: 0, untracked: 0 },
+    branch: 'main',
+    status: '',
+    scroll: 0,
+  };
+  const frame = render.renderFrame(view, {
+    width: 80,
+    height: 12,
+    color: false,
+  });
+  const rows = frame.rows.map((row) => stripAnsi(row));
+  const subject = rows.find((row) => row.includes('uncommitted changes'));
+  const at = rows.indexOf(subject);
+  assert.ok(subject.includes('▶'));
+  assert.ok(subject.includes('Diffs:'));
+  assert.ok(subject.indexOf('Diffs:') < subject.indexOf('+4'));
+  assert.ok(subject.indexOf('+4') < subject.indexOf('-1'));
+  assert.equal(rows[at - 1].trim(), '');
+});
+
+test('diff counts follow branches in full and replace them in brief', () => {
+  const entry = {
+    sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    shortSha: 'aaa1111',
+    author: 'Ada',
+    email: 'ada@example.com',
+    date: '2 hours ago',
+    when: '2026-09-26 00:32:00 +0300',
+    refs: 'HEAD -> main',
+    subject: 'land the change',
+    body: 'land the change',
+    added: 4,
+    removed: 1,
+    head: true,
+  };
+  const view = {
+    pane: 'commits',
+    commitView: 'full',
+    commits: [entry],
+    commitCursor: 0,
+    repoName: 'demo',
+    counts: { staged: 0, unstaged: 0, untracked: 0 },
+    branch: 'main',
+    status: '',
+    scroll: 0,
+  };
+  const full = render.renderFrame(view, {
+    width: 120,
+    height: 16,
+    color: false,
+  });
+  const rows = full.rows.map((row) => stripAnsi(row));
+  const branches = rows.find((row) => row.includes('HEAD -> main'));
+  const count = rows.find((row) => row.includes('Diffs:'));
+  const ago = '2 hours ago';
+  const timeRow = rows.find((row) => row.includes(ago));
+  const endAt = (row, token) => row.indexOf(token) + token.length;
+  assert.ok(count.includes('+4'));
+  assert.ok(count.includes('-1'));
+  assert.ok(rows.indexOf(branches) < rows.indexOf(count));
+  assert.ok(count.indexOf('Diffs:') < count.indexOf('+4'));
+  assert.ok(count.indexOf('+4') < count.indexOf('-1'));
+  assert.equal(endAt(count, '-1'), endAt(timeRow, ago));
+  const wider = render.renderFrame(
+    {
+      ...view,
+      commits: [
+        entry,
+        {
+          ...entry,
+          sha: 'b'.repeat(40),
+          added: 12,
+          removed: 30,
+          refs: 'old',
+        },
+      ],
+    },
+    { width: 120, height: 20, color: false },
+  );
+  const wideRows = wider.rows.map((row) => stripAnsi(row));
+  const small = wideRows.find(
+    (row) => row.includes('Diffs:') && row.includes('+4'),
+  );
+  const large = wideRows.find((row) => row.includes('+12'));
+  assert.equal(endAt(small, '+4'), endAt(large, '+12'));
+  assert.equal(endAt(small, '-1'), endAt(large, '-30'));
+  const colored = render.renderFrame(view, {
+    width: 120,
+    height: 16,
+    color: true,
+  });
+  const painted = colored.rows.find((row) => row.includes('Diffs:'));
+  const addPaint = ansi.paint('+4', THEME.addLineFg, THEME.buttonBg, true);
+  const delPaint = ansi.paint('-1', THEME.delLineFg, THEME.buttonBg, true);
+  assert.ok(painted.includes(addPaint));
+  assert.ok(painted.includes(delPaint));
+  const brief = render.renderFrame(
+    { ...view, commitView: 'brief' },
+    { width: 80, height: 8, color: false },
+  );
+  const briefRow = brief.rows
+    .map((row) => stripAnsi(row))
+    .find((row) => row.includes('aaa1111'));
+  assert.ok(briefRow.includes('HEAD -> main'));
+  assert.equal(briefRow.includes('+4'), false);
+  const open = render.renderFrame(
+    {
+      ...view,
+      commitView: 'brief',
+      commits: [{ ...entry, refs: '' }],
+    },
+    { width: 80, height: 8, color: false },
+  );
+  const openRow = open.rows
+    .map((row) => stripAnsi(row))
+    .find((row) => row.includes('aaa1111'));
+  assert.ok(openRow.includes('+4'));
+  assert.ok(openRow.includes('-1'));
+  assert.equal(openRow.includes('HEAD -> main'), false);
+  assert.ok(openRow.indexOf('+4') < openRow.indexOf('-1'));
+  const pair = render.renderFrame(
+    {
+      ...view,
+      commitView: 'brief',
+      commits: [
+        { ...entry, refs: '', added: 4, removed: 1 },
+        {
+          ...entry,
+          refs: '',
+          sha: 'b'.repeat(40),
+          shortSha: 'bbb2222',
+          added: 12,
+          removed: 30,
+        },
+      ],
+    },
+    { width: 80, height: 8, color: false },
+  );
+  const pairRows = pair.rows.map((row) => stripAnsi(row));
+  const few = pairRows.find((row) => row.includes('+4'));
+  const many = pairRows.find((row) => row.includes('+12'));
+  assert.equal(endAt(few, '+4'), endAt(many, '+12'));
+  assert.equal(endAt(few, '-1'), endAt(many, '-30'));
+  const coloredBrief = render.renderFrame(
+    {
+      ...view,
+      commitView: 'brief',
+      commits: [{ ...entry, refs: '' }],
+    },
+    { width: 80, height: 8, color: true },
+  );
+  const coloredRow = coloredBrief.rows.find((row) => row.includes('+4'));
+  assert.ok(coloredRow.includes(addPaint));
+  assert.ok(coloredRow.includes(delPaint));
+});
+
 test('brief mode shows only the first line of a commit message', () => {
   const view = {
     pane: 'commits',

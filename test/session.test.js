@@ -2019,6 +2019,42 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(repo.commits[0].message, 'land the change');
 });
 
+test('enter on uncommitted changes opens the commit editor', () => {
+  const { session } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.pane, 'commits');
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.commitKind, 'commit');
+  assert.equal(session.commitCursor, 0);
+});
+
+test('amend is active on uncommitted and while unstaged is current', () => {
+  const { session } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  const amendHit = () => {
+    session.draw();
+    return session.lastFrame.buttons.find((hit) => hit.id === 'amend');
+  };
+  session.pushInput('c');
+  assert.ok(amendHit());
+  session.dispatch('next');
+  assert.ok(amendHit());
+  session.rev = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  session.revShort = 'aaa1111';
+  assert.equal(amendHit(), undefined);
+  session.pushInput('a');
+  assert.equal(session.mode, 'review');
+  assert.equal(session.commitKind, null);
+  session.handleEvent({ type: 'key', key: 'home' });
+  assert.ok(amendHit());
+  session.pushInput('a');
+  assert.equal(session.commitKind, 'amend');
+});
+
 test('click commit footer chooses commit amend or fixup', () => {
   const clickKind = (id, kind) => {
     const { session } = openSession([sampleItem('a.js', 'staged')], {
@@ -2407,8 +2443,9 @@ test('commits pane lists newest first', () => {
   session.handleEvent({ type: 'key', key: 'home' });
   assert.equal(session.commitCursor, 0);
   session.handleEvent({ type: 'key', key: 'enter' });
-  assert.equal(session.pane, 'diff');
-  assert.equal(session.rev, '');
+  assert.equal(session.pane, 'commits');
+  assert.equal(session.mode, 'review');
+  assert.equal(session.status, 'nothing to commit');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('c');
   session.handleEvent({ type: 'key', key: 'end' });
