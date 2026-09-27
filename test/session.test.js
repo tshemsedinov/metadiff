@@ -2019,6 +2019,27 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(repo.commits[0].message, 'land the change');
 });
 
+test('enter on uncommitted changes leaves a viewed commit', () => {
+  const { session } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  const sha = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  session.pushInput('c');
+  session.dispatch('next');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.pane, 'diff');
+  assert.equal(session.rev, sha);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('c');
+  assert.equal(session.commitCursor, 0);
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.rev, '');
+  assert.equal(session.revShort, '');
+  assert.equal(session.mode, 'review');
+  assert.equal(session.pane, 'diff');
+  assert.notEqual(session.items[0].origin, 'commit');
+});
+
 test('enter on uncommitted changes opens the commit editor', () => {
   const { session } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
