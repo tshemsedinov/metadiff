@@ -5,7 +5,7 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const files = require('../lib/files.js');
-const { fileEntries, fileStatus, itemPath, relativeAge } = files;
+const { fileEntries, fileStatus, itemPath, relativeAge, shortAge } = files;
 const { TODO_FILE, REPO_TODOS_LABEL, isTodosEntry, isTodoItem } = files;
 const { fileTotals, isTotalEntry, TOTAL_LABEL } = files;
 
@@ -156,13 +156,29 @@ test('fileEntries opens a partial file on the first unstaged block', () => {
   assert.equal(entries[0].openIndex, 1);
 });
 
-test('relativeAge uses git-style units', () => {
+test('relativeAge uses short units', () => {
   const now = 1_000_000_000_000;
-  assert.equal(relativeAge(now - 1000, now), '1 second ago');
-  assert.equal(relativeAge(now - 2000, now), '2 seconds ago');
-  assert.equal(relativeAge(now - 2 * 3600 * 1000, now), '2 hours ago');
-  assert.equal(relativeAge(now - 2 * 86400 * 1000, now), '2 days ago');
-  assert.equal(relativeAge(now - 21 * 86400 * 1000, now), '3 weeks ago');
+  assert.equal(relativeAge(now - 1000, now), '1s ago');
+  assert.equal(relativeAge(now - 2000, now), '2s ago');
+  assert.equal(relativeAge(now - 2 * 3600 * 1000, now), '2h ago');
+  assert.equal(relativeAge(now - 2 * 86400 * 1000, now), '2d ago');
+  assert.equal(relativeAge(now - 21 * 86400 * 1000, now), '3w ago');
+  assert.equal(relativeAge(now - 400 * 86400 * 1000, now), '1y ago');
+});
+
+test('shortAge compresses git relative dates', () => {
+  assert.equal(shortAge('2 hours ago'), '2h ago');
+  assert.equal(shortAge('1 hour ago'), '1h ago');
+  assert.equal(shortAge('yesterday'), '1d ago');
+  assert.equal(shortAge('3 days ago'), '3d ago');
+  assert.equal(shortAge('3 weeks ago'), '3w ago');
+  assert.equal(shortAge('4 months ago'), '4mo ago');
+  assert.equal(shortAge('2 years ago'), '2y ago');
+  assert.equal(shortAge('45 seconds ago'), '45s ago');
+  assert.equal(shortAge('12 minutes ago'), '12m ago');
+  assert.equal(shortAge('2h'), '2h ago');
+  assert.equal(shortAge('2h ago'), '2h ago');
+  assert.equal(shortAge(''), '');
 });
 
 test('fileEntries copies the first item date', () => {

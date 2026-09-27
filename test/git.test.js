@@ -412,7 +412,7 @@ test('AC15 file argv loads only that file', () => {
     assert.equal(files.length, 2);
     assert.equal(files[0].kind, 'todos');
     assert.equal(files[1].path, 'keep.txt');
-    assert.match(files[1].date, / ago$/);
+    assert.match(files[1].date, /^\d+(mo|[smhdwy]) ago$/);
   } finally {
     repo.cleanup();
   }

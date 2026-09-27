@@ -618,22 +618,22 @@ test('commit pane brief mode lists subject hash branch and age', () => {
   assert.ok(oldRow);
   assert.ok(headRow.includes('▶ land the change'));
   assert.ok(headRow.includes('HEAD -> main'));
-  assert.ok(headRow.includes('2 hours ago'));
+  assert.ok(headRow.includes('2h ago'));
   assert.equal(headRow.includes('Ada'), false);
   assert.ok(oldRow.includes('   init'));
   assert.ok(oldRow.includes('old'));
-  assert.ok(oldRow.includes('yesterday'));
+  assert.ok(oldRow.includes('1d ago'));
   assert.ok(headRow.indexOf('land the change') < headRow.indexOf('aaa1111'));
   assert.ok(headRow.indexOf('aaa1111') < headRow.indexOf('HEAD -> main'));
   assert.equal(headRow.indexOf('HEAD -> main'), oldRow.indexOf('old'));
-  assert.ok(headRow.indexOf('HEAD -> main') < headRow.indexOf('2 hours ago'));
-  assert.ok(headRow.endsWith('2 hours ago '));
-  assert.ok(oldRow.endsWith('yesterday '));
+  assert.ok(headRow.indexOf('HEAD -> main') < headRow.indexOf('2h ago'));
+  assert.ok(headRow.endsWith('2h ago '));
+  assert.ok(oldRow.endsWith('1d ago '));
   assert.equal(visibleWidth(headRow), 80);
   assert.equal(visibleWidth(oldRow), 80);
   assert.equal(
-    headRow.indexOf('2 hours ago') + '2 hours ago'.length,
-    oldRow.indexOf('yesterday') + 'yesterday'.length,
+    headRow.indexOf('2h ago') + '2h ago'.length,
+    oldRow.indexOf('1d ago') + '1d ago'.length,
   );
   assert.match(text, /land the change/);
   assert.match(render.headerText(view), /demo: commits brief$/);
@@ -909,7 +909,7 @@ test('diff counts follow branches in full and replace them in brief', () => {
   const rows = full.rows.map((row) => stripAnsi(row));
   const branches = rows.find((row) => row.includes('HEAD -> main'));
   const count = rows.find((row) => row.includes('Diffs:'));
-  const ago = '2 hours ago';
+  const ago = '2h ago';
   const timeRow = rows.find((row) => row.includes(ago));
   const endAt = (row, token) => row.indexOf(token) + token.length;
   assert.ok(count.includes('+4'));
@@ -1356,16 +1356,16 @@ test('commit pane full mode shows the message author date and branches', () => {
   assert.ok(head.includes('Ada <ada@example.com>'));
   assert.ok(head.indexOf(hash) < head.indexOf('Ada'));
   assert.ok(stamp.includes('land the change'));
-  assert.ok(stamp.includes('2 hours ago'));
+  assert.ok(stamp.includes('2h ago'));
   assert.ok(stamp.indexOf('land the change') < stamp.indexOf('2026-09-26'));
-  assert.ok(stamp.indexOf('2026-09-26') < stamp.indexOf('2 hours ago'));
+  assert.ok(stamp.indexOf('2026-09-26') < stamp.indexOf('2h ago'));
   assert.ok(rows.some((row) => row.includes('explain the change')));
   const column = head.indexOf('Ada');
   assert.equal(stamp.indexOf('2026-09-26'), column);
   assert.equal(branches.indexOf('HEAD -> main'), column);
   const wideRefs = 'HEAD -> main, origin/main, feature/long-name';
   const when = '2026-09-26 00:32:00 +0300';
-  const ago = '2 hours ago';
+  const ago = '2h ago';
   const wide = render.renderFrame(
     {
       ...view,
@@ -1436,7 +1436,7 @@ test('commit pane full mode shows the message author date and branches', () => {
   assert.ok(!paintedAuthor.includes(bg(THEME.ctxBg)));
   const panelTail = ansi.paint(' ', THEME.chromeFg, THEME.buttonBg, true);
   assert.ok(paintedSubject.endsWith(panelTail));
-  assert.ok(stripAnsi(paintedSubject).endsWith('2 hours ago '));
+  assert.ok(stripAnsi(paintedSubject).endsWith('2h ago '));
   assert.ok(paintedSubject.includes(subjectPaint));
   assert.ok(paintedBody.includes(bodyPaint));
   view.commitCursor = 1;
@@ -2105,8 +2105,8 @@ test('branch pane lists names and marks the default branch', () => {
   assert.match(text, /bbb2222/);
   assert.match(text, /⇡1/);
   assert.match(text, /⇣2/);
-  assert.match(text, /2 days ago/);
-  assert.match(text, /3 weeks ago/);
+  assert.match(text, /2d ago/);
+  assert.match(text, /3w ago/);
   assert.match(text, /init/);
   assert.match(text, /wip/);
   assert.match(render.headerText(view), /demo: branches$/);
@@ -2131,15 +2131,15 @@ test('branch pane lists names and marks the default branch', () => {
     undefined,
   );
   assert.equal(mainRow.indexOf('aaa1111'), featRow.indexOf('bbb2222'));
-  assert.ok(mainRow.endsWith('2 days ago '));
-  assert.ok(!mainRow.endsWith('2 days ago  '));
-  assert.ok(featRow.endsWith('3 weeks ago '));
-  assert.ok(!featRow.endsWith('3 weeks ago  '));
+  assert.ok(mainRow.endsWith('2d ago '));
+  assert.ok(!mainRow.endsWith('2d ago  '));
+  assert.ok(featRow.endsWith('3w ago '));
+  assert.ok(!featRow.endsWith('3w ago  '));
   assert.equal(
-    mainRow.indexOf('2 days ago') + '2 days ago'.length,
-    featRow.indexOf('3 weeks ago') + '3 weeks ago'.length,
+    mainRow.indexOf('2d ago') + '2d ago'.length,
+    featRow.indexOf('3w ago') + '3w ago'.length,
   );
-  assert.match(featRow, /⇣2 {3}3 weeks ago/);
+  assert.match(featRow, /⇣2 {3}3w ago/);
   assert.equal(visibleWidth(featRow), 80);
   assert.equal(visibleWidth(mainRow), 80);
   const colored = render.renderFrame(view, {
@@ -2163,7 +2163,7 @@ test('branch pane lists names and marks the default branch', () => {
   assert.ok(featPainted.includes(`${fg(THEME.shaDarkFg)}${currentBg}`));
   assert.ok(!featPainted.includes(`${fg(THEME.shaFg)}${currentBg}`));
   assert.ok(featPainted.includes(`${fg(THEME.headerFg)}${currentBg}`));
-  const date = ansi.paint('3 weeks ago', THEME.headerFg, THEME.currentBg, true);
+  const date = ansi.paint('3w ago', THEME.headerFg, THEME.currentBg, true);
   const dateTail = ansi.paint(' ', THEME.headerFg, THEME.currentBg, true);
   const currentLead = ansi.paint(' ▶ ', THEME.headerFg, THEME.currentBg, true);
   assert.ok(featPainted.includes(currentLead));
@@ -2193,12 +2193,7 @@ test('branch pane lists names and marks the default branch', () => {
   const currentPlain = ansi.paint('   ', THEME.headerFg, THEME.currentBg, true);
   assert.ok(ontoFeat.includes(currentPlain));
   assert.ok(!ontoFeat.includes(bg(THEME.ctxBg)));
-  const selectDate = ansi.paint(
-    ' 2 days ago',
-    THEME.mutedFg,
-    THEME.buttonBg,
-    true,
-  );
+  const selectDate = ansi.paint('2d ago', THEME.mutedFg, THEME.buttonBg, true);
   const selectTail = ansi.paint(' ', THEME.chromeFg, THEME.buttonBg, true);
   assert.ok(ontoMain.includes(`${selectDate}${selectTail}`));
   assert.ok(!ontoMain.includes(bg(THEME.ctxBg)));
@@ -2396,11 +2391,11 @@ test('file list dates are right-aligned', () => {
   const rows = [2, 3].map((i) => stripAnsi(frame.rows[i]));
   const recent = rows.find((row) => row.includes('a.js'));
   const older = rows.find((row) => row.includes('b.js'));
-  assert.ok(recent.endsWith('2 hours ago '));
-  assert.ok(older.endsWith('yesterday '));
+  assert.ok(recent.endsWith('2h ago '));
+  assert.ok(older.endsWith('1d ago '));
   assert.equal(
-    recent.indexOf('2 hours ago') + '2 hours ago'.length,
-    older.indexOf('yesterday') + 'yesterday'.length,
+    recent.indexOf('2h ago') + '2h ago'.length,
+    older.indexOf('1d ago') + '1d ago'.length,
   );
   const colored = render.renderFrame(
     {
@@ -2414,8 +2409,8 @@ test('file list dates are right-aligned', () => {
     },
     { width: 80, height: 8, color: true },
   );
-  const painted = colored.rows.find((row) => row.includes('2 hours ago'));
-  const age = ansi.paint('2 hours ago', THEME.mutedFg, THEME.buttonBg, true);
+  const painted = colored.rows.find((row) => row.includes('2h ago'));
+  const age = ansi.paint('2h ago', THEME.mutedFg, THEME.buttonBg, true);
   assert.ok(painted.includes(age));
 });
 
