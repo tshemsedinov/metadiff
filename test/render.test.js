@@ -836,8 +836,10 @@ test('full view puts uncommitted changes on the first line', () => {
         shortSha: '',
         date: '',
         refs: '',
-        added: 4,
-        removed: 1,
+        stagedAdded: 2,
+        unstagedAdded: 4,
+        stagedRemoved: 1,
+        unstagedRemoved: 3,
       },
     ],
     commitCursor: 0,
@@ -857,9 +859,20 @@ test('full view puts uncommitted changes on the first line', () => {
   const at = rows.indexOf(subject);
   assert.ok(subject.includes('▶'));
   assert.ok(subject.includes('Diffs:'));
-  assert.ok(subject.indexOf('Diffs:') < subject.indexOf('+4'));
-  assert.ok(subject.indexOf('+4') < subject.indexOf('-1'));
+  assert.ok(subject.indexOf('Diffs:') < subject.indexOf('+2/4'));
+  assert.ok(subject.indexOf('+2/4') < subject.indexOf('-1/3'));
   assert.equal(rows[at - 1].trim(), '');
+  const brief = render.renderFrame(
+    { ...view, commitView: 'brief' },
+    { width: 80, height: 8, color: false },
+  );
+  const briefRow = brief.rows
+    .map((row) => stripAnsi(row))
+    .find((row) => row.includes('uncommitted'));
+  assert.ok(briefRow.includes('+2/4'));
+  assert.ok(briefRow.includes('-1/3'));
+  assert.equal(briefRow.includes('Diffs:'), false);
+  assert.ok(briefRow.indexOf('+2/4') < briefRow.indexOf('-1/3'));
 });
 
 test('diff counts follow branches in full and replace them in brief', () => {
@@ -946,7 +959,10 @@ test('diff counts follow branches in full and replace them in brief', () => {
     .map((row) => stripAnsi(row))
     .find((row) => row.includes('aaa1111'));
   assert.ok(briefRow.includes('HEAD -> main'));
-  assert.equal(briefRow.includes('+4'), false);
+  assert.ok(briefRow.includes('+4'));
+  assert.ok(briefRow.includes('-1'));
+  assert.ok(briefRow.indexOf('HEAD -> main') < briefRow.indexOf('+4'));
+  assert.ok(briefRow.indexOf('+4') < briefRow.indexOf('-1'));
   const open = render.renderFrame(
     {
       ...view,
