@@ -175,6 +175,11 @@ test('serializeReview writes ready when status is ready', () => {
     md,
     /If not `editing`, set `status` to `partial` if some remain/,
   );
+  assert.match(md, /Run the full check with `npm t`/);
+  assert.match(
+    md,
+    /Run specific test files with `reslop t -- node --test <files>`/,
+  );
 });
 
 test('parseFrontmatterStatus maps pending to ready', () => {

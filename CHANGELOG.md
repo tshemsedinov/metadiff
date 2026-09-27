@@ -2,6 +2,7 @@
 
 ## [Unreleased][unreleased]
 
+- Add instructions for agents to run tests using reslop
 - Remove circular dependencies between Git modules
 - Share rebase cleanup, dependency index writes, and session Git operations
 - Stage dependency changes without rewriting working files
