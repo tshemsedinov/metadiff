@@ -2,6 +2,12 @@
 
 ## [Unreleased][unreleased]
 
+- Remove circular dependencies between Git modules
+- Share rebase cleanup, dependency index writes, and session Git operations
+- Stage dependency changes without rewriting working files
+- Unify list rendering and keyboard navigation
+- Simplify dependency transformations and remove redundant wrappers
+
 ## [0.2.3][] - 2026-09-27
 
 - Add brief and full commit lists, toggled with `v`

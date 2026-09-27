@@ -10,7 +10,9 @@ const gitDeps = require('../lib/git-deps.js');
 const { proposedNpmPlan } = gitDeps;
 const render = require('../lib/render/render.js');
 const { Session } = require('../lib/session.js');
-const { realpathSync } = require('node:fs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { realpathSync } = fs;
 const { makeRepo, sink } = require('./helpers.js');
 const { stripAnsi, THEME, bg } = require('../lib/ansi.js');
 const { parseDiff, itemsFromFiles } = diff;
@@ -1996,4 +1998,87 @@ test('lockPackageCount ignores the root package entry', () => {
     },
   };
   assert.equal(lockPackageCount(lock), 1);
+});
+
+const dependencyStagingRepo = (t) => {
+  const repo = makeRepo();
+  t.after(repo.cleanup);
+  const before = { lodash: '^4.17.20' };
+  const after = { lodash: '^4.17.21', leftpad: '1.0.0' };
+  repo.write('package.json', pkgJson(before));
+  repo.write('package-lock.json', lockV3(before, { lodash: '4.17.20' }));
+  repo.git(['add', '.']);
+  repo.git(['commit', '-m', 'init']);
+  repo.write('package.json', pkgJson(after));
+  const versions = { lodash: '4.17.21', leftpad: '1.0.0' };
+  repo.write('package-lock.json', lockV3(after, versions));
+  for (const rel of ['package.json', 'package-lock.json']) {
+    fs.utimesSync(path.join(repo.dir, rel), 1, 1);
+  }
+  return repo;
+};
+
+const dependencyFiles = (repo) =>
+  ['package.json', 'package-lock.json'].map((rel) => {
+    const file = path.join(repo.dir, rel);
+    const { mtimeMs, mode, ino } = fs.statSync(file);
+    return { text: repo.read(rel), mtimeMs, mode, ino };
+  });
+
+test('partial dependency staging leaves worktree files untouched', (t) => {
+  const repo = dependencyStagingRepo(t);
+  const before = dependencyFiles(repo);
+  const item = depByName(load(repo.dir).items, 'lodash');
+  addItem(repo.dir, item);
+  assert.deepEqual(dependencyFiles(repo), before);
+  const staged = load(repo.dir).items.find(
+    (entry) => entry.origin === 'staged' && entry.dep?.change.name === 'lodash',
+  );
+  unstageItem(repo.dir, staged);
+  assert.deepEqual(dependencyFiles(repo), before);
+  assert.equal(repo.git(['diff', '--cached']), '');
+});
+
+test('failed dependency staging preserves worktree and index', (t) => {
+  const repo = dependencyStagingRepo(t);
+  const before = dependencyFiles(repo);
+  const item = depByName(load(repo.dir).items, 'lodash');
+  repo.write('.git/index.lock', 'locked');
+  assert.throws(() => addItem(repo.dir, item), /index.lock/);
+  assert.deepEqual(dependencyFiles(repo), before);
+  assert.equal(repo.git(['diff', '--cached']), '');
+});
+
+test('partial staging adds new dependency files to an empty index', (t) => {
+  const repo = makeRepo();
+  t.after(repo.cleanup);
+  repo.write('package.json', pkgJson({ lodash: '^4.17.21' }));
+  const before = repo.read('package.json');
+  const item = depByName(load(repo.dir).items, 'lodash');
+  assert.ok(item);
+  addItem(repo.dir, item);
+  assert.equal(repo.read('package.json'), before);
+  const indexed = parseGitJson(repo, ':package.json');
+  assert.equal(indexed.dependencies.lodash, '^4.17.21');
+});
+
+test('dependency staging respects clean filters without editing files', (t) => {
+  const repo = dependencyStagingRepo(t);
+  const filter = path.join(repo.dir, 'clean.cjs');
+  const script = `
+    const fs = require('node:fs');
+    const text = fs.readFileSync(0, 'utf8');
+    process.stdout.write(text.replace('demo', 'clean'));
+  `;
+  repo.write('clean.cjs', script);
+  const command = [process.execPath, filter]
+    .map((value) => JSON.stringify(value))
+    .join(' ');
+  repo.git(['config', 'filter.dependency.clean', command]);
+  repo.write('.gitattributes', 'package.json filter=dependency\n');
+  const before = dependencyFiles(repo);
+  const item = depByName(load(repo.dir).items, 'lodash');
+  addItem(repo.dir, item);
+  assert.equal(parseGitJson(repo, ':package.json').name, 'clean');
+  assert.deepEqual(dependencyFiles(repo), before);
 });
