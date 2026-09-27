@@ -3183,6 +3183,9 @@ test('wrapPlain moves whole words to the next line', () => {
   const long = wrap.wrapPlain('supercalifragilistic', 8);
   assert.deepEqual(long, ['supercal', 'ifragili', 'stic']);
   assert.equal(long.join(''), 'supercalifragilistic');
+  const words = wrap.wrapPlain('alpha beta gamma', 8);
+  assert.deepEqual(words, ['alpha ', 'beta ', 'gamma']);
+  for (const row of words) assert.ok(visibleWidth(row) <= 8);
 });
 
 test('cursorInWrap follows word wrap', () => {
@@ -3329,6 +3332,90 @@ test('code overlay paints proposed adds and an in-place cursor', () => {
   assert.ok(!body.includes('+ b'));
   assert.ok(frame.cursor);
   assert.equal(frame.cursor.x, 3);
+});
+
+test('diff and file view wrap a long line', () => {
+  const text = 'alpha beta gamma delta';
+  const hunk = sampleHunk([{ type: 'add', text, noNl: false, blockId: 0 }]);
+  const diffView = reviewView(
+    {
+      origin: 'unstaged',
+      file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
+      hunk,
+      blockId: 0,
+    },
+    { pane: 'diff' },
+  );
+  const diffFrame = render.renderFrame(diffView, {
+    width: 20,
+    height: 12,
+    color: false,
+  });
+  const diffRows = diffFrame.rows.map((row) => stripAnsi(row));
+  const head = diffRows.find((row) => row.includes('alpha beta'));
+  const tail = diffRows.find(
+    (row) => row.includes('delta') && !row.includes('alpha'),
+  );
+  assert.ok(head);
+  assert.ok(tail);
+  const fileView = {
+    pane: 'unit',
+    item: null,
+    reviewPath: 'a.js',
+    unitLine: 0,
+    unitLines: [{ type: 'ctx', text, blockId: null, item: null, origin: '' }],
+    index: 0,
+    total: 1,
+    scroll: 0,
+    status: '',
+    counts: { staged: 0, unstaged: 0, untracked: 0 },
+    repoName: 'demo',
+  };
+  const fileFrame = render.renderFrame(fileView, {
+    width: 20,
+    height: 8,
+    color: false,
+  });
+  const fileRows = fileFrame.rows.map((row) => stripAnsi(row));
+  assert.ok(fileRows.some((row) => row.includes('alpha beta')));
+  assert.ok(
+    fileRows.some((row) => row.includes('delta') && !row.includes('alpha')),
+  );
+});
+
+test('editor scrolls a long line instead of wrapping it', () => {
+  const text = 'abcdefghijklmnopqrstuvwxyz';
+  const hunk = sampleHunk([
+    { type: 'add', text: 'b', noNl: false, blockId: 0 },
+  ]);
+  const view = reviewView(
+    {
+      origin: 'unstaged',
+      file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
+      hunk,
+      blockId: 0,
+    },
+    {
+      pane: 'diff',
+      mode: 'compose',
+      codeOverlay: {
+        text,
+        keepEmpty: true,
+        cursor: text.length,
+        scrollCol: 16,
+      },
+    },
+  );
+  const frame = render.renderFrame(view, {
+    width: 20,
+    height: 12,
+    color: false,
+  });
+  const rows = frame.rows.map((row) => stripAnsi(row));
+  const shown = rows.filter((row) => row.includes('qrstuvwxyz'));
+  assert.equal(shown.length, 1);
+  assert.ok(!rows.some((row) => row.includes('abcdef')));
+  assert.equal(frame.cursor.x, 13);
 });
 
 test('unit pane marks the current block and keeps other diffs', () => {

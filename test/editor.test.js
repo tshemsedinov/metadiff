@@ -62,6 +62,18 @@ test('moveLine with width follows visual wrap', () => {
   assert.equal(editor.cursor, 5);
 });
 
+test('reveal keeps the cursor column on screen', () => {
+  const editor = new Editor('abcdefghijklmnopqrstuvwxyz');
+  editor.reveal(10);
+  assert.equal(editor.scrollCol, 17);
+  editor.move(-1);
+  editor.reveal(10);
+  assert.equal(editor.scrollCol, 17);
+  editor.home();
+  editor.reveal(10);
+  assert.equal(editor.scrollCol, 0);
+});
+
 test('moveWord jumps by identifier', () => {
   const editor = new Editor('hello world.foo');
   editor.home();
