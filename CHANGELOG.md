@@ -7,7 +7,7 @@
 - Propose unused removals only for libraries that export code
 - Improve TUI/TUX, multiple small fixes
 - Implement npm command runner with termination and re-run
-- Filter and save logs running tests and other npm commands
+- Reduce `npm t` and other script output for agents as Markdown, with a raw mode
 
 ## [0.2.1][] - 2026-09-23
 

@@ -39,6 +39,16 @@ npm i -g reslop
 ```
 
 Works on Linux, macOS, and Windows. On Windows use Windows Terminal.
+Requires Node.js `>=18.15.0`.
+
+Prefix each program in an npm script with `reslop t --`. `&&` stays between those wraps, so each program is captured on its own:
+
+```json
+"lint": "reslop t -- eslint . && reslop t -- prettier -c \"**/*.js\"",
+"test": "reslop t -- npm run -s lint && reslop t -- node --test"
+```
+
+The report is Markdown. Set `RESLOP_OUTPUT=raw` to pass the command through unchanged. The reduced report is also saved under `.log/`. The review screen runs scripts with `RESLOP_OUTPUT=raw` and applies its own filter once.
 
 ## Usage
 

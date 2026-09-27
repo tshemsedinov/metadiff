@@ -189,8 +189,11 @@ test('commandEnv asks the program to print color', () => {
   const env = commandEnv({ PATH: '/bin' });
   assert.equal(env.FORCE_COLOR, '1');
   assert.equal(env.TERM, 'xterm-256color');
+  assert.equal(env.RESLOP_OUTPUT, 'raw');
   assert.equal(commandEnv({ FORCE_COLOR: '0' }).FORCE_COLOR, '0');
   assert.equal(commandEnv({ NO_COLOR: '1' }).FORCE_COLOR, undefined);
+  const kept = commandEnv({ RESLOP_OUTPUT: 'md' });
+  assert.equal(kept.RESLOP_OUTPUT, 'raw');
 });
 
 test('reduceOutput omits the exit line while the process is running', () => {

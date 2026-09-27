@@ -20,4 +20,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - run: npm run enable
+      - name: Put reslop on PATH
+        run: node scripts/github-path.js
       - run: npm test

@@ -49,9 +49,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "npm run -s lint && node --test",
-    "lint": "eslint . && prettier -c \"**/*.js\" \"**/*.json\" \"**/*.md\"",
-    "fix": "eslint . --fix && prettier --write \"**/*.js\" \"**/*.json\" \"**/*.md\"",
+    "test": "reslop t -- npm run -s lint && reslop t -- node --test",
+    "lint": "reslop t -- eslint . && reslop t -- prettier -c \"**/*.js\" \"**/*.json\" \"**/*.md\"",
+    "fix": "reslop t -- eslint . --fix && reslop t -- prettier --write \"**/*.js\" \"**/*.json\" \"**/*.md\"",
     "enable": "node scripts/enable.js",
     "disable": "node scripts/disable.js"
   },
