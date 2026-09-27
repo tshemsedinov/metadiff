@@ -1,17 +1,22 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildDocument } = require('../lib/report-parse.js');
+const reportParse = require('../lib/report-parse.js');
+const { buildDocument } = reportParse;
 const render = require('../lib/report-render.js');
 
 const { renderMarkdown, NOTICE } = render;
-const { run } = require('../lib/cli.js');
-const { winCommand } = require('../lib/report-run.js');
-const { sink, tempDir } = require('./helpers.js');
+const cli = require('../lib/cli.js');
+const { run } = cli;
+const reportRun = require('../lib/report-run.js');
+const { winCommand } = reportRun;
+const helpers = require('./helpers.js');
+const { sink, tempDir } = helpers;
 
 const ROOT = '/repo';
 

@@ -1,6 +1,7 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const deps = require('../lib/deps.js');
@@ -9,12 +10,15 @@ const git = require('../lib/git.js');
 const gitDeps = require('../lib/git-deps.js');
 const { proposedNpmPlan } = gitDeps;
 const render = require('../lib/render/render.js');
-const { Session } = require('../lib/session.js');
+const session = require('../lib/session.js');
+const { Session } = session;
 const fs = require('node:fs');
 const path = require('node:path');
 const { realpathSync } = fs;
-const { makeRepo, sink } = require('./helpers.js');
-const { stripAnsi, THEME, bg } = require('../lib/ansi.js');
+const helpers = require('./helpers.js');
+const { makeRepo, sink } = helpers;
+const ansi = require('../lib/ansi.js');
+const { stripAnsi, THEME, bg } = ansi;
 const { parseDiff, itemsFromFiles } = diff;
 const { load, loadExtras, addItem, unstageItem, revertItem } = git;
 const { foldDepItems, readSections, diffSections } = deps;

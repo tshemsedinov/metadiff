@@ -1,20 +1,29 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { Session } = require('../lib/session.js');
-const { createOpsRunner } = require('../lib/session/ops.js');
-const { hitAction } = require('../lib/keys.js');
-const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
-const { createStore, addTodo, serializeReview } = require('../lib/review.js');
-const { parseReview } = require('../lib/review.js');
-const { stripAnsi, THEME, BOLD, seq } = require('../lib/ansi.js');
-const { logViewRows } = require('../lib/render/npm.js');
-const { setTheme, themeName } = require('../lib/ansi.js');
-const { REVIEW_DIR } = require('../lib/files.js');
+const session = require('../lib/session.js');
+const { Session } = session;
+const ops = require('../lib/session/ops.js');
+const { createOpsRunner } = ops;
+const keys = require('../lib/keys.js');
+const { hitAction } = keys;
+const helpers = require('./helpers.js');
+const { uiSink, sampleHunk, tempDir } = helpers;
+const review = require('../lib/review.js');
+const { createStore, addTodo, serializeReview } = review;
+const { parseReview } = review;
+const ansi = require('../lib/ansi.js');
+const { stripAnsi, THEME, BOLD, seq } = ansi;
+const npm = require('../lib/render/npm.js');
+const { logViewRows } = npm;
+const { setTheme, themeName } = ansi;
+const files = require('../lib/files.js');
+const { REVIEW_DIR } = files;
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
 

@@ -1,14 +1,15 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const {
-  isAbortError,
-  createLoadCoordinator,
-} = require('../lib/session/load.js');
-const { Session } = require('../lib/session.js');
-const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
+const load = require('../lib/session/load.js');
+const { isAbortError, createLoadCoordinator } = load;
+const session = require('../lib/session.js');
+const { Session } = session;
+const helpers = require('./helpers.js');
+const { uiSink, sampleHunk, tempDir } = helpers;
 
 const sampleItem = (name) => ({
   origin: 'unstaged',

@@ -1,14 +1,12 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const {
-  createTransport,
-  parseLinkNext,
-  parseNextPage,
-  noteFromLocation,
-} = require('../lib/remote.js');
+const remote = require('../lib/remote.js');
+const { createTransport, parseLinkNext, parseNextPage, noteFromLocation } =
+  remote;
 const diff = require('../lib/diff/diff.js');
 const { parseDiff, itemsFromFiles } = diff;
 

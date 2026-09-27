@@ -1,11 +1,13 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const childProcess = require('node:child_process');
+const { spawnSync } = childProcess;
 
 const git = require('../lib/git.js');
 const { load, addItem, unstageItem, revertItem } = git;
@@ -14,10 +16,14 @@ const { currentBranch, listBranches, checkoutBranch } = git;
 const { createBranch, dropBranch, pullChanges } = git;
 const { listCommits, dropCommit, applyFixup } = git;
 const { pushChanges, editItem } = git;
-const { runProc } = require('../lib/utilities.js');
-const { Session } = require('../lib/session.js');
-const { blockAddText } = require('../lib/diff/diff.js');
-const { makeRepo, sink } = require('./helpers.js');
+const utilities = require('../lib/utilities.js');
+const { runProc } = utilities;
+const session = require('../lib/session.js');
+const { Session } = session;
+const diff = require('../lib/diff/diff.js');
+const { blockAddText } = diff;
+const helpers = require('./helpers.js');
+const { makeRepo, sink } = helpers;
 
 const sessionFor = (dir) => {
   const stdout = sink();

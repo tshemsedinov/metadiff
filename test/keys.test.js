@@ -1,6 +1,7 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const keys = require('../lib/keys.js');
@@ -11,7 +12,8 @@ const { COMMITS_DISABLED, UNIT_DISABLED } = keys;
 const { decodeChunk, actionFromKey, hitAction } = keys;
 const { disabledActions } = keys;
 const { actionLetter, buttonWord } = keys;
-const { layoutButtons } = require('../lib/render/render.js');
+const render = require('../lib/render/render.js');
+const { layoutButtons } = render;
 
 test('decodeChunk maps letters and arrows', () => {
   const keys = decodeChunk('ar').events.map((event) => event.key);

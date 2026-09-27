@@ -1,6 +1,7 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -8,8 +9,10 @@ const path = require('node:path');
 
 const cli = require('../lib/cli.js');
 const { run, parseArgv, resolveScope } = cli;
-const { createGitRepo } = require('../lib/git.js');
-const { makeRepo, sink, sampleHunk } = require('./helpers.js');
+const git = require('../lib/git.js');
+const { createGitRepo } = git;
+const helpers = require('./helpers.js');
+const { makeRepo, sink, sampleHunk } = helpers;
 
 const fakeProc = (cwd, extra = {}) => {
   const stdout = sink();

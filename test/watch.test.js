@@ -1,17 +1,21 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { Session } = require('../lib/session.js');
-const { addTodo } = require('../lib/review.js');
+const session = require('../lib/session.js');
+const { Session } = session;
+const review = require('../lib/review.js');
+const { addTodo } = review;
 const items = require('../lib/session/items.js');
 const { restoredIndex, alignLoadedItems } = items;
 const watch = require('../lib/session/watch.js');
 const { ignoredRel, isOwnDirEvent, createDiskWatcher, DEBOUNCE_MS } = watch;
-const { uiSink, tempDir } = require('./helpers.js');
+const helpers = require('./helpers.js');
+const { uiSink, tempDir } = helpers;
 
 const wait = (ms) =>
   new Promise((resolve) => {

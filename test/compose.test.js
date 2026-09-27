@@ -1,11 +1,15 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const { createComposer } = require('../lib/session/compose.js');
-const { createNavigation } = require('../lib/session/navigation.js');
-const { createStore } = require('../lib/review.js');
+const compose = require('../lib/session/compose.js');
+const { createComposer } = compose;
+const navigation = require('../lib/session/navigation.js');
+const { createNavigation } = navigation;
+const review = require('../lib/review.js');
+const { createStore } = review;
 
 const setup = (extra = {}) => {
   const notes = extra.notes ?? createStore('/tmp/review.md');

@@ -1,9 +1,11 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const { Editor } = require('../lib/editor.js');
+const editor = require('../lib/editor.js');
+const { Editor } = editor;
 
 test('insert and backspace at cursor', () => {
   const editor = new Editor();

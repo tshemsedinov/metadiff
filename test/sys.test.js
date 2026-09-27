@@ -1,8 +1,10 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
-const { EventEmitter } = require('node:events');
+const events = require('node:events');
+const { EventEmitter } = events;
 
 const sys = require('../lib/utilities.js');
 const { npmBin, npmOpts, clipTools, watchResize } = sys;

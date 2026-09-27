@@ -1,15 +1,19 @@
 'use strict';
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
-const { EventEmitter } = require('node:events');
+const events = require('node:events');
+const { EventEmitter } = events;
 
-const { sink } = require('./helpers.js');
+const helpers = require('./helpers.js');
+const { sink } = helpers;
 const sys = require('../lib/utilities.js');
 const { watchResize } = sys;
 const terminal = require('../lib/session/terminal.js');
 const { createTerminal, ENTER_TERM, LEAVE_TERM } = terminal;
-const { createProgress } = require('../lib/session/progress.js');
+const progress = require('../lib/session/progress.js');
+const { createProgress } = progress;
 
 const fakeStdin = () => {
   const stdin = new EventEmitter();

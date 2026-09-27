@@ -1,11 +1,14 @@
 'use strict';
 
-const { sampleHunk, reviewView } = require('./helpers.js');
+const helpers = require('./helpers.js');
+const { sampleHunk, reviewView } = helpers;
 
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const { displayLines } = require('../lib/diff/diff.js');
+const diff = require('../lib/diff/diff.js');
+const { displayLines } = diff;
 const render = require('../lib/render/render.js');
 const wrap = require('../lib/wrap.js');
 const ansi = require('../lib/ansi.js');
@@ -3553,7 +3556,8 @@ test('npm output drops the command background', () => {
 });
 
 test('npm output paints assertion fields as a colored table', () => {
-  const { reduceOutput } = require('../lib/npm-commands.js');
+  const npmCommands = require('../lib/npm-commands.js');
+  const { reduceOutput } = npmCommands;
   const mark = String.fromCharCode(39);
   const field = (name, value) => `  ${name}: ${mark}${value}${mark}`;
   const raw = [

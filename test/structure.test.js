@@ -2,10 +2,12 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
-const { test } = require('node:test');
+const nodeTest = require('node:test');
+const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
-const { Linter } = require('eslint');
+const eslint = require('eslint');
+const { Linter } = eslint;
 
 const SESSION_FILE = path.resolve(__dirname, '../lib/session.js');
 
