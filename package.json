@@ -1,6 +1,6 @@
 {
   "name": "reslop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Interactive code review and repair planning for AI-assisted changes",
   "keywords": [
     "code-review",
@@ -46,7 +46,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18.15.0"
   },
   "scripts": {
     "test": "reslop t -- npm run -s lint && reslop t -- node --test",

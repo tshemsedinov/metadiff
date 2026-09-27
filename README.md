@@ -41,15 +41,6 @@ npm i -g reslop
 Works on Linux, macOS, and Windows. On Windows use Windows Terminal.
 Requires Node.js `>=18.15.0`.
 
-Prefix each program in an npm script with `reslop t --`. `&&` stays between those wraps, so each program is captured on its own:
-
-```json
-"lint": "reslop t -- eslint . && reslop t -- prettier -c \"**/*.js\"",
-"test": "reslop t -- npm run -s lint && reslop t -- node --test"
-```
-
-The report is Markdown. Set `RESLOP_OUTPUT=raw` to pass the command through unchanged. The reduced report is also saved under `.log/`. The review screen runs scripts with `RESLOP_OUTPUT=raw` and applies its own filter once.
-
 ## Usage
 
 - `reslop` uncommitted diffs in this repository
@@ -59,6 +50,16 @@ The report is Markdown. Set `RESLOP_OUTPUT=raw` to pass the command through unch
 - `reslop -n` start a new review even if the latest is still editing
 - `reslop -r` read-only mode
 - `reslop -light` light color theme (default dark)
+- `reslop t -- <program> [args]` run one program and print a reduced report
+
+Prefix each program in an npm script with `reslop t --`. Keep `&&` between those wraps, so each program is captured on its own and a failing step does not start the next one:
+
+```json
+"lint": "reslop t -- eslint . && reslop t -- prettier -c \"**/*.js\"",
+"test": "reslop t -- npm run -s lint && reslop t -- node --test"
+```
+
+The report is Markdown: failures, diagnostics, and a short summary. Passing results are omitted and similar problems are grouped. The same text is saved under `.log/`. Set `RESLOP_OUTPUT=raw` to pass the command through unchanged. The review screen runs scripts in raw mode and applies its own filter once.
 
 Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 
@@ -75,7 +76,6 @@ Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 - Send anonymized code blocks for expert review
 - Send questions and the repair plan to experts for approval
 - Ask experts
-- Verify the codebase
 - Apply refactoring skills
 - Call agents, harnesses, and IDEs to execute prepared plans
 - Squash, cherry-pick, and interactive rebase

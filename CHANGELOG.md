@@ -2,12 +2,17 @@
 
 ## [Unreleased][unreleased]
 
+## [0.2.2][] - 2026-09-27
+
 - Add brief and full commit lists, toggled with `v`
-- Edit a multi-line commit messages
+- Select a commit from the list to view its diff
+- Edit a multi-line commit message
 - Propose unused removals only for libraries that export code
 - Improve TUI/TUX, multiple small fixes
 - Implement npm command runner with termination and re-run
-- Reduce `npm t` and other script output for agents as Markdown, with a raw mode
+- Filter tests output to reduce AI costs: `npm t` and other scripts
+- Save script logs under `.log/`
+- Group similar problems in test and other output
 
 ## [0.2.1][] - 2026-09-23
 
@@ -124,7 +129,8 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...HEAD
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tshemsedinov/reslop/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tshemsedinov/reslop/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/tshemsedinov/reslop/compare/v0.1.8...v0.1.9
