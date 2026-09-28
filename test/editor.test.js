@@ -92,3 +92,31 @@ test('moveWord jumps by identifier', () => {
   editor.moveWord(-1);
   assert.equal(editor.cursor, 0);
 });
+
+test('shift movement selects and edits replace the span', () => {
+  const editor = new Editor('hello');
+  editor.move(-2, true);
+  assert.equal(editor.selectedText(), 'lo');
+  editor.move(-1);
+  assert.equal(editor.cursor, 3);
+  assert.equal(editor.anchor, null);
+  editor.move(2, true);
+  editor.backspace();
+  assert.equal(editor.text, 'hel');
+  editor.undoEdit();
+  assert.equal(editor.text, 'hello');
+  assert.equal(editor.selectedText(), 'lo');
+  editor.insert('X');
+  assert.equal(editor.text, 'helX');
+  assert.equal(editor.anchor, null);
+  editor.end();
+  editor.home(true);
+  assert.equal(editor.selectedText(), 'helX');
+  editor.place(1);
+  assert.equal(editor.cursor, 1);
+  assert.equal(editor.anchor, null);
+  editor.home(true);
+  editor.home();
+  assert.equal(editor.cursor, 0);
+  assert.equal(editor.anchor, null);
+});

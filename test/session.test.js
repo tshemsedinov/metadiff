@@ -24,6 +24,7 @@ const { logViewRows } = npm;
 const { setTheme, themeName } = ansi;
 const files = require('../lib/files.js');
 const { REVIEW_DIR } = files;
+const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
 
@@ -3828,9 +3829,10 @@ test('files pane n opens npm scripts and bins', () => {
 });
 
 test('npm output v toggles raw text until the screen closes', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+  const { session, cwd, repo, stdout } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
+  stdout.columns = 400;
   fs.writeFileSync(
     path.join(cwd, 'package.json'),
     `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
@@ -4305,4 +4307,143 @@ test('click moves the caret in commit, branch, and npm editors', () => {
   assert.equal(session.editor.cursor, 0);
   clickAt(session, command.textX + 5, command.y);
   assert.equal(session.editor.cursor, 5);
+});
+
+const editRow = (session) => {
+  const rows = session.lastFrame.rows.map((row) => stripAnsi(row));
+  return rows.find((row) => row.includes('▶'));
+};
+
+const longValue = (head, tail) => `${head}${'m'.repeat(120)}${tail}`;
+
+test('table editors scroll long lines horizontally', () => {
+  const { session, stdout, cwd } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  stdout.columns = 80;
+  stdout.rows = 24;
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
+  );
+  const showsTail = (head, tail) => {
+    session.draw();
+    const row = editRow(session);
+    assert.ok(row);
+    assert.ok(session.editor.scrollCol > 0);
+    assert.ok(row.includes(tail));
+    assert.ok(!row.includes(head));
+    return row;
+  };
+  session.pushInput('b');
+  session.pushInput('n');
+  session.editor.replace(longValue('Q', 'Z'));
+  showsTail('Q', 'Z');
+  const stuck = session.editor.scrollCol;
+  const caret = session.lastFrame.cursor.x;
+  session.handleEvent({ type: 'key', key: 'left' });
+  session.draw();
+  assert.equal(session.editor.scrollCol, stuck);
+  assert.ok(session.lastFrame.cursor.x < caret);
+  assert.ok(editRow(session).includes('Z'));
+  const origin = session.lastFrame.cursor.x - session.editor.visibleLineCol();
+  clickAt(
+    session,
+    origin + session.editor.scrollCol,
+    session.lastFrame.cursor.y,
+  );
+  assert.equal(session.editor.cursor, stuck);
+  session.handleEvent({ type: 'key', key: 'home' });
+  session.draw();
+  assert.equal(session.editor.scrollCol, 0);
+  assert.ok(editRow(session).includes('Q'));
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('c');
+  session.pushInput('c');
+  session.editor.replace(longValue('Q', 'Z'));
+  showsTail('Q', 'Z');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('n');
+  session.pushInput('e');
+  session.editor.replace(longValue('Q', 'Z'));
+  showsTail('Q', 'Z');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.editor.replace(longValue('A', 'B'));
+  showsTail('A', 'B');
+  assert.equal(session.npm.editField, 'command');
+});
+
+const press = (session, name) => {
+  session.handleEvent({ type: 'key', key: name });
+};
+
+test('ctrl-c quits outside an editor', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  press(session, 'ctrl-c');
+  assert.equal(session.done, true);
+});
+
+test('editors select with shift and copy cut paste', () => {
+  const { session, stdout } = openSession([sampleItem('a.js')]);
+  session.dispatch('feedback');
+  session.editor.replace('hello');
+  session.color = true;
+  session.draw();
+  const rowOf = (text) =>
+    session.lastFrame.rows.find((row) => stripAnsi(row).includes(text));
+  const before = rowOf('hello');
+  press(session, 'shift-left');
+  press(session, 'shift-left');
+  assert.equal(session.editor.selectedText(), 'lo');
+  session.draw();
+  const after = rowOf('hello');
+  assert.equal(stripAnsi(before), stripAnsi(after));
+  assert.notEqual(before, after);
+  const dumped = stdout.dump().length;
+  press(session, 'ctrl-c');
+  assert.equal(session.done, false);
+  assert.equal(session.status, 'copied');
+  assert.match(stdout.dump().slice(dumped), /\]52;/);
+  press(session, 'ctrl-x');
+  assert.equal(session.editor.text, 'hel');
+  press(session, 'ctrl-c');
+  assert.equal(session.done, false);
+  assert.equal(session.editor.text, 'hel');
+  const saved = clipboard.pasteText;
+  clipboard.pasteText = () => 'ZZ';
+  try {
+    press(session, 'ctrl-v');
+  } finally {
+    clipboard.pasteText = saved;
+  }
+  assert.equal(session.editor.text, 'helZZ');
+  press(session, 'escape');
+  press(session, 'e');
+  session.editor.replace('abcd');
+  press(session, 'shift-left');
+  assert.equal(session.composeKind, 'code');
+  assert.equal(session.editor.selectedText(), 'd');
+  press(session, 'shift-up');
+  assert.equal(session.editor.hasSelect(), true);
+  press(session, 'escape');
+  press(session, 'escape');
+  press(session, 'b');
+  press(session, 'n');
+  session.pushInput('topic');
+  press(session, 'shift-home');
+  assert.equal(session.composeKind, 'branch');
+  assert.equal(session.editor.selectedText(), 'topic');
+  press(session, 'escape');
+  press(session, 'escape');
+  session.dispatch('todo');
+  session.pushInput('ship');
+  press(session, 'escape');
+  press(session, 'enter');
+  session.editor.replace('ab\ncd');
+  press(session, 'shift-up');
+  assert.equal(session.editor.text, 'ab\ncd');
+  assert.equal(session.editor.hasSelect(), true);
+  assert.equal(session.composeKind, 'todo');
 });
