@@ -266,11 +266,12 @@ test('layoutButtons hitboxes cover labels', () => {
   assert.ok(dim.hits.some((hit) => hit.id === 'commit'));
 });
 
-test('disabledActions hides add unstage drop on files todos', () => {
+test('disabledActions hides add unstage drop ignore on files todos', () => {
   const file = disabledActions('files', { path: 'a.js' });
   assert.equal(file.includes('add'), false);
   assert.equal(file.includes('unstage'), false);
   assert.equal(file.includes('revert'), false);
+  assert.equal(file.includes('ignore'), false);
   assert.equal(file.includes('pull'), false);
   assert.equal(file.includes('push'), false);
   const todos = disabledActions('files', { kind: 'todos' });

@@ -919,6 +919,22 @@ test('files pane add unstage revert apply to the whole file', () => {
   assert.equal(session.fileList()[1].path, 'b.js');
 });
 
+test('files pane i appends the path to gitignore and npmignore', () => {
+  const { session, cwd } = openSession([sampleItem('noise.log')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(path.join(cwd, '.npmignore'), 'dist/\n');
+  session.dispatch('next');
+  session.pushInput('i');
+  assert.equal(session.status, 'ignored');
+  const gitignore = fs.readFileSync(path.join(cwd, '.gitignore'), 'utf8');
+  assert.match(gitignore, /^noise\.log\n$/);
+  const npmignore = fs.readFileSync(path.join(cwd, '.npmignore'), 'utf8');
+  assert.match(npmignore, /dist\/\nnoise\.log\n$/);
+  session.pushInput('i');
+  assert.equal(session.status, 'already ignored');
+});
+
 test('files pane disables mode and feedback', () => {
   const { session } = openSession([sampleItem('a.js')], {
     startPane: 'files',
