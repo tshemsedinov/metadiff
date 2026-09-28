@@ -61,6 +61,16 @@ test('decodeChunk maps letters and arrows', () => {
   assert.equal(ctrlUp.key, 'ctrl-up');
   const ctrlDown = decodeChunk('\x1b[1;5B').events[0];
   assert.equal(ctrlDown.key, 'ctrl-down');
+  const shiftLeft = decodeChunk('\x1b[1;2D').events[0];
+  assert.equal(shiftLeft.key, 'shift-left');
+  const shiftRight = decodeChunk('\x1b[1;2C').events[0];
+  assert.equal(shiftRight.key, 'shift-right');
+  const word = decodeChunk('\x1b[1;6D').events[0];
+  assert.equal(word.key, 'ctrl-shift-left');
+  const shiftHome = decodeChunk('\x1b[1;2H').events[0];
+  assert.equal(shiftHome.key, 'shift-home');
+  const shiftEnd = decodeChunk('\x1b[1;2F').events[0];
+  assert.equal(shiftEnd.key, 'shift-end');
 });
 
 test('decodeChunk parses SGR mouse press', () => {
