@@ -369,51 +369,69 @@ test('npm extras do not block a disk reload', () => {
   assert.equal(session.pane, 'diff');
 });
 
-test('diff pane poll reloads when the current file changes', () => {
-  const cwd = tempDir('reslop-watch-');
-  const file = path.join(cwd, 'a.js');
-  fs.writeFileSync(file, 'old\n');
-  const before = sampleItem('a.js', { text: 'old' });
-  const after = sampleItem('a.js', { text: 'newer' });
-  const { session, repo } = openWatched([before], { cwd });
-  session.uiOpen = true;
-  session.lifecycle.pollCurrentFile();
-  assert.equal(session.current().hunk.lines[0].text, 'old');
-  repo.setItems([after]);
-  fs.writeFileSync(file, 'newer\n');
-  session.lifecycle.pollCurrentFile();
-  assert.equal(session.current().hunk.lines[0].text, 'newer');
-  assert.equal(session.pane, 'diff');
-  assert.equal(session.busy, '');
-});
+for (const recursive of [false, true]) {
+  const name = `disk watcher reports skipped item files (${recursive})`;
+  test(name, async () => {
+    const cwd = tempDir('reslop-watch-');
+    fs.mkdirSync(path.join(cwd, '.git'));
+    fs.mkdirSync(path.join(cwd, 'dist'));
+    const built = path.join(cwd, 'dist', 'out.js');
+    const other = path.join(cwd, 'dist', 'other.js');
+    fs.writeFileSync(built, 'x\n');
+    fs.writeFileSync(other, 'x\n');
+    let n = 0;
+    const watcher = createDiskWatcher({
+      root: cwd,
+      recursive,
+      debounceMs: 20,
+      onChange: () => {
+        n += 1;
+      },
+    });
+    try {
+      watcher.watchFiles(['dist/out.js']);
+      await wait(60);
+      fs.writeFileSync(other, 'y\n');
+      await wait(150);
+      assert.equal(n, 0);
+      fs.writeFileSync(built, 'y\n');
+      assert.equal(await waitUntil(() => n >= 1, 1000), true);
+    } finally {
+      watcher.close();
+    }
+  });
+}
 
-test('files pane poll does not reload', () => {
-  const a = sampleItem('a.js');
-  const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a], { startPane: 'files' });
-  session.uiOpen = true;
-  session.lifecycle.pollCurrentFile();
-  repo.setItems([a, b]);
-  session.lifecycle.pollCurrentFile();
-  assert.equal(session.items.length, 1);
-});
-
-test('todo page poll reloads when a worktree file changes', () => {
+test('disk watcher keeps a code change during a review write', async () => {
   const cwd = tempDir('reslop-watch-');
-  const file = path.join(cwd, 'a.js');
-  fs.writeFileSync(file, 'old\n');
-  const before = sampleItem('a.js', { text: 'old' });
-  const after = sampleItem('a.js', { text: 'newer' });
-  const { session, repo } = openWatched([before], { cwd });
-  session.uiOpen = true;
-  session.composer.openTasksPage();
-  session.lifecycle.pollCurrentFile();
-  assert.equal(session.items[0].hunk.lines[0].text, 'old');
-  repo.setItems([after]);
-  fs.writeFileSync(file, 'newer\n');
-  session.lifecycle.pollCurrentFile();
-  assert.equal(session.tasksOpen, true);
-  assert.equal(session.items[0].hunk.lines[0].text, 'newer');
+  fs.mkdirSync(path.join(cwd, '.git'));
+  fs.mkdirSync(path.join(cwd, '.review'));
+  const review = path.join(cwd, '.review', '2026-09-23-00.md');
+  const code = path.join(cwd, 'a.js');
+  fs.writeFileSync(review, '---\nstatus: editing\n---\n');
+  fs.writeFileSync(code, 'x\n');
+  let changes = 0;
+  let reviews = 0;
+  const watcher = createDiskWatcher({
+    root: cwd,
+    recursive: false,
+    debounceMs: 20,
+    onChange: () => {
+      changes += 1;
+    },
+    onReview: () => {
+      reviews += 1;
+    },
+  });
+  try {
+    await wait(60);
+    fs.writeFileSync(review, '---\nstatus: partial\n---\n');
+    fs.writeFileSync(code, 'y\n');
+    assert.equal(await waitUntil(() => reviews >= 1, 1000), true);
+    assert.equal(await waitUntil(() => changes >= 1, 1000), true);
+  } finally {
+    watcher.close();
+  }
 });
 
 test('leaving todos reloads the file list', () => {
