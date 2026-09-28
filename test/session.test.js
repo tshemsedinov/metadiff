@@ -315,6 +315,27 @@ const clickFooter = (session, id) => {
   });
 };
 
+const clickAt = (session, x, y) => {
+  session.handleEvent({
+    type: 'mouse',
+    kind: 'press',
+    btn: 0,
+    button: 0,
+    x,
+    y,
+    press: true,
+  });
+  session.handleEvent({
+    type: 'mouse',
+    kind: 'release',
+    btn: 0,
+    button: 0,
+    x,
+    y,
+    press: false,
+  });
+};
+
 test('prev at first block opens todos and next reaches last', () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
@@ -2475,6 +2496,21 @@ test('commits pane skips commit when nothing is staged', () => {
   assert.equal(repo.commits.length, 0);
 });
 
+test('commits pane opens on the viewed revision', () => {
+  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'end' });
+  assert.equal(session.commitCursor, 2);
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.draw();
+  assert.equal(session.pane, 'diff');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.pane, 'files');
+  session.pushInput('c');
+  assert.equal(session.pane, 'commits');
+  assert.equal(session.commitCursor, 2);
+});
+
 test('commits pane lists newest first', () => {
   const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
   session.pushInput('c');
@@ -3750,27 +3786,6 @@ test('partial file add reloads after a later hunk fails', () => {
   assert.equal(session.items[1].origin, 'unstaged');
   assert.equal(session.items[1].blockId, 1);
 });
-
-const clickAt = (session, x, y) => {
-  session.handleEvent({
-    type: 'mouse',
-    kind: 'press',
-    btn: 0,
-    button: 0,
-    x,
-    y,
-    press: true,
-  });
-  session.handleEvent({
-    type: 'mouse',
-    kind: 'release',
-    btn: 0,
-    button: 0,
-    x,
-    y,
-    press: false,
-  });
-};
 
 test('x and a checkbox click toggle a todo and the file keeps it', () => {
   const { session } = openSession([sampleItem('a.js')]);
