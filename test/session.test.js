@@ -9,7 +9,7 @@ const path = require('node:path');
 const session = require('../lib/session.js');
 const { Session } = session;
 const ops = require('../lib/session/ops.js');
-const { createOpsRunner } = ops;
+const { OpsRunner } = ops;
 const keys = require('../lib/keys.js');
 const { hitAction } = keys;
 const helpers = require('./helpers.js');
@@ -3692,7 +3692,7 @@ test('read only blocks branch pull and push', () => {
 });
 
 test('ops runner releases busy if after throws', async () => {
-  const runner = createOpsRunner({
+  const runner = new OpsRunner({
     top: '/tmp',
     done: false,
     mode: 'review',

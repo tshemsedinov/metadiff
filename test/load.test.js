@@ -5,7 +5,7 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const load = require('../lib/session/load.js');
-const { isAbortError, createLoadCoordinator } = load;
+const { isAbortError, LoadCoordinator, tagLoaded } = load;
 const session = require('../lib/session.js');
 const { Session } = session;
 const helpers = require('./helpers.js');
@@ -32,9 +32,9 @@ test('isAbortError recognizes ABORT codes', () => {
 });
 
 test('stale generation is not accepted after bump', () => {
-  const loader = createLoadCoordinator();
+  const loader = new LoadCoordinator();
   const first = loader.bump();
-  const tagged = loader.tag({ items: [1] }, first);
+  const tagged = tagLoaded({ items: [1] }, first);
   assert.equal(tagged.generation, first);
   const second = loader.bump();
   assert.equal(loader.accept(first), false);
@@ -43,7 +43,7 @@ test('stale generation is not accepted after bump', () => {
 });
 
 test('abort replaces the signal and marks the old one aborted', () => {
-  const loader = createLoadCoordinator();
+  const loader = new LoadCoordinator();
   loader.bump();
   const first = loader.signal;
   loader.bump();
@@ -90,7 +90,7 @@ test('a slow load cannot replace a newer load', async () => {
 });
 
 test('reset invalidates generations without reusing them', () => {
-  const loader = createLoadCoordinator();
+  const loader = new LoadCoordinator();
   const old = loader.bump();
   const signal = loader.signal;
 

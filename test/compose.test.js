@@ -7,13 +7,13 @@ const assert = require('node:assert/strict');
 const compose = require('../lib/session/compose.js');
 const { createComposer } = compose;
 const navigation = require('../lib/session/navigation.js');
-const { createNavigation } = navigation;
+const { Navigation } = navigation;
 const review = require('../lib/review.js');
 const { createStore } = review;
 
 const setup = (extra = {}) => {
   const notes = extra.notes ?? createStore('/tmp/review.md');
-  const nav = extra.nav ?? createNavigation({ startPane: 'diff' });
+  const nav = extra.nav ?? new Navigation({ startPane: 'diff' });
   const flushed = [];
   const ui = {
     nav,
