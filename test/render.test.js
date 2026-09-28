@@ -786,7 +786,15 @@ test('viewed commit is marked like the current branch', () => {
   });
   const selectedViewed = selected.rows.find((row) => row.includes('aaa1111'));
   const selectedLead = ansi.paint(' ▶ ', THEME.headerFg, THEME.currentBg, true);
+  const currentRefs = ansi.paint(
+    'HEAD -> main',
+    THEME.shaDarkFg,
+    THEME.currentBg,
+    true,
+  );
   assert.ok(selectedViewed.includes(`${selectedLead}${currentSubject}`));
+  assert.ok(selectedViewed.includes(currentRefs));
+  assert.ok(!selectedViewed.includes(fg(THEME.warnFg)));
   assert.ok(!selectedViewed.includes(bg(THEME.buttonBg)));
   view.rev = '';
   view.revShort = '';
