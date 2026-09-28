@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 
 const files = require('../lib/files.js');
 const { fileEntries, fileStatus, itemPath, relativeAge, shortAge } = files;
-const { TODO_FILE, REPO_TODOS_LABEL, isTodosEntry, isTodoItem } = files;
+const { TASKS_FILE, REPO_TASKS_LABEL, isTasksEntry, isTaskItem } = files;
 const { fileTotals, isTotalEntry, TOTAL_LABEL } = files;
 
 const item = (name, origin, indexHint) => ({
@@ -48,14 +48,14 @@ test('fileStatus joins mixed origins', () => {
 
 test('fileEntries skips todo items', () => {
   const items = [
-    { origin: 'todo', file: { newPath: TODO_FILE, oldPath: TODO_FILE } },
+    { origin: 'task', file: { newPath: TASKS_FILE, oldPath: TASKS_FILE } },
     item('a.js', 'unstaged', 0),
   ];
   const entries = fileEntries(items);
   assert.equal(entries.length, 1);
   assert.equal(entries[0].path, 'a.js');
-  assert.equal(isTodoItem(items[0]), true);
-  assert.equal(isTodoItem(items[1]), false);
+  assert.equal(isTaskItem(items[0]), true);
+  assert.equal(isTaskItem(items[1]), false);
 });
 
 test('fileEntries counts lines and mixed staged blocks', () => {
@@ -89,9 +89,9 @@ test('fileEntries counts lines and mixed staged blocks', () => {
 
 test('fileTotals sums line and origin counts across files', () => {
   const todos = {
-    path: REPO_TODOS_LABEL,
-    kind: 'todos',
-    status: 'todos',
+    path: REPO_TASKS_LABEL,
+    kind: 'tasks',
+    status: 'tasks',
     remaining: 5,
     staged: 2,
     added: 0,
@@ -140,7 +140,7 @@ test('fileTotals sums line and origin counts across files', () => {
   assert.equal(total.staged, 1);
   assert.equal(total.unstaged, 6);
   assert.equal(total.remaining, 7);
-  assert.equal(isTodosEntry(total), false);
+  assert.equal(isTasksEntry(total), false);
   assert.equal(isTotalEntry(total), true);
   assert.equal(isTotalEntry(todos), false);
 });

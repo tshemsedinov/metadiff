@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 const diff = require('../lib/diff/diff.js');
 const { displayLines } = diff;
 const render = require('../lib/render/render.js');
-const { REPO_TODOS_LABEL } = require('../lib/files.js');
+const { REPO_TASKS_LABEL } = require('../lib/files.js');
 const wrap = require('../lib/wrap.js');
 const ansi = require('../lib/ansi.js');
 const { THEME, CODE_FG, fg, bg, stripAnsi, BOLD, seq } = ansi;
@@ -378,7 +378,7 @@ test('status line includes feedback todo and code counts', () => {
       unstaged: 11,
       untracked: 0,
       feedback: 3,
-      todo: 2,
+      tasks: 2,
       code: 1,
     },
     repoName: 'demo',
@@ -390,7 +390,7 @@ test('status line includes feedback todo and code counts', () => {
     color: false,
   });
   const statusRow = frame.rows[frame.rows.length - 2];
-  assert.match(statusRow, /main {2}feedback 3 {2}todo 2 {2}code 1/);
+  assert.match(statusRow, /main {2}feedback 3 {2}tasks 2 {2}code 1/);
   assert.ok(!statusRow.includes('['));
   assert.match(statusRow, /6\/17\s*$/);
   assert.ok(!statusRow.includes('untracked'));
@@ -457,7 +457,7 @@ test('status line includes repo +/- totals', () => {
     color: false,
   });
   const statusRow = stripAnsi(frame.rows[frame.rows.length - 2]);
-  assert.match(statusRow, /main {2}feedback 0 {2}todo 0 {2}code 0/);
+  assert.match(statusRow, /main {2}feedback 0 {2}tasks 0 {2}code 0/);
   assert.ok(!statusRow.includes('['));
   assert.match(statusRow, /\+3\/35 {2}-1\/6 {2}1\/17\s*$/);
   assert.ok(!statusRow.includes('untracked'));
@@ -1762,9 +1762,9 @@ test('header last column uses the light grey bar background', () => {
 test('file list leads with repository TODOs and a count', () => {
   const files = [
     {
-      path: REPO_TODOS_LABEL,
-      kind: 'todos',
-      status: 'todos',
+      path: REPO_TASKS_LABEL,
+      kind: 'tasks',
+      status: 'tasks',
       remaining: 3,
       staged: 1,
       firstIndex: 0,
@@ -1777,15 +1777,15 @@ test('file list leads with repository TODOs and a count', () => {
       files,
       fileCursor: 0,
       repoName: 'demo',
-      counts: { staged: 0, unstaged: 1, untracked: 0, todo: 3 },
+      counts: { staged: 0, unstaged: 1, untracked: 0, tasks: 3 },
       status: '',
       scroll: 0,
     },
-    { width: 64, height: 8, color: false },
+    { width: 120, height: 8, color: false },
   );
   const lead = stripAnsi(frame.rows[2]);
   const file = stripAnsi(frame.rows[3]);
-  assert.ok(lead.includes(`▶ ${REPO_TODOS_LABEL}`));
+  assert.ok(lead.includes(`▶ ${REPO_TASKS_LABEL}`));
   assert.match(lead, /1\/3\s*$/);
   assert.match(file, /a\.js/);
   assert.ok(!file.includes('Repository'));
@@ -1797,7 +1797,7 @@ test('file list leads with repository TODOs and a count', () => {
     fileCursor: 0,
     repoName: 'demo',
   });
-  assert.ok(header.endsWith(`: ${REPO_TODOS_LABEL}`));
+  assert.ok(header.endsWith(`: ${REPO_TASKS_LABEL}`));
   assert.ok(!header.includes('todo '));
   assert.ok(!/\d+\/\d+/.test(header));
   assert.ok(!header.includes('demo/'));
@@ -1807,7 +1807,7 @@ test('file list leads with repository TODOs and a count', () => {
       files,
       fileCursor: 0,
       repoName: 'demo',
-      counts: { staged: 0, unstaged: 1, untracked: 0, todo: 3 },
+      counts: { staged: 0, unstaged: 1, untracked: 0, tasks: 3 },
       status: '',
       scroll: 0,
     },
@@ -1921,7 +1921,10 @@ test('AC10 footer words highlight the bound letter', () => {
     color: false,
   });
   const fileScopeRow = fileScope.rows[fileScope.rows.length - 1];
-  assert.match(fileScopeRow, /tasks {2}branch {2}npm {2}diff {2}commit {2}pull/);
+  assert.match(
+    fileScopeRow,
+    /tasks {2}branch {2}npm {2}diff {2}commit {2}pull/,
+  );
   assert.ok(fileScope.buttons.find((hit) => hit.id === 'diff'));
   assert.equal(
     fileScope.buttons.find((hit) => hit.id === 'file'),
@@ -1934,9 +1937,9 @@ test('files pane todos row dims add unstage drop', () => {
     pane: 'files',
     files: [
       {
-        path: REPO_TODOS_LABEL,
-        kind: 'todos',
-        status: 'todos',
+        path: REPO_TASKS_LABEL,
+        kind: 'tasks',
+        status: 'tasks',
         remaining: 1,
         staged: 0,
         firstIndex: 0,
@@ -1945,7 +1948,7 @@ test('files pane todos row dims add unstage drop', () => {
     ],
     fileCursor: 0,
     repoName: 'demo',
-    counts: { staged: 0, unstaged: 1, untracked: 0, todo: 1 },
+    counts: { staged: 0, unstaged: 1, untracked: 0, tasks: 1 },
     status: '',
     scroll: 0,
   };
@@ -2427,9 +2430,9 @@ test('file list dates are right-aligned', () => {
 test('file list TODOs n/m aligns with file staged/remaining', () => {
   const files = [
     {
-      path: REPO_TODOS_LABEL,
-      kind: 'todos',
-      status: 'todos',
+      path: REPO_TASKS_LABEL,
+      kind: 'tasks',
+      status: 'tasks',
       remaining: 5,
       staged: 2,
       firstIndex: 0,
@@ -2450,7 +2453,7 @@ test('file list TODOs n/m aligns with file staged/remaining', () => {
       files,
       fileCursor: 0,
       repoName: 'demo',
-      counts: { staged: 0, unstaged: 1, untracked: 0, todo: 5 },
+      counts: { staged: 0, unstaged: 1, untracked: 0, tasks: 5 },
       status: '',
       scroll: 0,
     },
@@ -2636,7 +2639,7 @@ test('commit review header and counts use short sha', () => {
   });
   assert.match(
     frame.text,
-    /commit 7ac260c {2}1 {2}feedback 0 {2}todo 0 {2}code 0/,
+    /commit 7ac260c {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/,
   );
 });
 
@@ -2666,7 +2669,7 @@ test('PR review header and counts use pull request label', () => {
     height: 16,
     color: false,
   });
-  assert.match(frame.text, /pr #123 {2}1 {2}feedback 0 {2}todo 0 {2}code 0/);
+  assert.match(frame.text, /pr #123 {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/);
 });
 
 test('MR review header and counts use merge request label', () => {
@@ -2695,7 +2698,7 @@ test('MR review header and counts use merge request label', () => {
     height: 16,
     color: false,
   });
-  assert.match(frame.text, /mr !123 {2}1 {2}feedback 0 {2}todo 0 {2}code 0/);
+  assert.match(frame.text, /mr !123 {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/);
 });
 
 test('compose panel sits above status and buttons', () => {
@@ -2783,7 +2786,7 @@ test('todo compose does not paint feedback templates', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -2793,11 +2796,11 @@ test('todo compose does not paint feedback templates', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 1 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 1 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this'],
-    todoFocus: 0,
-    todoEdit: { cursor: 0 },
+    tasks: ['[ ] rewrite this'],
+    tasksFocus: 0,
+    taskEdit: { cursor: 0 },
     templates: [{ text: 'extract helper', count: 1 }],
     templateIndex: 0,
   };
@@ -2910,7 +2913,7 @@ test('todo view paints file todo text not a diff hunk', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -2920,10 +2923,10 @@ test('todo view paints file todo text not a diff hunk', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 1 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 1 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this', '[x] already done'],
-    todoFocus: 0,
+    tasks: ['[ ] rewrite this', '[x] already done'],
+    tasksFocus: 0,
   };
   const frame = render.renderFrame(view, {
     width: 80,
@@ -2931,16 +2934,16 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: false,
   });
   const body = stripAnsi(frame.rows.join('\n'));
-  const captionAt = body.indexOf(REPO_TODOS_LABEL);
+  const captionAt = body.indexOf(REPO_TASKS_LABEL);
   const firstAt = body.indexOf('[ ] rewrite this');
   assert.ok(captionAt >= 0 && captionAt < firstAt);
   assert.match(body, /\[ \] rewrite this/);
   assert.match(body, /\[x\] already done/);
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('+'));
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('-'));
-  assert.ok(body.includes(`demo: ${REPO_TODOS_LABEL}`));
+  assert.ok(body.includes(`demo: ${REPO_TASKS_LABEL}`));
   assert.ok(!body.includes('todo 1/1'));
-  assert.ok(!body.includes(`demo/${REPO_TODOS_LABEL}`));
+  assert.ok(!body.includes(`demo/${REPO_TASKS_LABEL}`));
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(footer, /← {2}→ {2}x/);
   assert.ok(!footer.includes('q'));
@@ -2965,7 +2968,7 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: true,
   });
   const caption = colored.rows[2];
-  assert.ok(stripAnsi(caption).includes(REPO_TODOS_LABEL));
+  assert.ok(stripAnsi(caption).includes(REPO_TASKS_LABEL));
   assert.ok(!stripAnsi(caption).includes('demo'));
   assert.ok(!caption.includes(BOLD));
   assert.ok(!caption.includes(fg(THEME.buttonHotFg)));
@@ -2976,7 +2979,7 @@ test('todo list stays visible while composing', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -2986,11 +2989,11 @@ test('todo list stays visible while composing', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 2 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 2 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this', '[x] already done'],
-    todoFocus: 0,
-    todoEdit: { cursor: 12 },
+    tasks: ['[ ] rewrite this', '[x] already done'],
+    tasksFocus: 0,
+    taskEdit: { cursor: 12 },
   };
   const frame = render.renderFrame(view, {
     width: 80,
@@ -3005,7 +3008,7 @@ test('todo list stays visible while composing', () => {
     return plain.includes('rewrite this') && !plain.includes('[ ]');
   });
   assert.equal(footer, undefined);
-  const hit = frame.todoHits.find((row) => row.cursor === 0);
+  const hit = frame.taskHits.find((row) => row.cursor === 0);
   assert.ok(hit);
   assert.equal(frame.cursor.y, hit.y);
 });
@@ -3014,7 +3017,7 @@ test('todo list paints the focused row on the selection bar', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -3024,10 +3027,10 @@ test('todo list paints the focused row on the selection bar', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 2 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 2 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this', '[x] already done'],
-    todoFocus: 1,
+    tasks: ['[ ] rewrite this', '[x] already done'],
+    tasksFocus: 1,
   };
   const frame = render.renderFrame(view, {
     width: 80,
@@ -3053,7 +3056,7 @@ test('checkbox marks use a contrast chip on todo and note rows', () => {
   const todoView = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -3063,10 +3066,10 @@ test('checkbox marks use a contrast chip on todo and note rows', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 2 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 2 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this', '[x] already done'],
-    todoFocus: 0,
+    tasks: ['[ ] rewrite this', '[x] already done'],
+    tasksFocus: 0,
   };
   const noteView = reviewView(
     {
@@ -3099,7 +3102,7 @@ test('todo list exposes a click hit for each todo row', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -3109,18 +3112,18 @@ test('todo list exposes a click hit for each todo row', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 2 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 2 },
     repoName: 'demo',
-    todos: ['[ ] rewrite this', '[x] already done'],
-    todoFocus: 0,
+    tasks: ['[ ] rewrite this', '[x] already done'],
+    tasksFocus: 0,
   };
   const frame = render.renderFrame(view, {
     width: 80,
     height: 16,
     color: false,
   });
-  const boxes = frame.todoHits.filter((hit) => hit.check === true);
-  const rows = frame.todoHits.filter((hit) => hit.check !== true);
+  const boxes = frame.taskHits.filter((hit) => hit.check === true);
+  const rows = frame.taskHits.filter((hit) => hit.check !== true);
   assert.equal(boxes.length, 2);
   assert.equal(rows.length, 2);
   assert.equal(boxes[0].cursor, 0);
@@ -3136,7 +3139,7 @@ test('todo wrap hangs under the checkbox text', () => {
   const view = {
     pane: 'diff',
     item: {
-      origin: 'todo',
+      origin: 'task',
       todoId: 1,
       file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
       hunk: null,
@@ -3146,11 +3149,11 @@ test('todo wrap hangs under the checkbox text', () => {
     total: 1,
     scroll: 0,
     status: '',
-    counts: { staged: 0, unstaged: 0, untracked: 0, todo: 1 },
+    counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 1 },
     repoName: 'demo',
-    todos: ['[ ] abcdefghijklmnopqrstuvwxyz12'],
-    todoFocus: 0,
-    todoEdit: { cursor: 14 },
+    tasks: ['[ ] abcdefghijklmnopqrstuvwxyz12'],
+    tasksFocus: 0,
+    taskEdit: { cursor: 14 },
   };
   const frame = render.renderFrame(view, {
     width: 20,
@@ -3175,7 +3178,7 @@ test('todo wrap hangs under the checkbox text', () => {
   assert.equal(visibleWidth(chunk0), visibleWidth(chunk1));
   assert.equal(firstPlain.indexOf('a'), secondPlain.indexOf('o'));
   assert.equal(frame.cursor.x, 6);
-  const rows = frame.todoHits.filter((hit) => hit.check !== true);
+  const rows = frame.taskHits.filter((hit) => hit.check !== true);
   assert.equal(frame.cursor.y, rows[1].y);
 });
 
@@ -3289,7 +3292,7 @@ test('compose and idle notes wrap on word boundaries', () => {
     {
       ...base,
       item: {
-        origin: 'todo',
+        origin: 'task',
         todoId: 1,
         file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
         hunk: null,
@@ -3733,7 +3736,7 @@ test('secondary screens lead the hint line with 🢐esc', () => {
   assert.match(plain({ pane: 'branches' }), /^ 🢐esc {2}/);
   assert.match(plain({ pane: 'commits' }), /^ 🢐esc {2}/);
   assert.match(plain({ pane: 'npm' }), /^ 🢐esc {2}/);
-  assert.match(plain({ pane: 'diff', item: { origin: 'todo' } }), /^ 🢐esc {2}/);
+  assert.match(plain({ pane: 'diff', item: { origin: 'task' } }), /^ 🢐esc {2}/);
   assert.ok(!plain({ pane: 'files' }).includes('🢐'));
   assert.ok(!plain({ pane: 'diff' }).includes('🢐'));
   const output = footerOf({ pane: 'npm', npmView: true });

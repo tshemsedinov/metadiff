@@ -15,7 +15,7 @@ const { hitAction } = keys;
 const helpers = require('./helpers.js');
 const { uiSink, sampleHunk, tempDir } = helpers;
 const review = require('../lib/review.js');
-const { createStore, addTodo, serializeReview } = review;
+const { createStore, addTask, serializeReview } = review;
 const { parseReview } = review;
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, THEME, BOLD, seq } = ansi;
@@ -23,7 +23,7 @@ const npm = require('../lib/render/npm.js');
 const { logViewRows } = npm;
 const { setTheme, themeName } = ansi;
 const files = require('../lib/files.js');
-const { REVIEW_DIR, REPO_TODOS_LABEL } = files;
+const { REVIEW_DIR, REPO_TASKS_LABEL } = files;
 const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
@@ -342,7 +342,7 @@ test('prev at first block opens todos and next reaches last', () => {
   const c = sampleItem('c.js');
   const { session } = openSession([a, b, c]);
   session.dispatch('prev');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
   session.dispatch('next');
   assert.equal(session.current().file.newPath, 'a.js');
   session.dispatch('next');
@@ -472,7 +472,7 @@ test('AC21 commit add and revert are read only', () => {
   assert.equal(session.status, 'read only');
   assert.equal(repo.commits.length, 0);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'todos');
+  assert.equal(files[0].kind, 'tasks');
   assert.equal(files[1].status, '7ac260c');
   session.dispatch('next');
   assert.equal(session.status, 'read only');
@@ -504,7 +504,7 @@ test('PR add and revert are read only and feedback attaches', () => {
   assert.equal(session.status, 'read only');
   assert.equal(repo.commits.length, 0);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'todos');
+  assert.equal(files[0].kind, 'tasks');
   assert.equal(files[1].status, '#12');
   session.dispatch('feedback');
   session.pushInput('prefer const');
@@ -516,7 +516,7 @@ test('PR add and revert are read only and feedback attaches', () => {
   session.dispatch('next');
   assert.equal(session.status, 'saved');
   session.dispatch('prev');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
   session.dispatch('next');
   assert.equal(session.current().file.newPath, 'lib/a.js');
   const view = session.view();
@@ -590,7 +590,7 @@ test('j and k move next and prev on the diff', () => {
   session.pushInput('k');
   assert.equal(session.current().file.newPath, 'a.js');
   session.pushInput('k');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
   session.pushInput('j');
   assert.equal(session.current().file.newPath, 'a.js');
 });
@@ -825,10 +825,10 @@ test('starts on the file list', () => {
   const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
   assert.equal(session.pane, 'files');
   assert.equal(session.fileCursor, 0);
-  assert.equal(session.fileList()[0].kind, 'todos');
+  assert.equal(session.fileList()[0].kind, 'tasks');
   session.dispatch('open');
   assert.equal(session.pane, 'diff');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
 });
 
 test('AC14 files pane lists paths and enter opens', () => {
@@ -840,7 +840,7 @@ test('AC14 files pane lists paths and enter opens', () => {
   const text = stdout.dump();
   assert.ok(!text.includes('todo 1/3'));
   assert.ok(!text.includes('@@'));
-  assert.ok(text.includes(REPO_TODOS_LABEL));
+  assert.ok(text.includes('Project Tasks'));
   assert.match(text, /a\.js/);
   assert.match(text, /b\.js/);
   session.dispatch('scrollDown');
@@ -975,7 +975,7 @@ test('files pane todos row ignores add unstage drop', () => {
     startPane: 'files',
   });
   assert.equal(session.fileCursor, 0);
-  assert.equal(session.fileList()[0].kind, 'todos');
+  assert.equal(session.fileList()[0].kind, 'tasks');
   session.dispatch('add');
   session.dispatch('unstage');
   session.dispatch('revert');
@@ -1091,7 +1091,7 @@ test('f maps feedback to the hunk location', () => {
   assert.equal(note.file, 'a.js');
   assert.equal(note.newStart, 1);
   assert.equal(session.counts().feedback, 1);
-  assert.equal(session.counts().todo, 0);
+  assert.equal(session.counts().tasks, 0);
   assert.equal(session.idleNoteText(), '[ ] extract helper');
 });
 
@@ -1368,22 +1368,22 @@ test('code save equal to original drops the proposal', () => {
 
 test('todos screen ignores commit and todo hotkeys', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.todoOpen, true);
+  assert.equal(session.tasksOpen, true);
   assert.equal(session.mode, 'review');
   session.dispatch('commit');
   assert.equal(session.mode, 'review');
-  session.dispatch('todo');
+  session.dispatch('tasks');
   assert.equal(session.mode, 'review');
 });
 
 test('todo list scrolls the focused row into view', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 12;
-  for (let i = 0; i < 30; i++) addTodo(session.notes, 'a.js', `item ${i}`);
-  session.composer.openTodoPage();
-  session.todoFocus = 0;
+  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  session.composer.openTasksPage();
+  session.tasksFocus = 0;
   session.draw();
   const top = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(top, /item 0(?!\d)/);
@@ -1405,27 +1405,27 @@ test('todo list scrolls the focused row into view', () => {
   });
   session.draw();
   const up = stripAnsi(session.lastFrame.rows.join('\n'));
-  assert.equal(session.todoFocus, 24);
+  assert.equal(session.tasksFocus, 24);
   assert.match(up, /item 24(?!\d)/);
   session.dispatch('pageDown');
   session.draw();
   const paged = stripAnsi(session.lastFrame.rows.join('\n'));
-  assert.equal(session.todoFocus, 30);
+  assert.equal(session.tasksFocus, 30);
   assert.match(paged, /item 29(?!\d)/);
   assert.ok(!/item 0(?!\d)/.test(paged));
 });
 
 test('todo edits in the list not the note line', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('in the list');
   session.draw();
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] in the list/);
   assert.equal(body.split('in the list').length - 1, 1);
   assert.equal(session.view().compose, null);
-  assert.ok(session.view().todoEdit);
-  const hit = session.lastFrame.todoHits.find((row) => row.cursor === 0);
+  assert.ok(session.view().taskEdit);
+  const hit = session.lastFrame.taskHits.find((row) => row.cursor === 0);
   assert.ok(hit);
   assert.equal(session.lastFrame.cursor.y, hit.y);
 });
@@ -1436,18 +1436,18 @@ test('t from any file adds a repo todo and starts editing', () => {
   });
   session.dispatch('scrollDown');
   assert.equal(session.fileCursor, 1);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   assert.equal(session.pane, 'diff');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
   assert.equal(session.current().file.newPath, 'TODOs');
   assert.equal(session.mode, 'compose');
-  assert.equal(session.composeKind, 'todo');
-  assert.equal(session.todoFocus, 0);
-  assert.deepEqual(session.view().todos, ['[ ] ']);
+  assert.equal(session.composeKind, 'tasks');
+  assert.equal(session.tasksFocus, 0);
+  assert.deepEqual(session.view().tasks, ['[ ] ']);
   session.handleEvent({ type: 'key', key: 'escape' });
   session.dispatch('files');
   session.fileCursor = 0;
-  session.dispatch('todo');
+  session.dispatch('tasks');
   assert.equal(session.current().file.newPath, 'TODOs');
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
@@ -1458,12 +1458,12 @@ test('t opens the repo todo page and lets you edit it', () => {
   const b = sampleItem('b.js');
   const { session } = openSession([a, b]);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'todos');
-  assert.equal(files[0].path, REPO_TODOS_LABEL);
+  assert.equal(files[0].kind, 'tasks');
+  assert.equal(files[0].path, REPO_TASKS_LABEL);
   assert.equal(files[0].remaining, 0);
   assert.equal(files[0].staged, 0);
-  session.dispatch('todo');
-  assert.equal(session.current().origin, 'todo');
+  session.dispatch('tasks');
+  assert.equal(session.current().origin, 'task');
   assert.equal(session.current().file.newPath, 'TODOs');
   assert.equal(session.mode, 'compose');
   assert.equal(session.items[0].origin, 'unstaged');
@@ -1471,39 +1471,39 @@ test('t opens the repo todo page and lets you edit it', () => {
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.items[0].file.newPath, 'a.js');
   assert.equal(session.items[1].file.newPath, 'b.js');
-  assert.equal(session.current().origin, 'todo');
-  assert.deepEqual(session.view().todos, ['[ ] rewrite loop', '[ ] ']);
+  assert.equal(session.current().origin, 'task');
+  assert.deepEqual(session.view().tasks, ['[ ] rewrite loop', '[ ] ']);
   assert.equal(session.view().total, 2);
-  assert.equal(session.counts().todo, 1);
+  assert.equal(session.counts().tasks, 1);
   assert.equal(session.counts().feedback, 0);
   assert.equal(session.fileList()[0].remaining, 1);
   assert.equal(session.fileList()[0].staged, 0);
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'rewrite loop');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.dispatch('next');
   assert.equal(session.current().origin, 'unstaged');
   assert.equal(session.current().file.newPath, 'a.js');
   assert.equal(session.idleNoteText(), '');
-  session.dispatch('todo');
-  assert.equal(session.current().origin, 'todo');
+  session.dispatch('tasks');
+  assert.equal(session.current().origin, 'task');
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
-  assert.deepEqual(session.view().todos, ['[ ] rewrite loop', '[ ] ']);
-  assert.equal(session.todoFocus, 1);
+  assert.deepEqual(session.view().tasks, ['[ ] rewrite loop', '[ ] ']);
+  assert.equal(session.tasksFocus, 1);
   session.pushInput('add tests');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
-  assert.equal(session.todoOpen, true);
-  assert.deepEqual(session.view().todos, [
+  assert.equal(session.tasksOpen, true);
+  assert.deepEqual(session.view().tasks, [
     '[ ] rewrite loop',
     '[ ] add tests',
     '[ ] ',
   ]);
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.dispatch('next');
   assert.equal(session.current().origin, 'unstaged');
   assert.equal(session.current().file.newPath, 'a.js');
@@ -1512,25 +1512,25 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.idleNoteText(), '');
   session.dispatch('prev');
   session.dispatch('prev');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
 });
 
 test('todo list keeps a blank row to start a new item', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
-  assert.deepEqual(session.view().todos, ['[ ] first note', '[ ] ']);
+  assert.deepEqual(session.view().tasks, ['[ ] first note', '[ ] ']);
   session.dispatch('scrollDown');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.composeTodoId, null);
+  assert.equal(session.composeTaskId, null);
   assert.equal(session.editor.text, '');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.draw();
-  const draft = session.lastFrame.todoHits.find((row) => row.cursor === 1);
+  const draft = session.lastFrame.taskHits.find((row) => row.cursor === 1);
   assert.ok(draft);
   session.handleEvent({
     type: 'mouse',
@@ -1550,39 +1550,39 @@ test('todo list keeps a blank row to start a new item', () => {
     y: draft.y,
     press: false,
   });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.mode, 'compose');
-  assert.equal(session.composeTodoId, null);
+  assert.equal(session.composeTaskId, null);
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'enter' });
-  assert.deepEqual(session.view().todos, [
+  assert.deepEqual(session.view().tasks, [
     '[ ] first note',
     '[ ] second note',
     '[ ] ',
   ]);
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 2);
+  assert.equal(session.tasksFocus, 2);
   assert.equal(session.editor.text, '');
 });
 
 test('enter and click edit the focused todo', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   session.startDraftCompose();
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'second note');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.dispatch('scrollUp');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.draw();
-  const hit = session.lastFrame.todoHits.find((row) => row.cursor === 0);
+  const hit = session.lastFrame.taskHits.find((row) => row.cursor === 0);
   assert.ok(hit);
   session.handleEvent({
     type: 'mouse',
@@ -1602,12 +1602,12 @@ test('enter and click edit the focused todo', () => {
     y: hit.y,
     press: false,
   });
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'first note');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.draw();
-  const other = session.lastFrame.todoHits.find((row) => row.cursor === 1);
+  const other = session.lastFrame.taskHits.find((row) => row.cursor === 1);
   assert.ok(other);
   session.handleEvent({
     type: 'mouse',
@@ -1627,14 +1627,14 @@ test('enter and click edit the focused todo', () => {
     y: other.y,
     press: false,
   });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'second note');
 });
 
 test('todo list stays on screen while composing', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   session.startDraftCompose();
@@ -1643,7 +1643,7 @@ test('todo list stays on screen while composing', () => {
   session.draw();
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] first note/);
-  const hit = session.lastFrame.todoHits.find((row) => row.cursor === 0);
+  const hit = session.lastFrame.taskHits.find((row) => row.cursor === 0);
   assert.ok(hit);
   session.handleEvent({
     type: 'mouse',
@@ -1665,71 +1665,71 @@ test('todo list stays on screen while composing', () => {
   });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'first note');
-  assert.equal(session.notes.todos.length, 2);
-  assert.equal(session.notes.todos[1].text, 'draft two');
+  assert.equal(session.notes.tasks.length, 2);
+  assert.equal(session.notes.tasks[1].text, 'draft two');
 });
 
 test('delete and backspace remove the selected todo', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   session.startDraftCompose();
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'delete' });
-  assert.deepEqual(session.view().todos, ['[ ] first note', '[ ] ']);
-  assert.equal(session.todoFocus, 0);
-  assert.equal(session.current().origin, 'todo');
+  assert.deepEqual(session.view().tasks, ['[ ] first note', '[ ] ']);
+  assert.equal(session.tasksFocus, 0);
+  assert.equal(session.current().origin, 'task');
   session.handleEvent({ type: 'key', key: 'backspace' });
-  assert.deepEqual(session.view().todos, ['[ ] ']);
-  assert.equal(session.current().origin, 'todo');
+  assert.deepEqual(session.view().tasks, ['[ ] ']);
+  assert.equal(session.current().origin, 'task');
 });
 
 test('empty autosave does not persist a draft todo', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
-  assert.equal(session.composeTodoId, null);
+  session.dispatch('tasks');
+  assert.equal(session.composeTaskId, null);
   session.autosave();
-  assert.equal(session.notes.todos.length, 0);
+  assert.equal(session.notes.tasks.length, 0);
   session.pushInput('keep this');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
-  assert.equal(session.todoFocus, 1);
-  assert.equal(session.notes.todos[0].text, 'keep this');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.tasksFocus, 1);
+  assert.equal(session.notes.tasks[0].text, 'keep this');
+  assert.equal(session.current().origin, 'task');
 });
 
 test('todo autosave updates one draft instead of duplicating', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('keep this');
   session.autosave();
-  assert.equal(session.notes.todos.length, 1);
-  assert.equal(session.composeTodoId, session.notes.todos[0].id);
+  assert.equal(session.notes.tasks.length, 1);
+  assert.equal(session.composeTaskId, session.notes.tasks[0].id);
   session.autosave();
-  assert.equal(session.notes.todos.length, 1);
+  assert.equal(session.notes.tasks.length, 1);
   session.pushInput(' more');
   session.autosave();
-  assert.equal(session.notes.todos.length, 1);
-  assert.equal(session.notes.todos[0].text, 'keep this more');
+  assert.equal(session.notes.tasks.length, 1);
+  assert.equal(session.notes.tasks[0].text, 'keep this more');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
-  assert.equal(session.todoFocus, 1);
-  assert.deepEqual(session.view().todos, ['[ ] keep this more', '[ ] ']);
+  assert.equal(session.tasksFocus, 1);
+  assert.deepEqual(session.view().tasks, ['[ ] keep this more', '[ ] ']);
 });
 
 test('typing a todo starts editing at the end of the line', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.pushInput('+more');
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'first+more');
@@ -1738,7 +1738,7 @@ test('typing a todo starts editing at the end of the line', () => {
 
 test('home end and page keys jump the todo list', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('two');
@@ -1747,116 +1747,116 @@ test('home end and page keys jump the todo list', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
   session.handleEvent({ type: 'key', key: 'home' });
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'end' });
-  assert.equal(session.todoFocus, 3);
+  assert.equal(session.tasksFocus, 3);
   session.handleEvent({ type: 'key', key: 'home' });
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.todoFocus, 3);
+  assert.equal(session.tasksFocus, 3);
   session.handleEvent({ type: 'key', key: 'pageUp' });
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
 });
 
 test('todo edit arrows move across todos without leaving edit', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('second');
   session.handleEvent({ type: 'key', key: 'up' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   assert.equal(session.editor.cursor, 'first'.length);
   session.handleEvent({ type: 'key', key: 'up' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'down' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.text, 'second');
   session.handleEvent({ type: 'key', key: 'down' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 2);
+  assert.equal(session.tasksFocus, 2);
   assert.equal(session.editor.text, '');
   session.handleEvent({ type: 'key', key: 'down' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 2);
-  assert.deepEqual(session.view().todos, ['[ ] first', '[ ] second', '[ ] ']);
+  assert.equal(session.tasksFocus, 2);
+  assert.deepEqual(session.view().tasks, ['[ ] first', '[ ] second', '[ ] ']);
 });
 
 test('todo edit arrows move inside a multiline todo', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('second');
   session.handleEvent({ type: 'key', key: 'escape' });
-  session.notes.todos[1].text = 'one\ntwo\nthree';
+  session.notes.tasks[1].text = 'one\ntwo\nthree';
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.linePos().line, 2);
   session.handleEvent({ type: 'key', key: 'up' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.linePos().line, 1);
   session.handleEvent({ type: 'key', key: 'up' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.linePos().line, 0);
   session.handleEvent({ type: 'key', key: 'up' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.text, 'one\ntwo\nthree');
   assert.equal(session.editor.linePos().line, 2);
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 2);
+  assert.equal(session.tasksFocus, 2);
   assert.equal(session.editor.text, '');
 });
 
 test('todo list arrows skip over multiline items', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('second');
   session.handleEvent({ type: 'key', key: 'escape' });
-  session.notes.todos[1].text = 'one\ntwo\nthree';
+  session.notes.tasks[1].text = 'one\ntwo\nthree';
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'up' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 2);
+  assert.equal(session.tasksFocus, 2);
 });
 
 test('todo edit arrows move across wrapped lines', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('second');
   session.handleEvent({ type: 'key', key: 'escape' });
   const long = 'x'.repeat(90);
-  session.notes.todos[1].text = long;
+  session.notes.tasks[1].text = long;
   session.handleEvent({ type: 'key', key: 'enter' });
   session.handleEvent({ type: 'key', key: 'up' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.ok(session.editor.cursor < long.length);
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.cursor, long.length);
   session.handleEvent({ type: 'key', key: 'down' });
-  assert.equal(session.todoFocus, 2);
+  assert.equal(session.tasksFocus, 2);
 });
 
 test('todo edit page keys jump across todos', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('second');
@@ -1864,37 +1864,37 @@ test('todo edit page keys jump across todos', () => {
   session.pushInput('third');
   session.handleEvent({ type: 'key', key: 'pageUp' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 0);
+  assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.todoFocus, 3);
+  assert.equal(session.tasksFocus, 3);
   assert.equal(session.editor.text, '');
 });
 
 test('enter edits the next todo and escape stays on it', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.todoFocus, 1);
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.editor.text, '');
   session.pushInput('second');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
-  assert.equal(session.todoFocus, 1);
-  assert.deepEqual(session.view().todos, ['[ ] first', '[ ] second', '[ ] ']);
+  assert.equal(session.tasksFocus, 1);
+  assert.deepEqual(session.view().tasks, ['[ ] first', '[ ] second', '[ ] ']);
 });
 
 test('todo save recovers if the stub was dropped', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
-  session.notes.todos = [];
+  session.dispatch('tasks');
+  session.notes.tasks = [];
   session.pushInput('still here');
   session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.notes.todos.length, 1);
-  assert.equal(session.notes.todos[0].text, 'still here');
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.notes.tasks.length, 1);
+  assert.equal(session.notes.tasks[0].text, 'still here');
+  assert.equal(session.current().origin, 'task');
 });
 
 test('quit with notes asks f to finish or c to continue', () => {
@@ -1949,15 +1949,15 @@ test('initReview resumes latest editing file', () => {
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
   const draft = createStore(reviewPath);
-  addTodo(draft, 'a.js', 'rewrite loop');
+  addTask(draft, 'a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], { cwd });
   assert.equal(session.notes.reviewPath, reviewPath);
   assert.equal(session.notes.status, 'editing');
-  assert.equal(session.notes.todos[0].text, 'rewrite loop');
+  assert.equal(session.notes.tasks[0].text, 'rewrite loop');
   assert.equal(
-    session.fileList().some((entry) => entry.kind === 'todos'),
+    session.fileList().some((entry) => entry.kind === 'tasks'),
     true,
   );
 });
@@ -1968,7 +1968,7 @@ test('initReview starts a new file when latest is ready', () => {
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
   const draft = createStore(reviewPath);
   draft.status = 'ready';
-  addTodo(draft, 'a.js', 'rewrite loop');
+  addTask(draft, 'a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], { cwd });
@@ -1976,7 +1976,7 @@ test('initReview starts a new file when latest is ready', () => {
     session.notes.reviewPath,
     path.join(cwd, REVIEW_DIR, `${dateStamp()}-01.md`),
   );
-  assert.equal(session.notes.todos.length, 0);
+  assert.equal(session.notes.tasks.length, 0);
 });
 
 test('newReview starts a new file even if latest is editing', () => {
@@ -1984,7 +1984,7 @@ test('newReview starts a new file even if latest is editing', () => {
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
   const draft = createStore(reviewPath);
-  addTodo(draft, 'a.js', 'rewrite loop');
+  addTask(draft, 'a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], {
@@ -1995,7 +1995,7 @@ test('newReview starts a new file even if latest is editing', () => {
     session.notes.reviewPath,
     path.join(cwd, REVIEW_DIR, `${dateStamp()}-01.md`),
   );
-  assert.equal(session.notes.todos.length, 0);
+  assert.equal(session.notes.tasks.length, 0);
 });
 
 test('files pane c lists commits and c commits the message', () => {
@@ -2679,21 +2679,21 @@ test('load applies imported GitHub notes on a new review', () => {
   const notes = [...session.notes.feedback.values()];
   assert.equal(notes.length, 1);
   assert.match(notes[0].text, /use const/);
-  assert.equal(session.notes.todos.length, 1);
-  assert.equal(session.notes.todos[0].file, 'pull request');
+  assert.equal(session.notes.tasks.length, 1);
+  assert.equal(session.notes.tasks[0].file, 'pull request');
   assert.equal(
-    session.fileList().some((entry) => entry.kind === 'todos'),
+    session.fileList().some((entry) => entry.kind === 'tasks'),
     true,
   );
   session.load();
-  assert.equal(session.notes.todos.length, 1);
+  assert.equal(session.notes.tasks.length, 1);
 });
 
 test('load skips imported GitHub notes when resuming a review', () => {
   const cwd = tempDir('reslop-ui-');
   const reviewPath = path.join(cwd, REVIEW_DIR, `${dateStamp()}-00.md`);
   const draft = createStore(reviewPath);
-  addTodo(draft, 'a.js', 'rewrite loop');
+  addTask(draft, 'a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const item = sampleItem('lib/parser.js', 'pr');
@@ -2710,8 +2710,8 @@ test('load skips imported GitHub notes when resuming a review', () => {
       revert: () => {},
     },
   });
-  assert.equal(session.notes.todos.length, 1);
-  assert.equal(session.notes.todos[0].text, 'rewrite loop');
+  assert.equal(session.notes.tasks.length, 1);
+  assert.equal(session.notes.tasks[0].text, 'rewrite loop');
 });
 
 test('openLoad paints git items before npm extras arrive', async () => {
@@ -3022,7 +3022,7 @@ test('list screens hint 🢐esc and the button goes back', () => {
   session.dispatch('scrollDown');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.pane, 'diff');
-  assert.notEqual(session.current().origin, 'todo');
+  assert.notEqual(session.current().origin, 'task');
   assert.ok(!footer().includes('🢐'));
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('b');
@@ -3037,10 +3037,10 @@ test('list screens hint 🢐esc and the button goes back', () => {
   assert.match(footer(), /^ 🢐esc {2}/);
   clickFooter(session, 'back');
   assert.equal(session.pane, 'files');
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('ship');
   session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.current().origin, 'todo');
+  assert.equal(session.current().origin, 'task');
   assert.match(footer(), /^ 🢐esc {2}/);
   clickFooter(session, 'back');
   assert.equal(session.pane, 'files');
@@ -3371,12 +3371,7 @@ test('unit scope lists every file sorted by path', () => {
   repo.extraFiles.push('a.js', 'z.js');
   session.dispatch('file');
   const names = session.fileList().map((entry) => entry.path);
-  assert.deepEqual(names, [
-    REPO_TODOS_LABEL,
-    'a.js',
-    'b.js',
-    'z.js',
-  ]);
+  assert.deepEqual(names, [REPO_TASKS_LABEL, 'a.js', 'b.js', 'z.js']);
 });
 
 test('unit view shows the file with current block marks', () => {
@@ -3788,7 +3783,7 @@ test('partial file add reloads after a later hunk fails', () => {
 
 test('x and a checkbox click toggle a todo and the file keeps it', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('ship it');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
@@ -3796,33 +3791,33 @@ test('x and a checkbox click toggle a todo and the file keeps it', () => {
   let body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] ship it/);
   session.pushInput('x');
-  assert.equal(session.notes.todos[0].done, true);
+  assert.equal(session.notes.tasks[0].done, true);
   session.draw();
   body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[x\] ship it/);
   assert.match(body, /→ {2}x/);
   assert.ok(!body.includes(' q'));
   session.pushInput(' ');
-  assert.equal(session.notes.todos[0].done, false);
+  assert.equal(session.notes.tasks[0].done, false);
   session.draw();
-  const box = session.lastFrame.todoHits.find((row) => row.check);
+  const box = session.lastFrame.taskHits.find((row) => row.check);
   assert.ok(box);
   clickAt(session, box.x0 + 1, box.y);
   assert.equal(session.mode, 'review');
-  assert.equal(session.notes.todos[0].done, true);
-  assert.equal(session.notes.todos[0].text, 'ship it');
+  assert.equal(session.notes.tasks[0].done, true);
+  assert.equal(session.notes.tasks[0].text, 'ship it');
   const loaded = parseReview(
     serializeReview(session.notes),
     session.notes.reviewPath,
   );
-  assert.equal(loaded.todos[0].done, true);
-  assert.equal(loaded.todos[0].text, 'ship it');
+  assert.equal(loaded.tasks[0].done, true);
+  assert.equal(loaded.tasks[0].text, 'ship it');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.handleEvent({ type: 'key', key: 'x' });
   session.handleEvent({ type: 'key', key: ' ' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'ship itx ');
-  assert.equal(session.notes.todos[0].done, true);
+  assert.equal(session.notes.tasks[0].done, true);
 });
 
 test('l toggles the theme and is typed as text while composing', () => {
@@ -4355,18 +4350,18 @@ test('click moves the caret in feedback and todo editors', () => {
   assert.equal(session.editor.cursor, 1);
   assert.equal(session.composeKind, 'feedback');
   session.handleEvent({ type: 'key', key: 'escape' });
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('ship');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: 'enter' });
   session.editor.replace('ab\ncd');
   session.draw();
-  const box = session.lastFrame.todoHits.find((row) => row.check);
+  const box = session.lastFrame.taskHits.find((row) => row.check);
   assert.ok(box);
   clickAt(session, box.x0 + 1, box.y);
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'ab\ncd');
-  assert.equal(session.notes.todos[0].done, true);
+  assert.equal(session.notes.tasks[0].done, true);
   session.draw();
   clickCaret(session, -1, -1);
   assert.equal(session.editor.cursor, 1);
@@ -4552,7 +4547,7 @@ test('editors select with shift and copy cut paste', () => {
   assert.equal(session.editor.selectedText(), 'topic');
   press(session, 'escape');
   press(session, 'escape');
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('ship');
   press(session, 'escape');
   press(session, 'enter');
@@ -4560,5 +4555,5 @@ test('editors select with shift and copy cut paste', () => {
   press(session, 'shift-up');
   assert.equal(session.editor.text, 'ab\ncd');
   assert.equal(session.editor.hasSelect(), true);
-  assert.equal(session.composeKind, 'todo');
+  assert.equal(session.composeKind, 'tasks');
 });

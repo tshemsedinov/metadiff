@@ -9,7 +9,7 @@ const path = require('node:path');
 const session = require('../lib/session.js');
 const { Session } = session;
 const review = require('../lib/review.js');
-const { addTodo } = review;
+const { addTask } = review;
 const items = require('../lib/session/items.js');
 const { restoredIndex, alignLoadedItems } = items;
 const watch = require('../lib/session/watch.js');
@@ -405,13 +405,13 @@ test('todo page poll reloads when a worktree file changes', () => {
   const after = sampleItem('a.js', { text: 'newer' });
   const { session, repo } = openWatched([before], { cwd });
   session.uiOpen = true;
-  session.composer.openTodoPage();
+  session.composer.openTasksPage();
   session.lifecycle.pollCurrentFile();
   assert.equal(session.items[0].hunk.lines[0].text, 'old');
   repo.setItems([after]);
   fs.writeFileSync(file, 'newer\n');
   session.lifecycle.pollCurrentFile();
-  assert.equal(session.todoOpen, true);
+  assert.equal(session.tasksOpen, true);
   assert.equal(session.items[0].hunk.lines[0].text, 'newer');
 });
 
@@ -420,11 +420,11 @@ test('leaving todos reloads the file list', () => {
   const b = sampleItem('b.js');
   const { session, repo } = openWatched([a]);
   session.uiOpen = true;
-  session.composer.openTodoPage();
+  session.composer.openTasksPage();
   repo.setItems([a, b]);
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
-  assert.equal(session.todoOpen, false);
+  assert.equal(session.tasksOpen, false);
   assert.equal(session.items.length, 2);
 });
 
@@ -433,14 +433,14 @@ test('editing a todo applies a deferred reload on exit', () => {
   const b = sampleItem('b.js');
   const { session, repo } = openWatched([a]);
   session.uiOpen = true;
-  session.composer.openTodoPage();
-  session.composer.editFocusedTodo();
+  session.composer.openTasksPage();
+  session.composer.editFocusedTask();
   assert.equal(session.mode, 'compose');
   repo.setItems([a, b]);
   session.lifecycle.onDiskChange();
   assert.equal(session.items.length, 1);
   session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.todoOpen, true);
+  assert.equal(session.tasksOpen, true);
   assert.equal(session.items.length, 1);
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
@@ -450,27 +450,27 @@ test('editing a todo applies a deferred reload on exit', () => {
 test('review file change merges into the open todo list', () => {
   const { session } = openWatched([sampleItem('a.js')]);
   session.uiOpen = true;
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('alpha');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTodo(session.notes, 'TODOs', 'beta');
+  addTask(session.notes, 'TODOs', 'beta');
   const file = session.notes.reviewPath;
   const md = fs.readFileSync(file, 'utf8');
   const next = md.replace('- [ ] alpha\n', '- [ ] alpha\n- [ ] gamma\n');
   fs.writeFileSync(file, next);
   session.lifecycle.applyReviewChange();
-  const texts = session.notes.todos.map((todo) => todo.text);
+  const texts = session.notes.tasks.map((todo) => todo.text);
   assert.deepEqual(texts, ['alpha', 'gamma', 'beta']);
 });
 
 test('external todo edits replace the line instead of stacking', () => {
   const { session } = openWatched([sampleItem('a.js')]);
   session.uiOpen = true;
-  session.dispatch('todo');
+  session.dispatch('tasks');
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTodo(session.notes, 'TODOs', 'beta');
-  const edited = session.notes.todos[0].id;
+  addTask(session.notes, 'TODOs', 'beta');
+  const edited = session.notes.tasks[0].id;
   const file = session.notes.reviewPath;
   const writeLine = (text) => {
     const md = fs.readFileSync(file, 'utf8');
@@ -481,9 +481,9 @@ test('external todo edits replace the line instead of stacking', () => {
   writeLine('one three');
   writeLine('one three four');
   writeLine('one three four five');
-  const texts = session.notes.todos.map((todo) => todo.text);
+  const texts = session.notes.tasks.map((todo) => todo.text);
   assert.deepEqual(texts, ['one three four five', 'beta']);
-  assert.equal(session.notes.todos[0].id, edited);
+  assert.equal(session.notes.tasks[0].id, edited);
 });
 
 test('leaving branches reloads the file list', () => {
