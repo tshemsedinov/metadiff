@@ -11,21 +11,24 @@
 
 > Turn generated changes into owned changes
 
-Open a change, leave findings and todos, and prepare a repair plan
+Open a change, leave findings and a backlog, and prepare a repair plan
 for the agent.
 
 ```text
 Review → Plan → Repair → Verify
 ```
 
-- Leave feedback, issues/todos, and in-place code proposals as a repair plan
+- Leave feedback, a project backlog, and in-place code proposals as a repair plan
 - Review uncommitted git diffs, a given commit, a GitHub PR, or a GitLab MR
 - File-scope review mode: not just diffs, with editor mode
 - Stage, unstage, or revert each contiguous block of diff lines
 - Auto-reload local diffs when files change, keeping the current screen
 - Import GitHub PR and GitLab MR review comments into the local plan for AI
-- Commits list: commit, amend, fixup, reword, drop, pull, and push
+- Commits list: brief and full, view a commit's diff, commit, amend, fixup, reword, drop, pull, and push
 - Branches: checkout, create, rebase, drop, pull, and push
+- npm scripts and bins: run, edit, and reorder; double-click to run; clean logs older than 5 days
+- Long lines wrap in the diff view; the editor scrolls horizontally
+- Reduced test and lint output for agents: failures and a short summary, not passing noise
 - Review each npm dependency once across `package.json` and the lockfile
 - Propose unused removals, npm audit fixes, and outdated updates as diffs
 - Code highlighting and intra-line diffs: unified, mixed, and side-by-side
@@ -60,6 +63,8 @@ Prefix each program in an npm script with `reslop t --`. Keep `&&` between those
 ```
 
 The report is Markdown: failures, diagnostics, and a short summary. Passing results are omitted and similar problems are grouped. The same text is saved under `.log/`. Set `RESLOP_OUTPUT=raw` to pass the command through unchanged. The review screen runs scripts in raw mode and applies its own filter once.
+
+Run the full check with `npm t`. Run one or more test files with `reslop t -- node --test <files>`. New reviews include those two commands in the agent instructions.
 
 Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 

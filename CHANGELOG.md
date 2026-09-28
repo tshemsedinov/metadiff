@@ -2,12 +2,15 @@
 
 ## [Unreleased][unreleased]
 
-- Add instructions for agents to run tests using reslop
-- Show old log size on the npm screen and delete logs older than 5 days
-- Rename the todo list to Project Backlog and Issues
+## [0.2.4][] - 2026-09-28
+
+- Add AI instructions to run `npm t` or `reslop t -- node --test`
+- Cleanup old logs (older than 5 days)
+- Rename TODO list to Project Backlog and Issues
+- Word wrap in view and horizontal scrolling in edit mode
+- Return to uncommitted changes when viewing history in read-only mode
+- Improve TUI/TUX for commits and npm commands
 - Remove circular dependencies between Git modules
-- Share rebase cleanup, dependency index writes, and session Git operations
-- Stage dependency changes without rewriting working files
 - Unify list rendering and keyboard navigation
 - Simplify dependency transformations and remove redundant wrappers
 
@@ -138,7 +141,8 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...HEAD
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/tshemsedinov/reslop/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tshemsedinov/reslop/compare/v0.1.9...v0.2.0
