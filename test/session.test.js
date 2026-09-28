@@ -2991,6 +2991,40 @@ test('click status branch opens the branch list', () => {
   assert.equal(session.pane, 'branches');
 });
 
+test('list screens hint 🢐esc and the button goes back', () => {
+  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const footer = () => {
+    session.draw();
+    return stripAnsi(session.lastFrame.rows.at(-1));
+  };
+  assert.ok(!footer().includes('🢐'));
+  session.dispatch('scrollDown');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.pane, 'diff');
+  assert.notEqual(session.current().origin, 'todo');
+  assert.ok(!footer().includes('🢐'));
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('b');
+  assert.match(footer(), /^ 🢐esc {2}/);
+  clickFooter(session, 'back');
+  assert.equal(session.pane, 'files');
+  session.pushInput('c');
+  assert.match(footer(), /^ 🢐esc {2}/);
+  clickFooter(session, 'back');
+  assert.equal(session.pane, 'files');
+  session.pushInput('n');
+  assert.match(footer(), /^ 🢐esc {2}/);
+  clickFooter(session, 'back');
+  assert.equal(session.pane, 'files');
+  session.dispatch('todo');
+  session.pushInput('ship');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.current().origin, 'todo');
+  assert.match(footer(), /^ 🢐esc {2}/);
+  clickFooter(session, 'back');
+  assert.equal(session.pane, 'files');
+});
+
 test('files pane b lists branches and enter checks out', () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
@@ -3990,7 +4024,8 @@ test('esc stops a running npm command and waits to leave', () => {
   session.draw();
   const footer = () => stripAnsi(session.lastFrame.rows.at(-1));
   const hitIds = () => session.lastFrame.buttons.map((hit) => hit.id);
-  assert.match(footer(), / esc /);
+  assert.match(footer(), /⊗ esc/);
+  assert.ok(!footer().includes('🢐'));
   assert.match(footer(), / re-run/);
   assert.ok(!footer().includes('edit'));
   assert.ok(!footer().includes('new'));
@@ -4021,6 +4056,8 @@ test('esc stops a running npm command and waits to leave', () => {
   assert.ok(!text.includes('more'));
   assert.ok(!text.includes('exit null'));
   session.draw();
+  assert.match(footer(), /🢐esc/);
+  assert.ok(!footer().includes('⊗'));
   let hits = hitIds();
   assert.ok(hits.includes('npmStop'));
   assert.ok(hits.includes('npmRerun'));
@@ -4216,7 +4253,7 @@ test('d deletes the selected npm script after confirmation', () => {
   session.pushInput('n');
   session.draw();
   const footer = stripAnsi(session.lastFrame.rows.at(-1));
-  assert.match(footer, /edit {2}new {2}delete {2}cleanup/);
+  assert.match(footer, /^ 🢐esc {2}edit {2}new {2}delete {2}cleanup/);
   session.handleEvent({ type: 'key', key: 'd' });
   assert.equal(session.mode, 'confirmDrop');
   session.pushInput('y');
