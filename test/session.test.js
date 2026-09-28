@@ -23,7 +23,7 @@ const npm = require('../lib/render/npm.js');
 const { logViewRows } = npm;
 const { setTheme, themeName } = ansi;
 const files = require('../lib/files.js');
-const { REVIEW_DIR } = files;
+const { REVIEW_DIR, REPO_TODOS_LABEL } = files;
 const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
@@ -838,10 +838,9 @@ test('AC14 files pane lists paths and enter opens', () => {
   assert.equal(session.pane, 'files');
   session.draw();
   const text = stdout.dump();
-  assert.match(text, /: Project Backlog and Issues/);
   assert.ok(!text.includes('todo 1/3'));
   assert.ok(!text.includes('@@'));
-  assert.match(text, /Project Backlog and Issues/);
+  assert.ok(text.includes(REPO_TODOS_LABEL));
   assert.match(text, /a\.js/);
   assert.match(text, /b\.js/);
   session.dispatch('scrollDown');
@@ -1460,7 +1459,7 @@ test('t opens the repo todo page and lets you edit it', () => {
   const { session } = openSession([a, b]);
   const files = session.fileList();
   assert.equal(files[0].kind, 'todos');
-  assert.equal(files[0].path, 'Project Backlog and Issues');
+  assert.equal(files[0].path, REPO_TODOS_LABEL);
   assert.equal(files[0].remaining, 0);
   assert.equal(files[0].staged, 0);
   session.dispatch('todo');
@@ -3373,7 +3372,7 @@ test('unit scope lists every file sorted by path', () => {
   session.dispatch('file');
   const names = session.fileList().map((entry) => entry.path);
   assert.deepEqual(names, [
-    'Project Backlog and Issues',
+    REPO_TODOS_LABEL,
     'a.js',
     'b.js',
     'z.js',

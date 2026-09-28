@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const diff = require('../lib/diff/diff.js');
 const { displayLines } = diff;
 const render = require('../lib/render/render.js');
+const { REPO_TODOS_LABEL } = require('../lib/files.js');
 const wrap = require('../lib/wrap.js');
 const ansi = require('../lib/ansi.js');
 const { THEME, CODE_FG, fg, bg, stripAnsi, BOLD, seq } = ansi;
@@ -1761,7 +1762,7 @@ test('header last column uses the light grey bar background', () => {
 test('file list leads with repository TODOs and a count', () => {
   const files = [
     {
-      path: 'Project Backlog and Issues',
+      path: REPO_TODOS_LABEL,
       kind: 'todos',
       status: 'todos',
       remaining: 3,
@@ -1784,7 +1785,7 @@ test('file list leads with repository TODOs and a count', () => {
   );
   const lead = stripAnsi(frame.rows[2]);
   const file = stripAnsi(frame.rows[3]);
-  assert.match(lead, /▶ Project Backlog and Issues/);
+  assert.ok(lead.includes(`▶ ${REPO_TODOS_LABEL}`));
   assert.match(lead, /1\/3\s*$/);
   assert.match(file, /a\.js/);
   assert.ok(!file.includes('Repository'));
@@ -1796,7 +1797,7 @@ test('file list leads with repository TODOs and a count', () => {
     fileCursor: 0,
     repoName: 'demo',
   });
-  assert.match(header, /demo: Project Backlog and Issues\s*$/);
+  assert.ok(header.endsWith(`: ${REPO_TODOS_LABEL}`));
   assert.ok(!header.includes('todo '));
   assert.ok(!/\d+\/\d+/.test(header));
   assert.ok(!header.includes('demo/'));
@@ -1933,7 +1934,7 @@ test('files pane todos row dims add unstage drop', () => {
     pane: 'files',
     files: [
       {
-        path: 'Project Backlog and Issues',
+        path: REPO_TODOS_LABEL,
         kind: 'todos',
         status: 'todos',
         remaining: 1,
@@ -2426,7 +2427,7 @@ test('file list dates are right-aligned', () => {
 test('file list TODOs n/m aligns with file staged/remaining', () => {
   const files = [
     {
-      path: 'Project Backlog and Issues',
+      path: REPO_TODOS_LABEL,
       kind: 'todos',
       status: 'todos',
       remaining: 5,
@@ -2930,16 +2931,16 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: false,
   });
   const body = stripAnsi(frame.rows.join('\n'));
-  const captionAt = body.indexOf('Project Backlog and Issues');
+  const captionAt = body.indexOf(REPO_TODOS_LABEL);
   const firstAt = body.indexOf('[ ] rewrite this');
   assert.ok(captionAt >= 0 && captionAt < firstAt);
   assert.match(body, /\[ \] rewrite this/);
   assert.match(body, /\[x\] already done/);
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('+'));
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('-'));
-  assert.match(body, /demo: Project Backlog and Issues/);
+  assert.ok(body.includes(`demo: ${REPO_TODOS_LABEL}`));
   assert.ok(!body.includes('todo 1/1'));
-  assert.ok(!body.includes('demo/Project Backlog and Issues'));
+  assert.ok(!body.includes(`demo/${REPO_TODOS_LABEL}`));
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(footer, /← {2}→ {2}x/);
   assert.ok(!footer.includes('q'));
@@ -2964,7 +2965,7 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: true,
   });
   const caption = colored.rows[2];
-  assert.match(stripAnsi(caption), /Project Backlog and Issues/);
+  assert.ok(stripAnsi(caption).includes(REPO_TODOS_LABEL));
   assert.ok(!stripAnsi(caption).includes('demo'));
   assert.ok(!caption.includes(BOLD));
   assert.ok(!caption.includes(fg(THEME.buttonHotFg)));
