@@ -3781,6 +3781,49 @@ test('npm list aligns names and commands on the left', () => {
   assert.equal(cmdAt, nameAt + 'leftpad'.length + 2);
 });
 
+test('npm status line shows the old log size', () => {
+  const view = {
+    pane: 'npm',
+    npmCommands: [{ name: 'test', command: 'node --test', kind: 'script' }],
+    npmCursor: 0,
+    npmLogs: 'old logs 6b',
+    repoName: 'demo',
+    status: '',
+    counts: {},
+    files: [],
+  };
+  const frame = render.renderFrame(view, {
+    width: 60,
+    height: 10,
+    color: false,
+  });
+  const status = stripAnsi(frame.rows.at(-2));
+  const footer = stripAnsi(frame.rows.at(-1));
+  assert.match(status, /old logs 6b/);
+  assert.match(footer, /delete/);
+  assert.match(footer, /cleanup/);
+  const colored = render.renderFrame(view, {
+    width: 60,
+    height: 10,
+    color: true,
+  });
+  const row = colored.rows.at(-2);
+  const blue = seq(THEME.shaFg, THEME.chromeBg);
+  assert.ok(row.includes(`${blue}old logs 6b`));
+  assert.ok(!row.includes(`${blue}0/0`));
+  view.npmLogs = '';
+  const empty = render.renderFrame(view, {
+    width: 60,
+    height: 10,
+    color: false,
+  });
+  const emptyStatus = stripAnsi(empty.rows.at(-2));
+  const emptyFooter = stripAnsi(empty.rows.at(-1));
+  assert.ok(!emptyStatus.includes('old logs'));
+  assert.match(emptyFooter, /cleanup/);
+  assert.ok(!empty.buttons.some((hit) => hit.id === 'npmLogs'));
+});
+
 test('npm output keeps the colors the command printed', () => {
   const red = '\x1b[31m';
   const reset = '\x1b[0m';

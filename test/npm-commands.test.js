@@ -13,6 +13,7 @@ const helpers = require('./helpers.js');
 const { tempDir } = helpers;
 
 const { listCommands, reduceOutput, logFileName, writeLog } = npm;
+const { staleLogFiles, removeStaleLogs, formatSize } = npm;
 const { parseScriptLine, saveScript, removeScript, reorderScript } = npm;
 const { commandEnv, startNpm } = npm;
 
@@ -246,6 +247,29 @@ test('save remove and reorder scripts', () => {
   assert.equal(removeScript(root, 'check'), true);
   const next = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(Object.keys(next.scripts), ['test']);
+});
+
+test('stale logs are files dated more than 5 days ago', () => {
+  const root = tempDir('reslop-npm-');
+  const dir = path.join(root, '.log');
+  fs.mkdirSync(dir);
+  const now = new Date(2026, 8, 28);
+  fs.writeFileSync(path.join(dir, '2026-09-22-test-01.log'), 'abcdef');
+  fs.writeFileSync(path.join(dir, '2026-09-23-lint-01.log'), 'keep');
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'nope');
+  const found = staleLogFiles(root, now);
+  assert.equal(found.bytes, 6);
+  assert.equal(found.files.length, 1);
+  assert.equal(formatSize(0), '0b');
+  assert.equal(formatSize(6), '6b');
+  assert.equal(formatSize(1536), '1.5k');
+  assert.equal(formatSize(12 * 1024), '12k');
+  assert.equal(formatSize(1.5 * 1024 * 1024), '1.5m');
+  assert.equal(staleLogFiles(tempDir('reslop-npm-'), now).bytes, 0);
+  removeStaleLogs(root, now);
+  assert.equal(fs.existsSync(path.join(dir, '2026-09-22-test-01.log')), false);
+  assert.equal(fs.existsSync(path.join(dir, '2026-09-23-lint-01.log')), true);
+  assert.equal(staleLogFiles(root, now).bytes, 0);
 });
 
 test('startNpm drops output after the command is stopped', async () => {

@@ -4029,4 +4029,110 @@ test('npm screen refuses edits when read only', () => {
   assert.equal(session.status, 'read only');
   session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'review');
+  session.handleEvent({ type: 'key', key: 'd' });
+  assert.equal(session.status, 'read only');
+  assert.equal(session.mode, 'review');
+  session.handleEvent({ type: 'key', key: 'c' });
+  assert.equal(session.status, 'read only');
+  assert.equal(session.mode, 'review');
+});
+
+test('double click runs the selected npm command', () => {
+  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({
+      scripts: { test: 'node --test', lint: 'eslint .' },
+    })}\n`,
+  );
+  const ran = [];
+  repo.runNpmCommand = (root, entry, onData, onClose) => {
+    ran.push(entry.name);
+    onClose({ status: 0, text: '' });
+    return { kill() {} };
+  };
+  session.pushInput('n');
+  session.draw();
+  const hits = session.lastFrame.fileHits;
+  assert.ok(hits.length >= 2);
+  clickAt(session, 2, hits[1].y);
+  assert.deepEqual(ran, []);
+  assert.equal(session.npmCursor, hits[1].cursor);
+  clickAt(session, 2, hits[1].y);
+  assert.deepEqual(ran, ['lint']);
+  assert.equal(session.view().npmView, true);
+});
+
+test('d deletes the selected npm script after confirmation', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  const file = path.join(cwd, 'package.json');
+  fs.writeFileSync(
+    file,
+    `${JSON.stringify({
+      scripts: { test: 'node --test', lint: 'eslint .' },
+    })}\n`,
+  );
+  session.pushInput('n');
+  session.draw();
+  const footer = stripAnsi(session.lastFrame.rows.at(-1));
+  assert.match(footer, /edit {2}new {2}delete {2}cleanup/);
+  session.handleEvent({ type: 'key', key: 'd' });
+  assert.equal(session.mode, 'confirmDrop');
+  session.pushInput('y');
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(saved.scripts.test, undefined);
+  assert.equal(saved.scripts.lint, 'eslint .');
+  assert.equal(session.status, 'dropped test');
+});
+
+const daysAgoStamp = (ago) => {
+  const date = new Date();
+  date.setDate(date.getDate() - ago);
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+test('npm screen deletes logs older than 5 days', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
+  );
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const stale = path.join(dir, `${daysAgoStamp(6)}-test-01.log`);
+  const kept = path.join(dir, `${daysAgoStamp(5)}-test-01.log`);
+  fs.writeFileSync(stale, 'abcdef');
+  fs.writeFileSync(kept, 'keep');
+  session.pushInput('n');
+  session.draw();
+  const status = () => stripAnsi(session.lastFrame.rows.at(-2));
+  assert.match(status(), /old logs 6b/);
+  session.handleEvent({ type: 'key', key: 'c' });
+  assert.equal(session.mode, 'confirmDrop');
+  session.draw();
+  assert.match(status(), /drop logs older than 5 days \(6b\)\? y\/n/);
+  session.pushInput('n');
+  assert.equal(fs.existsSync(stale), true);
+  session.handleEvent({ type: 'key', key: 'c' });
+  session.pushInput('y');
+  assert.equal(fs.existsSync(stale), false);
+  assert.equal(fs.existsSync(kept), true);
+  session.draw();
+  assert.ok(!status().includes('old logs'));
+  assert.equal(session.status, 'dropped logs');
+  const hits = session.lastFrame.buttons.map((hit) => hit.id);
+  assert.ok(!hits.includes('npmLogs'));
+  assert.match(stripAnsi(session.lastFrame.rows.at(-1)), /cleanup/);
+  session.handleEvent({ type: 'key', key: 'c' });
+  assert.equal(session.status, 'dropped logs');
+  assert.equal(session.mode, 'review');
 });

@@ -155,6 +155,10 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('left', 'files'), null);
   assert.equal(actionFromKey('right', 'files'), null);
   assert.equal(actionFromKey('n', 'files'), 'npm');
+  assert.equal(actionFromKey('e', 'npm'), 'npmEdit');
+  assert.equal(actionFromKey('n', 'npm'), 'npmNew');
+  assert.equal(actionFromKey('d', 'npm'), 'npmDrop');
+  assert.equal(actionFromKey('c', 'npm'), 'npmLogs');
   assert.equal(actionFromKey('j', 'files'), 'next');
   assert.equal(actionFromKey('k', 'files'), 'prev');
   assert.equal(actionFromKey('a', 'files'), 'add');
@@ -409,4 +413,6 @@ test('buttonWord is the footer hint including the bound mark', () => {
   assert.equal(buttonWord('prev'), '←');
   assert.equal(buttonWord('quit'), 'q');
   assert.equal(buttonWord('check'), 'x');
+  assert.equal(buttonWord('npmDrop'), 'delete');
+  assert.equal(buttonWord('npmLogs'), 'cleanup');
 });
