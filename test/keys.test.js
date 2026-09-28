@@ -179,7 +179,7 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
 });
 
 test('layoutButtons hitboxes cover labels', () => {
-  const layout = layoutButtons(160, false);
+  const layout = layoutButtons(160);
   assert.equal(layout.hits[0].id, 'add');
   assert.ok(!layout.parts.some((part) => part.action.id === 'reload'));
   assert.ok(!layout.parts.some((part) => part.action.id === 'newBranch'));
@@ -194,17 +194,17 @@ test('layoutButtons hitboxes cover labels', () => {
   assert.equal(layout.parts[4].action.id, 'prev');
   assert.equal(layout.parts[5].action.id, 'next');
   assert.equal(hitAction(layout.hits, layout.hits[0].x0), 'add');
-  const diff80 = layoutButtons(80, false, DIFF_DISABLED);
+  const diff80 = layoutButtons(80, { hidden: DIFF_DISABLED });
   assert.equal(diff80.parts[0].label, 'add');
   assert.ok(!diff80.parts.some((part) => part.action.id === 'reload'));
   assert.ok(!diff80.parts.some((part) => part.action.id === 'commit'));
-  const letters = layoutButtons(20, true);
+  const letters = layoutButtons(20, { compact: true });
   assert.equal(letters.parts[0].label, 'a');
   assert.equal(letters.parts[0].piece, ' a');
   assert.ok(!letters.parts[0].piece.includes('['));
   const prev = letters.parts.find((part) => part.action.id === 'prev');
   assert.equal(prev.label, '←');
-  const off = layoutButtons(160, false, FILES_DISABLED);
+  const off = layoutButtons(160, { hidden: FILES_DISABLED });
   const hitIds = off.hits.map((hit) => hit.id);
   assert.equal(hitIds.includes('layout'), false);
   assert.equal(hitIds.includes('feedback'), false);
@@ -220,12 +220,10 @@ test('layoutButtons hitboxes cover labels', () => {
   assert.equal(ids.includes('feedback'), false);
   assert.equal(ids.includes('code'), false);
   assert.equal(ids.includes('todo'), true);
-  const filesHint = layoutButtons(160, false, FILES_HIDDEN, [
-    'file',
-    'commit',
-    'pull',
-    'push',
-  ]);
+  const filesHint = layoutButtons(160, {
+    hidden: FILES_HIDDEN,
+    extra: ['file', 'commit', 'pull', 'push'],
+  });
   const filesIds = filesHint.parts.map((part) => part.action.id);
   assert.deepEqual(filesIds, [
     'add',
@@ -239,29 +237,25 @@ test('layoutButtons hitboxes cover labels', () => {
     'push',
   ]);
   assert.ok(!filesIds.includes('diff'));
-  const diffHint = layoutButtons(160, false, FILES_HIDDEN, [
-    'diff',
-    'commit',
-    'pull',
-    'push',
-  ]);
+  const diffHint = layoutButtons(160, {
+    hidden: FILES_HIDDEN,
+    extra: ['diff', 'commit', 'pull', 'push'],
+  });
   const diffIds = diffHint.parts.map((part) => part.action.id);
   assert.ok(diffIds.includes('diff'));
   assert.ok(!diffIds.includes('file'));
   assert.ok(!filesIds.includes('prev'));
   assert.ok(!filesIds.includes('next'));
-  const todo = layoutButtons(160, false, TODO_DISABLED);
+  const todo = layoutButtons(160, { hidden: TODO_DISABLED });
   const todoIds = todo.parts.map((part) => part.action.id);
   assert.equal(todoIds.includes('commit'), false);
   assert.equal(todoIds.includes('todo'), false);
   assert.equal(todoIds.includes('open'), false);
-  const dim = layoutButtons(
-    160,
-    false,
-    FILES_HIDDEN,
-    ['commit', 'pull', 'push'],
-    FILES_GIT_DISABLED,
-  );
+  const dim = layoutButtons(160, {
+    hidden: FILES_HIDDEN,
+    extra: ['commit', 'pull', 'push'],
+    disabled: FILES_GIT_DISABLED,
+  });
   const dimAdd = dim.parts.find((part) => part.action.id === 'add');
   assert.equal(dimAdd.disabled, true);
   assert.equal(
@@ -316,10 +310,11 @@ test('disabledActions hides add unstage drop on files todos', () => {
   assert.equal(onto.includes('pull'), true);
   assert.equal(onto.includes('push'), true);
   const branchIds = ['newBranch', 'rebase', 'drop', 'pull', 'push'];
-  const branchLayout = layoutButtons(160, false, BRANCHES_DISABLED, branchIds, [
-    'rebase',
-    'drop',
-  ]);
+  const branchLayout = layoutButtons(160, {
+    hidden: BRANCHES_DISABLED,
+    extra: branchIds,
+    disabled: ['rebase', 'drop'],
+  });
   assert.ok(branchLayout.parts.some((part) => part.action.id === 'drop'));
   assert.ok(branchLayout.parts.some((part) => part.action.id === 'pull'));
   assert.ok(branchLayout.hits.some((hit) => hit.id === 'pull'));
@@ -330,10 +325,11 @@ test('disabledActions hides add unstage drop on files todos', () => {
     branchLayout.hits.find((hit) => hit.id === 'drop'),
     undefined,
   );
-  const ontoLayout = layoutButtons(160, false, BRANCHES_DISABLED, branchIds, [
-    'pull',
-    'push',
-  ]);
+  const ontoLayout = layoutButtons(160, {
+    hidden: BRANCHES_DISABLED,
+    extra: branchIds,
+    disabled: ['pull', 'push'],
+  });
   assert.ok(ontoLayout.parts.some((part) => part.action.id === 'pull'));
   assert.ok(ontoLayout.parts.some((part) => part.action.id === 'push'));
   assert.equal(
@@ -385,11 +381,11 @@ test('disabledActions hides add unstage drop on files todos', () => {
   assert.equal(fixupDim.includes('apply'), false);
   const headDim = keys.commitGitDisabled(head);
   assert.equal(headDim.includes('apply'), true);
-  const commitLayout = layoutButtons(160, false, COMMITS_DISABLED, commitIds, [
-    'commit',
-    'fixup',
-    'apply',
-  ]);
+  const commitLayout = layoutButtons(160, {
+    hidden: COMMITS_DISABLED,
+    extra: commitIds,
+    disabled: ['commit', 'fixup', 'apply'],
+  });
   assert.ok(commitLayout.parts.some((part) => part.action.id === 'commit'));
   assert.ok(commitLayout.parts.some((part) => part.action.id === 'amend'));
   assert.ok(commitLayout.parts.some((part) => part.action.id === 'apply'));
