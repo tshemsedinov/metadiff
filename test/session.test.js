@@ -4234,3 +4234,116 @@ test('npm screen deletes logs older than 5 days', () => {
   assert.equal(session.status, 'dropped logs');
   assert.equal(session.mode, 'review');
 });
+
+const clickCaret = (session, dx, dy) => {
+  const caret = session.lastFrame.cursor;
+  assert.ok(caret);
+  clickAt(session, caret.x + dx, caret.y + dy);
+};
+
+test('click moves the caret in the code and file editors', () => {
+  const { session, repo } = openSession([sampleItem('a.js')]);
+  session.pushInput('e');
+  session.editor.replace('ab\ncd');
+  session.draw();
+  const undo = session.editor.undo.length;
+  clickCaret(session, -1, -1);
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.editor.cursor, 1);
+  assert.equal(session.editor.undo.length, undo);
+  session.layout = 'side';
+  session.editor.place(session.editor.text.length);
+  session.draw();
+  clickCaret(session, -1, 0);
+  assert.equal(session.editor.cursor, 4);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'escape' });
+  repo.fileBodies['a.js'] = 'ab\ncd\n';
+  session.dispatch('file');
+  session.dispatch('next');
+  session.dispatch('open');
+  session.dispatch('code');
+  assert.equal(session.composeKind, 'file');
+  session.editor.place(2);
+  session.draw();
+  clickCaret(session, -2, 1);
+  assert.equal(session.editor.cursor, 3);
+});
+
+test('click moves the caret in feedback and todo editors', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  session.dispatch('feedback');
+  session.editor.replace('ab\ncd');
+  session.draw();
+  clickCaret(session, -1, -1);
+  assert.equal(session.editor.cursor, 1);
+  assert.equal(session.composeKind, 'feedback');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.dispatch('todo');
+  session.pushInput('ship');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.editor.replace('ab\ncd');
+  session.draw();
+  const box = session.lastFrame.todoHits.find((row) => row.check);
+  assert.ok(box);
+  clickAt(session, box.x0 + 1, box.y);
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.editor.text, 'ab\ncd');
+  assert.equal(session.notes.todos[0].done, true);
+  session.draw();
+  clickCaret(session, -1, -1);
+  assert.equal(session.editor.cursor, 1);
+});
+
+test('click moves the caret in commit, branch, and npm editors', () => {
+  const { session, cwd } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  session.pushInput('c');
+  session.pushInput('c');
+  session.pushInput('hello');
+  session.draw();
+  clickCaret(session, -4, 0);
+  assert.equal(session.editor.cursor, 1);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('v');
+  session.pushInput('c');
+  session.editor.replace('ab\ncd');
+  session.draw();
+  clickCaret(session, -1, -1);
+  assert.equal(session.editor.cursor, 1);
+  assert.equal(session.editor.text, 'ab\ncd');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pushInput('b');
+  session.pushInput('n');
+  session.pushInput('topic');
+  session.draw();
+  clickCaret(session, -3, 0);
+  assert.equal(session.composeKind, 'branch');
+  assert.equal(session.editor.cursor, 2);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'escape' });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
+  );
+  session.pushInput('n');
+  session.pushInput('e');
+  assert.equal(session.editor.text, 'test');
+  session.draw();
+  clickCaret(session, -3, 0);
+  assert.equal(session.npm.editField, 'name');
+  assert.equal(session.editor.cursor, 1);
+  const command = session.lastFrame.editHits.find(
+    (hit) => hit.field === 'command',
+  );
+  assert.ok(command);
+  clickAt(session, command.textX, command.y);
+  assert.equal(session.npm.editField, 'command');
+  assert.equal(session.editor.text, 'node --test');
+  assert.equal(session.editor.cursor, 0);
+  clickAt(session, command.textX + 5, command.y);
+  assert.equal(session.editor.cursor, 5);
+});
