@@ -119,6 +119,7 @@ test('ignoredRel skips review, modules, and git internals', () => {
   assert.equal(ignoredRel('.git/COMMIT_EDITMSG'), true);
   assert.equal(ignoredRel('.git/index'), false);
   assert.equal(ignoredRel('.git/HEAD'), false);
+  assert.equal(ignoredRel('.git/logs/HEAD'), false);
   assert.equal(ignoredRel('.git/refs/heads/main'), false);
   assert.equal(ignoredRel('src/a.js'), false);
   assert.equal(ignoredRel('src\\a.js'), false);
@@ -495,6 +496,32 @@ test('leaving branches reloads the file list', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
   assert.equal(session.items.length, 2);
+});
+
+test('commits pane reloads when HEAD moves outside reslop', () => {
+  const cwd = tempDir('reslop-watch-');
+  fs.mkdirSync(path.join(cwd, '.git', 'logs'), { recursive: true });
+  const logHead = path.join(cwd, '.git', 'logs', 'HEAD');
+  fs.writeFileSync(logHead, 'old\n');
+  let commitList = [
+    { sha: 'aaa', shortSha: 'aaa', subject: 'first', pending: false },
+  ];
+  const repo = {
+    load: () => ({ top: cwd, items: [], branch: 'main' }),
+    listCommits: () => commitList,
+  };
+  const { session } = openWatched([], { cwd, repo, startPane: 'files' });
+  session.uiOpen = true;
+  session.pushInput('c');
+  assert.equal(session.pane, 'commits');
+  assert.equal(session.view().commits[1].subject, 'first');
+  commitList = [
+    { sha: 'bbb', shortSha: 'bbb', subject: 'second', pending: false },
+    { sha: 'aaa', shortSha: 'aaa', subject: 'first', pending: false },
+  ];
+  fs.appendFileSync(logHead, 'new\n');
+  session.lifecycle.onDiskChange();
+  assert.equal(session.view().commits[1].subject, 'second');
 });
 
 test('async disk watch does not flash a loading state', async () => {
