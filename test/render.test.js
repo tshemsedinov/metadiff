@@ -1859,7 +1859,7 @@ test('AC10 footer words highlight the bound letter', () => {
   const plain = stripAnsi(row);
   assert.match(
     plain,
-    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
   );
   assert.match(plain, /commit {2}pull {2}push/);
   assert.match(plain, /^ add {2}/);
@@ -1885,7 +1885,7 @@ test('AC10 footer words highlight the bound letter', () => {
   const dimRow = dim.rows[dim.rows.length - 1];
   assert.match(
     dimRow,
-    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
   );
   assert.match(dimRow, /commit {2}pull {2}push/);
   assert.ok(!dimRow.includes('q'));
@@ -1920,7 +1920,7 @@ test('AC10 footer words highlight the bound letter', () => {
     color: false,
   });
   const fileScopeRow = fileScope.rows[fileScope.rows.length - 1];
-  assert.match(fileScopeRow, /todo {2}branch {2}npm {2}diff {2}commit {2}pull/);
+  assert.match(fileScopeRow, /tasks {2}branch {2}npm {2}diff {2}commit {2}pull/);
   assert.ok(fileScope.buttons.find((hit) => hit.id === 'diff'));
   assert.equal(
     fileScope.buttons.find((hit) => hit.id === 'file'),
@@ -1956,7 +1956,7 @@ test('files pane todos row dims add unstage drop', () => {
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(
     footer,
-    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
   );
   assert.match(footer, /commit {2}pull {2}push/);
   assert.ok(!footer.includes('q'));
@@ -1995,7 +1995,7 @@ test('files pane todos row dims add unstage drop', () => {
   const fileFooter = file.rows[file.rows.length - 1];
   assert.match(
     fileFooter,
-    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file/,
+    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file/,
   );
   assert.ok(file.buttons.find((hit) => hit.id === 'add'));
 });
