@@ -33,6 +33,8 @@ const setup = (extra = {}) => {
     clampIndex: () => {},
     syncReviewPath: () => {},
     syncFileCursor: () => {},
+    ignoreWatch: () => {},
+    reloadAfterChange: (afterLoad) => afterLoad(),
   };
   const composer = createComposer({
     nav,
