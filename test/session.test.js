@@ -2519,26 +2519,23 @@ test('click commit row selects it', () => {
   session.draw();
   const hit = session.lastFrame.fileHits.find((entry) => entry.cursor === 1);
   assert.ok(hit);
-  session.handleEvent({
-    type: 'mouse',
-    button: 0,
-    btn: 0,
-    kind: 'press',
-    x: 4,
-    y: hit.y,
-    press: true,
-  });
-  session.handleEvent({
-    type: 'mouse',
-    button: 0,
-    btn: 0,
-    kind: 'release',
-    x: 4,
-    y: hit.y,
-    press: false,
-  });
+  clickAt(session, 4, hit.y);
   assert.equal(session.commitCursor, 1);
   assert.equal(session.pane, 'commits');
+});
+
+test('double click commit row opens its diff', () => {
+  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+  session.pushInput('c');
+  session.draw();
+  const hit = session.lastFrame.fileHits.find((entry) => entry.cursor === 2);
+  assert.ok(hit);
+  clickAt(session, 4, hit.y);
+  assert.equal(session.commitCursor, 2);
+  assert.equal(session.pane, 'commits');
+  clickAt(session, 4, hit.y);
+  assert.equal(session.pane, 'diff');
+  assert.equal(session.rev, 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
 });
 
 test('files pane a and d stay add and revert', () => {
