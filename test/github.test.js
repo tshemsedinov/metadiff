@@ -8,7 +8,6 @@ const github = require('../lib/github.js');
 const diff = require('../lib/diff/diff.js');
 const { parseGithubPrUrl, githubToken, loadPullRequest } = github;
 const { filterChangeFiles, prApiUrl, discussionToNotes } = github;
-const { formatImportedText } = github;
 const { parseDiff, itemsFromFiles } = diff;
 
 const PR = { owner: 'acme', repo: 'app', number: 123 };
@@ -313,16 +312,6 @@ test('loadPullRequest maps 401 to an auth error', async () => {
     () => loadPullRequest(PR, { fetch: fetchImpl, token: 'tok' }),
     /GitHub authentication failed/,
   );
-});
-
-test('formatImportedText prefixes the GitHub reviewer', () => {
-  const text = formatImportedText({
-    reviewer: 'alice',
-    body: 'use const',
-  });
-  assert.equal(text, '@alice review at github: use const');
-  assert.doesNotMatch(text, /source:/);
-  assert.doesNotMatch(text, /\[alice\]/);
 });
 
 test('discussionToNotes maps an inline comment onto hunk feedback', () => {

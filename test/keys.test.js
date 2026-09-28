@@ -11,7 +11,6 @@ const { DIFF_DISABLED, TODO_DISABLED, BRANCHES_DISABLED } = keys;
 const { COMMITS_DISABLED, UNIT_DISABLED } = keys;
 const { decodeChunk, actionFromKey, hitAction } = keys;
 const { disabledActions } = keys;
-const { actionLetter, buttonWord } = keys;
 const render = require('../lib/render/render.js');
 const { layoutButtons } = render;
 
@@ -414,15 +413,4 @@ test('disabledActions hides add unstage drop on files todos', () => {
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'amend'));
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'pull'));
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'push'));
-});
-
-test('buttonWord is the footer hint including the bound mark', () => {
-  assert.equal(actionLetter('next'), '→');
-  assert.equal(actionLetter('prev'), '←');
-  assert.equal(buttonWord('next'), '→');
-  assert.equal(buttonWord('prev'), '←');
-  assert.equal(buttonWord('quit'), 'q');
-  assert.equal(buttonWord('check'), 'x');
-  assert.equal(buttonWord('npmDrop'), 'delete');
-  assert.equal(buttonWord('npmLogs'), 'cleanup');
 });

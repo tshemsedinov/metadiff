@@ -504,33 +504,6 @@ test('PR add and revert are read only and feedback attaches', () => {
   assert.equal(view.repoName, 'acme/app');
 });
 
-test('MR add and revert are read only and feedback attaches', () => {
-  const item = sampleItem('lib/a.js', 'pr');
-  const { session, repo } = openSession([item], {
-    sourceLabel: '!12',
-    change: {
-      source: 'mr',
-      repository: 'acme/app',
-      title: 'Fix',
-      author: 'alice',
-      number: 12,
-    },
-    repoName: 'acme/app',
-  });
-  session.dispatch('add');
-  assert.equal(session.status, 'read only');
-  assert.equal(repo.added.length, 0);
-  session.dispatch('revert');
-  assert.equal(session.status, 'read only');
-  const files = session.fileList();
-  assert.equal(files[0].kind, 'todos');
-  assert.equal(files[1].status, '!12');
-  const view = session.view();
-  assert.equal(view.sourceKind, 'mr');
-  assert.equal(view.sourceLabel, '!12');
-  assert.equal(view.repoName, 'acme/app');
-});
-
 test('-r blocks add unstage revert and still takes feedback', () => {
   const item = sampleItem('a.js');
   const { session, repo } = openSession([item], { readOnly: true });

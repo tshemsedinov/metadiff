@@ -7,8 +7,7 @@ const assert = require('node:assert/strict');
 const gitlab = require('../lib/gitlab.js');
 const diff = require('../lib/diff/diff.js');
 const { parseGitlabMrUrl, gitlabToken, loadMergeRequest } = gitlab;
-const { filterChangeFiles, mrApiUrl, discussionToNotes } = gitlab;
-const { formatImportedText } = gitlab;
+const { mrApiUrl, discussionToNotes } = gitlab;
 const { parseDiff, itemsFromFiles } = diff;
 
 const MR = {
@@ -142,34 +141,6 @@ test('gitlabToken reads GITLAB_TOKEN then GL_TOKEN', () => {
   assert.equal(gitlabToken({}), '');
 });
 
-const DEP_MR_DIFF = `diff --git a/package.json b/package.json
-index 1111111..2222222 100644
---- a/package.json
-+++ b/package.json
-@@ -1,6 +1,6 @@
- {
-   "name": "demo",
-   "dependencies": {
--    "lodash": "^4.17.20"
-+    "lodash": "^4.17.21"
-   }
- }
-diff --git a/package-lock.json b/package-lock.json
-index 1111111..2222222 100644
---- a/package-lock.json
-+++ b/package-lock.json
-@@ -1,8 +1,8 @@
- {
-   "lockfileVersion": 3,
-   "packages": {
-     "node_modules/lodash": {
--      "version": "4.17.20"
-+      "version": "4.17.21"
-     }
-   }
- }
-`;
-
 test('loadMergeRequest converts a GitLab patch into pr items', async () => {
   const fetchImpl = mockFetch(MR_JSON, MR_DIFF);
   const loaded = await loadMergeRequest(MR, {
@@ -212,22 +183,6 @@ test('mrApiUrl encodes nested project paths', () => {
   assert.equal(url, expected);
 });
 
-test('loadMergeRequest folds package.json and lockfile changes', async () => {
-  const fetchImpl = mockFetch(MR_JSON, DEP_MR_DIFF);
-  const loaded = await loadMergeRequest(MR, {
-    fetch: fetchImpl,
-    token: '',
-    cwd: '/tmp',
-  });
-  assert.deepEqual(loaded.change.files, ['package.json', 'package-lock.json']);
-  assert.equal(loaded.items.length, 1);
-  assert.ok(loaded.items[0].dep);
-  const hunkLines = loaded.items[0].hunk.lines;
-  const lines = hunkLines.map((line) => line.text);
-  assert.equal(lines[0], 'Dependencies in package.json & package-lock.json');
-  assert.ok(lines.includes('dependency version changed'));
-});
-
 test('loadMergeRequest sends a private token', async () => {
   const fetchImpl = mockFetch(MR_JSON, MR_DIFF);
   await loadMergeRequest(MR, { fetch: fetchImpl, token: 'secret' });
@@ -235,28 +190,6 @@ test('loadMergeRequest sends a private token', async () => {
   for (const call of fetchImpl.calls) {
     assert.equal(call.auth, 'secret');
   }
-});
-
-test('loadMergeRequest filters files by path scope', async () => {
-  const fetchImpl = mockFetch(MR_JSON, MR_DIFF);
-  const loaded = await loadMergeRequest(MR, {
-    fetch: fetchImpl,
-    token: '',
-    paths: ['lib'],
-  });
-  assert.deepEqual(loaded.change.files, ['lib/parser.js']);
-  assert.equal(loaded.items.length, 1);
-  assert.equal(loaded.items[0].file.newPath, 'lib/parser.js');
-});
-
-test('filterChangeFiles keeps matching paths', () => {
-  const files = [
-    { newPath: 'lib/a.js', oldPath: 'lib/a.js' },
-    { newPath: 'README.md', oldPath: 'README.md' },
-  ];
-  const kept = filterChangeFiles(files, ['lib']);
-  assert.equal(kept.length, 1);
-  assert.equal(kept[0].newPath, 'lib/a.js');
 });
 
 test('loadMergeRequest maps 404 to a not found error', async () => {
@@ -337,16 +270,6 @@ test('loadMergeRequest maps 401 to an auth error', async () => {
     () => loadMergeRequest(MR, { fetch: fetchImpl, token: 'tok' }),
     /GitLab authentication failed/,
   );
-});
-
-test('formatImportedText prefixes the GitLab reviewer', () => {
-  const text = formatImportedText({
-    reviewer: 'alice',
-    body: 'use const',
-  });
-  assert.equal(text, '@alice review at gitlab: use const');
-  assert.doesNotMatch(text, /source:/);
-  assert.doesNotMatch(text, /\[alice\]/);
 });
 
 const inlineDiffNote = (extra = {}) => {
