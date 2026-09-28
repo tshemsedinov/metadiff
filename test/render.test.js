@@ -3780,6 +3780,43 @@ test('npm list aligns names and commands on the left', () => {
   assert.equal(cmdAt, nameAt + 'leftpad'.length + 2);
 });
 
+test('secondary screens lead the hint line with 🢐esc', () => {
+  const footerOf = (view, color = false) =>
+    render.renderFrame(
+      {
+        repoName: 'demo',
+        status: '',
+        counts: {},
+        files: [],
+        scroll: 0,
+        ...view,
+      },
+      { width: 80, height: 8, color },
+    );
+  const plain = (view) => stripAnsi(footerOf(view).rows.at(-1));
+  assert.match(plain({ pane: 'branches' }), /^ 🢐esc {2}/);
+  assert.match(plain({ pane: 'commits' }), /^ 🢐esc {2}/);
+  assert.match(plain({ pane: 'npm' }), /^ 🢐esc {2}/);
+  assert.match(plain({ pane: 'diff', item: { origin: 'todo' } }), /^ 🢐esc {2}/);
+  assert.ok(!plain({ pane: 'files' }).includes('🢐'));
+  assert.ok(!plain({ pane: 'diff' }).includes('🢐'));
+  const output = footerOf({ pane: 'npm', npmView: true });
+  assert.match(stripAnsi(output.rows.at(-1)), /^ 🢐esc {2}/);
+  const running = footerOf({ pane: 'npm', npmView: true, npmRunning: true });
+  assert.match(stripAnsi(running.rows.at(-1)), /^ ⊗ esc {2}/);
+  assert.ok(!stripAnsi(running.rows.at(-1)).includes('🢐'));
+  assert.equal(output.buttons[0].id, 'npmStop');
+  const stops = output.buttons.filter((hit) => hit.id === 'npmStop');
+  assert.equal(stops.length, 1);
+  const colored = footerOf({ pane: 'branches' }, true);
+  const row = colored.rows.at(-1);
+  const arrow = `${BOLD}${seq(THEME.buttonHotFg, THEME.buttonBg)}🢐`;
+  const key = `${seq(THEME.buttonFg, THEME.buttonBg)}esc`;
+  assert.ok(row.includes(arrow));
+  assert.ok(row.indexOf(arrow) < row.indexOf(key));
+  assert.equal(colored.buttons[0].id, 'back');
+});
+
 test('npm status line shows the old log size', () => {
   const view = {
     pane: 'npm',
