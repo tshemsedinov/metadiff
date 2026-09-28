@@ -165,7 +165,7 @@ test('loadMergeRequest converts a GitLab patch into pr items', async () => {
   assert.equal(loaded.items[0].file.newPath, 'lib/parser.js');
   assert.ok(loaded.items[0].hunk);
   assert.equal(loaded.items[1].file.newPath, 'README.md');
-  assert.deepEqual(loaded.imported, { feedback: [], todos: [] });
+  assert.deepEqual(loaded.imported, { feedback: [], tasks: [] });
 });
 
 test('mrApiUrl encodes nested project paths', () => {
@@ -295,7 +295,7 @@ test('discussionToNotes maps an inline comment onto hunk feedback', () => {
   const items = itemsFromFiles(parseDiff(MR_DIFF), 'pr');
   const notes = discussionToNotes([{ notes: [inlineDiffNote()] }], items);
   assert.equal(notes.feedback.length, 1);
-  assert.equal(notes.todos.length, 0);
+  assert.equal(notes.tasks.length, 0);
   const note = notes.feedback[0];
   assert.equal(note.file, 'lib/parser.js');
   assert.equal(note.oldStart, 1);
@@ -345,12 +345,12 @@ test('discussionToNotes maps file-level and general comments to todos', () => {
     items,
   );
   assert.equal(notes.feedback.length, 0);
-  assert.equal(notes.todos.length, 3);
-  assert.equal(notes.todos[0].file, 'lib/parser.js');
-  assert.match(notes.todos[0].text, /add types/);
-  assert.equal(notes.todos[1].file, 'merge request');
-  assert.match(notes.todos[1].text, /Looks good overall/);
-  assert.match(notes.todos[2].text, /Please add tests/);
+  assert.equal(notes.tasks.length, 3);
+  assert.equal(notes.tasks[0].file, 'lib/parser.js');
+  assert.match(notes.tasks[0].text, /add types/);
+  assert.equal(notes.tasks[1].file, 'merge request');
+  assert.match(notes.tasks[1].text, /Looks good overall/);
+  assert.match(notes.tasks[2].text, /Please add tests/);
 });
 
 test('discussionToNotes skips system notes', () => {
@@ -369,7 +369,7 @@ test('discussionToNotes skips system notes', () => {
     ],
     items,
   );
-  assert.deepEqual(notes, { feedback: [], todos: [] });
+  assert.deepEqual(notes, { feedback: [], tasks: [] });
 });
 
 test('discussionToNotes marks resolved inline comments done', () => {
@@ -462,8 +462,8 @@ test('discussionToNotes skips empty bodies and out of scope paths', () => {
   );
   assert.equal(notes.feedback.length, 1);
   assert.match(notes.feedback[0].text, /parser nit/);
-  assert.equal(notes.todos.length, 1);
-  assert.match(notes.todos[0].text, /please add tests/);
+  assert.equal(notes.tasks.length, 1);
+  assert.match(notes.tasks[0].text, /please add tests/);
 });
 
 test('loadMergeRequest imports review discussion', async () => {
@@ -494,7 +494,7 @@ test('loadMergeRequest imports review discussion', async () => {
   assert.equal(loaded.imported.feedback.length, 1);
   assert.equal(loaded.imported.feedback[0].done, true);
   assert.match(loaded.imported.feedback[0].text, /use const/);
-  assert.equal(loaded.imported.todos.length, 2);
+  assert.equal(loaded.imported.tasks.length, 2);
 });
 
 test('loadMergeRequest paginates discussions', async () => {
@@ -577,9 +577,9 @@ test('discussionToNotes falls back to a todo when unmatched', () => {
     items,
   );
   assert.equal(notes.feedback.length, 0);
-  assert.equal(notes.todos.length, 1);
-  assert.equal(notes.todos[0].file, 'lib/parser.js');
-  assert.match(notes.todos[0].text, /orphan/);
+  assert.equal(notes.tasks.length, 1);
+  assert.equal(notes.tasks[0].file, 'lib/parser.js');
+  assert.match(notes.tasks[0].text, /orphan/);
 });
 
 test('loadMergeRequest abort during discussion does not fallback', async () => {
@@ -623,5 +623,5 @@ test('loadMergeRequest still opens when discussion import fails', async () => {
     retry: { attempts: 1 },
   });
   assert.equal(loaded.change.number, 123);
-  assert.deepEqual(loaded.imported, { feedback: [], todos: [] });
+  assert.deepEqual(loaded.imported, { feedback: [], tasks: [] });
 });

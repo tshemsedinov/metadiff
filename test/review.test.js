@@ -11,7 +11,7 @@ const review = require('../lib/review.js');
 const { allocateReviewPath, rankedTemplates } = review;
 const { prefixTemplates, upsertTemplate, createStore } = review;
 const { hasNotes, setFeedback, setCode, noteCounts, rememberTemplate } = review;
-const { addTodo, removeTodo, setTodoText, setTodoDone } = review;
+const { addTask, removeTask, setTaskText, setTaskDone } = review;
 const { serializeReview } = review;
 const { applyImportedNotes, flushReview, loadTemplates, parseReview } = review;
 const { resolveReviewPath, latestReviewName, parseFrontmatterStatus } = review;
@@ -136,7 +136,7 @@ test('rememberTemplate increments when reused on a new hunk', () => {
 
 test('serializeReview groups todos then feedback with position', () => {
   const store = createStore('/repo/.review/2026-09-07-00.md');
-  addTodo(store, 'lib/session.js', 'rewrite the retry loop');
+  addTask(store, 'lib/session.js', 'rewrite the retry loop');
   setFeedback(store, 'unstaged:lib/session.js:84:84:0', {
     file: 'lib/session.js',
     oldStart: 84,
@@ -166,7 +166,7 @@ test('serializeReview groups todos then feedback with position', () => {
 test('serializeReview writes ready when status is ready', () => {
   const store = createStore('/repo/.review/2026-09-07-00.md');
   store.status = 'ready';
-  addTodo(store, 'a.js', 'follow up');
+  addTask(store, 'a.js', 'follow up');
   const md = serializeReview(store);
   assert.match(md, /status: ready/);
   assert.match(md, /Execute reviews with `status` `ready, partial, editing`/);
@@ -191,7 +191,7 @@ test('parseFrontmatterStatus maps pending to ready', () => {
 
 test('parseReview restores todos and feedback keys', () => {
   const store = createStore('/repo/.review/2026-09-07-00.md');
-  addTodo(store, 'lib/session.js', 'rewrite the retry loop');
+  addTask(store, 'lib/session.js', 'rewrite the retry loop');
   const key = 'lib/session.js:84:84:0';
   setFeedback(store, key, {
     file: 'lib/session.js',
@@ -206,10 +206,10 @@ test('parseReview restores todos and feedback keys', () => {
   assert.equal(parseFrontmatterStatus(md), 'editing');
   const loaded = parseReview(md, store.reviewPath);
   assert.equal(loaded.status, 'editing');
-  assert.equal(loaded.todos.length, 1);
-  assert.equal(loaded.todos[0].file, 'TODOs');
-  assert.equal(loaded.todos[0].text, 'rewrite the retry loop');
-  assert.equal(loaded.todos[0].done, false);
+  assert.equal(loaded.tasks.length, 1);
+  assert.equal(loaded.tasks[0].file, 'TODOs');
+  assert.equal(loaded.tasks[0].text, 'rewrite the retry loop');
+  assert.equal(loaded.tasks[0].done, false);
   assert.equal(loaded.feedback.get(key).text, 'extract a helper');
   assert.equal(loaded.feedback.get(key).done, false);
   assert.equal(loaded.feedback.get(key).file, 'lib/session.js');
@@ -257,9 +257,9 @@ test('parseReview keeps checked todos and feedback', () => {
     '',
   ].join('\n');
   const loaded = parseReview(md, '/repo/.review/x.md');
-  assert.equal(loaded.todos[0].done, true);
-  assert.equal(loaded.todos[0].text, 'rewrite loop');
-  assert.equal(loaded.todos[1].done, false);
+  assert.equal(loaded.tasks[0].done, true);
+  assert.equal(loaded.tasks[0].text, 'rewrite loop');
+  assert.equal(loaded.tasks[1].done, false);
   assert.equal(loaded.feedback.get('a.js:1:1:0').done, true);
   const out = serializeReview(loaded);
   assert.match(out, /^## a\.js$/m);
@@ -270,13 +270,13 @@ test('parseReview keeps checked todos and feedback', () => {
 });
 
 test('noteCounts counts filled feedback todos and code', () => {
-  const empty = { feedback: 0, todo: 0, todoDone: 0, code: 0 };
+  const empty = { feedback: 0, tasks: 0, tasksDone: 0, code: 0 };
   const store = createStore('/repo/.review/x.md');
   assert.deepEqual(noteCounts(null), empty);
   assert.deepEqual(noteCounts(store), empty);
-  addTodo(store, 'a.js', '');
+  addTask(store, 'a.js', '');
   assert.deepEqual(noteCounts(store), empty);
-  addTodo(store, 'a.js', 'rewrite loop');
+  addTask(store, 'a.js', 'rewrite loop');
   setFeedback(store, 'a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
@@ -286,12 +286,12 @@ test('noteCounts counts filled feedback todos and code', () => {
   });
   assert.deepEqual(noteCounts(store), {
     feedback: 1,
-    todo: 1,
-    todoDone: 0,
+    tasks: 1,
+    tasksDone: 0,
     code: 0,
   });
-  store.todos[1].done = true;
-  assert.equal(noteCounts(store).todoDone, 1);
+  store.tasks[1].done = true;
+  assert.equal(noteCounts(store).tasksDone, 1);
   setCode(store, 'a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
@@ -301,8 +301,8 @@ test('noteCounts counts filled feedback todos and code', () => {
   });
   assert.deepEqual(noteCounts(store), {
     feedback: 1,
-    todo: 1,
-    todoDone: 1,
+    tasks: 1,
+    tasksDone: 1,
     code: 1,
   });
   assert.equal(hasNotes(store), true);
@@ -310,7 +310,7 @@ test('noteCounts counts filled feedback todos and code', () => {
 
 test('empty text is omitted from markdown and hasNotes', () => {
   const store = createStore('/repo/.review/2026-09-07-00.md');
-  addTodo(store, 'a.js', '   ');
+  addTask(store, 'a.js', '   ');
   setFeedback(store, 'k', {
     file: 'a.js',
     newStart: 1,
@@ -346,42 +346,42 @@ test('setFeedback keeps one latest note per key', () => {
   assert.ok(!md.includes('### Feedback'));
 });
 
-test('removeTodo drops a todo by id', () => {
+test('removeTask drops a todo by id', () => {
   const store = createStore('/tmp/x.md');
-  const first = addTodo(store, 'a.js', 'keep');
-  const second = addTodo(store, 'a.js', 'drop');
-  assert.equal(removeTodo(store, second.id), true);
+  const first = addTask(store, 'a.js', 'keep');
+  const second = addTask(store, 'a.js', 'drop');
+  assert.equal(removeTask(store, second.id), true);
   assert.deepEqual(
-    store.todos.map((todo) => todo.id),
+    store.tasks.map((todo) => todo.id),
     [first.id],
   );
-  assert.equal(removeTodo(store, 99), false);
-  assert.equal(store.todos.length, 1);
+  assert.equal(removeTask(store, 99), false);
+  assert.equal(store.tasks.length, 1);
 });
 
-test('setTodoDone keeps the text and round-trips through the file', () => {
+test('setTaskDone keeps the text and round-trips through the file', () => {
   const store = createStore('/tmp/x.md');
-  const todo = addTodo(store, 'a.js', 'ship it');
-  setTodoDone(store, todo.id, true);
-  assert.equal(store.todos[0].done, true);
-  assert.equal(store.todos[0].text, 'ship it');
+  const todo = addTask(store, 'a.js', 'ship it');
+  setTaskDone(store, todo.id, true);
+  assert.equal(store.tasks[0].done, true);
+  assert.equal(store.tasks[0].text, 'ship it');
   const loaded = parseReview(serializeReview(store), store.reviewPath);
-  assert.equal(loaded.todos[0].done, true);
-  assert.equal(loaded.todos[0].text, 'ship it');
-  setTodoDone(store, todo.id, false);
-  assert.equal(store.todos[0].done, false);
+  assert.equal(loaded.tasks[0].done, true);
+  assert.equal(loaded.tasks[0].text, 'ship it');
+  setTaskDone(store, todo.id, false);
+  assert.equal(store.tasks[0].done, false);
 });
 
-test('setTodoText deletes empty todos without template history', () => {
+test('setTaskText deletes empty todos without template history', () => {
   const store = createStore('/tmp/x.md');
-  const todo = addTodo(store, 'a.js', '');
-  setTodoText(store, todo.id, 'add tests');
-  setTodoText(store, todo.id, 'add tests please');
-  assert.equal(store.todos.length, 1);
-  assert.equal(store.todos[0].text, 'add tests please');
+  const todo = addTask(store, 'a.js', '');
+  setTaskText(store, todo.id, 'add tests');
+  setTaskText(store, todo.id, 'add tests please');
+  assert.equal(store.tasks.length, 1);
+  assert.equal(store.tasks[0].text, 'add tests please');
   assert.equal(store.templates.length, 0);
-  setTodoText(store, todo.id, '');
-  assert.equal(store.todos.length, 0);
+  setTaskText(store, todo.id, '');
+  assert.equal(store.tasks.length, 0);
 });
 
 test('flushReview writes markdown and templates when notes exist', () => {
@@ -413,8 +413,8 @@ test('flushReview merges disk todos instead of overwriting', () => {
   try {
     const reviewPath = path.join(dir, '.review', '2026-09-07-00.md');
     const store = createStore(reviewPath);
-    addTodo(store, 'TODOs', 'alpha');
-    const beta = addTodo(store, 'TODOs', 'beta');
+    addTask(store, 'TODOs', 'alpha');
+    const beta = addTask(store, 'TODOs', 'beta');
     setFeedback(store, 'a.js:1:1:0', {
       file: 'a.js',
       oldStart: 1,
@@ -429,18 +429,18 @@ test('flushReview merges disk todos instead of overwriting', () => {
       .replace('rename this', 'rename that')
       .replace('- [ ] beta\n', '- [ ] beta\n- [ ] gamma\n');
     fs.writeFileSync(reviewPath, edited);
-    setTodoText(store, beta.id, 'beta two');
-    addTodo(store, 'TODOs', 'delta');
+    setTaskText(store, beta.id, 'beta two');
+    addTask(store, 'TODOs', 'delta');
     assert.equal(flushReview(store), true);
     const loaded = parseReview(fs.readFileSync(reviewPath, 'utf8'), reviewPath);
-    const texts = loaded.todos.map((todo) => {
+    const texts = loaded.tasks.map((todo) => {
       const mark = todo.done ? 'x' : ' ';
       return `${mark}:${todo.text}`;
     });
     assert.deepEqual(texts, ['x:alpha', ' :gamma', ' :beta two', ' :delta']);
     const note = loaded.feedback.get('a.js:1:1:0');
     assert.equal(note.text, 'rename that');
-    assert.equal(store.todos.length, 4);
+    assert.equal(store.tasks.length, 4);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -464,15 +464,15 @@ test('flushReview skips write when there are no notes', () => {
 test('parseReview reads a legacy TODOs heading as the backlog', () => {
   const md = '---\nstatus: editing\n---\n\n## TODOs\n\n- [ ] keep\n';
   const loaded = parseReview(md, '/repo/.review/x.md');
-  assert.equal(loaded.todos[0].file, 'TODOs');
-  assert.equal(loaded.todos[0].text, 'keep');
+  assert.equal(loaded.tasks[0].file, 'TODOs');
+  assert.equal(loaded.tasks[0].text, 'keep');
   assert.match(serializeReview(loaded), /^## Backlog$/m);
 });
 
 test('serializeReview collects todos under Backlog not file headings', () => {
   const store = createStore('/tmp/x.md');
-  addTodo(store, 'a.js', 'todo a');
-  addTodo(store, 'b.js', 'todo b');
+  addTask(store, 'a.js', 'todo a');
+  addTask(store, 'b.js', 'todo b');
   setFeedback(store, 'k', {
     file: 'a.js',
     oldStart: 1,
@@ -489,9 +489,9 @@ test('serializeReview collects todos under Backlog not file headings', () => {
   assert.ok(todosAt >= 0 && todosAt < fileAt);
   assert.ok(!md.slice(fileAt).includes('todo a'));
   const loaded = parseReview(md, store.reviewPath);
-  assert.equal(loaded.todos.length, 2);
-  assert.equal(loaded.todos[0].file, 'TODOs');
-  assert.equal(loaded.todos[1].file, 'TODOs');
+  assert.equal(loaded.tasks.length, 2);
+  assert.equal(loaded.tasks[0].file, 'TODOs');
+  assert.equal(loaded.tasks[1].file, 'TODOs');
 });
 
 test('applyImportedNotes maps comments onto feedback and todos', () => {
@@ -527,10 +527,10 @@ test('applyImportedNotes maps comments onto feedback and todos', () => {
   const note = store.feedback.get('lib/parser.js:1:1:0');
   assert.equal(note.text, 'first\n\nsecond');
   assert.equal(note.done, true);
-  assert.equal(store.todos.length, 2);
-  assert.equal(store.todos[0].text, 'add tests');
-  assert.equal(store.todos[0].done, false);
-  assert.equal(store.todos[1].done, true);
+  assert.equal(store.tasks.length, 2);
+  assert.equal(store.tasks[0].text, 'add tests');
+  assert.equal(store.tasks[0].done, false);
+  assert.equal(store.tasks[1].done, true);
 });
 
 test('applyImportedNotes keeps feedback open if any comment is open', () => {
@@ -630,8 +630,8 @@ test('empty code proposal still counts as a note', () => {
   assert.equal(hasNotes(store), true);
   assert.deepEqual(noteCounts(store), {
     feedback: 0,
-    todo: 0,
-    todoDone: 0,
+    tasks: 0,
+    tasksDone: 0,
     code: 1,
   });
   const md = serializeReview(store);

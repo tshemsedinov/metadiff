@@ -92,7 +92,7 @@ test('page home and end move in a multiline compose editor', () => {
 });
 
 test('ctrl arrows move by word in compose editors', () => {
-  const kinds = ['feedback', 'code', 'todo', 'commit', 'branch'];
+  const kinds = ['feedback', 'code', 'task', 'commit', 'branch'];
   for (const kind of kinds) {
     const { composer } = setup();
     composer.openCompose(kind, 'hello world');

@@ -56,7 +56,7 @@ test('createLoadedSource is read only and returns a copy of items', () => {
   const loaded = { items: [item], sourceLabel: '#1' };
   const source = createLoadedSource(loaded);
   const first = source.load();
-  first.items.push({ origin: 'todo' });
+  first.items.push({ origin: 'task' });
   const second = source.load();
   assert.equal(second.items.length, 1);
   assert.equal(typeof source.add, 'undefined');
