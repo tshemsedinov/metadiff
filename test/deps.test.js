@@ -606,6 +606,53 @@ test('parseAuditReport maps affected dependents from effects', () => {
   assert.equal(eslint.title, 'minimatch: ReDoS in minimatch');
 });
 
+test('parseAuditReport merges lower findings into the highest one', () => {
+  const report = {
+    vulnerabilities: {
+      eslint: {
+        name: 'eslint',
+        severity: 'critical',
+        via: [{ title: 'Code injection', severity: 'critical' }],
+        fixAvailable: false,
+      },
+      minimatch: {
+        name: 'minimatch',
+        severity: 'high',
+        effects: ['eslint'],
+        range: '<3.0.5',
+        via: [{ title: 'ReDoS', severity: 'high' }],
+        fixAvailable: true,
+      },
+    },
+  };
+  const eslint = parseAuditReport(JSON.stringify(report)).get('eslint');
+  assert.equal(eslint.severity, 'critical');
+  assert.equal(eslint.title, 'eslint: Code injection');
+  assert.deepEqual(eslint.titles, [
+    'eslint: Code injection',
+    'minimatch: ReDoS',
+  ]);
+  assert.equal(eslint.range, '<3.0.5');
+});
+
+test('parseAuditReport reads npm audit v1 advisories', () => {
+  const report = `{
+  "advisories": {
+    "118": {
+      "module_name": "lodash",
+      "severity": "moderate",
+      "title": "Prototype Pollution"
+    },
+    "119": { "module_name": "debug", "severity": "info", "title": "Notice" }
+  }
+}`;
+  const audit = parseAuditReport(report);
+  assert.deepEqual([...audit.keys()], ['lodash']);
+  const lodash = audit.get('lodash');
+  assert.equal(lodash.severity, 'moderate');
+  assert.equal(lodash.title, 'lodash: Prototype Pollution');
+});
+
 test('foldDepItems marks a dependency with an npm audit warning', () => {
   const oldDeps = { lodash: '^4.17.20' };
   const newDeps = { lodash: '^4.17.21' };
