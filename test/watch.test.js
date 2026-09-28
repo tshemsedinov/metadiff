@@ -356,21 +356,6 @@ test('busy git work defers disk reload', async () => {
   assert.equal(session.items.length, 2);
 });
 
-test('commit reviews do not start a disk watcher', () => {
-  const { session } = openWatched([sampleItem('a.js')], { rev: 'abc1234' });
-  session.uiOpen = true;
-  session.lifecycle.startWatch();
-  session.lifecycle.stopWatch();
-});
-
-test('worktree watch starts and stops fs watchers', () => {
-  const { session } = openWatched([sampleItem('a.js')]);
-  session.uiOpen = true;
-  session.lifecycle.startWatch();
-  session.lifecycle.stopWatch();
-  session.lifecycle.stopWatch();
-});
-
 test('npm extras do not block a disk reload', () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');

@@ -10,7 +10,5 @@ const ansi = require('../lib/ansi.js');
 const { ESC } = ansi;
 
 test('osc52 encodes UTF-8 as base64', () => {
-  const seq = osc52('hi');
-  const b64 = Buffer.from('hi', 'utf8').toString('base64');
-  assert.equal(seq, `${ESC}]52;c;${b64}\x07`);
+  assert.equal(osc52('hé'), `${ESC}]52;c;aMOp\x07`);
 });

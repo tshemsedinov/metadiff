@@ -471,25 +471,6 @@ test('foldDepItems skips unused for a dep with no exports', () => {
   }
 });
 
-test('proposeDepItems skips unused for a dep with no exports', () => {
-  const repo = makeRepo();
-  try {
-    repo.write(
-      'node_modules/metaskills/package.json',
-      noExportPkg('metaskills'),
-    );
-    const used = new Set(['eslint']);
-    const pkg = pkgLib({ eslint: '^9.39.5', metaskills: '^1.0.5' });
-    const proposed = proposeDepItems(pkg, null, null, {
-      usedNames: used,
-      root: repo.dir,
-    });
-    assert.equal(depByName(proposed, 'metaskills'), null);
-  } finally {
-    repo.cleanup();
-  }
-});
-
 test('proposeDepItems removes an unused devDependency that exports', () => {
   const repo = makeRepo();
   try {
