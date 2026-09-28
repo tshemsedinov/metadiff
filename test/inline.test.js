@@ -45,6 +45,20 @@ test('identical strings have no changed spans', () => {
   assert.equal(changedText(diff.newSpans), '');
 });
 
+test('unrelated lines are changed whole despite shared spaces', () => {
+  const left = '      const { withoutNodeFrame, indentStack } = commands;';
+  const right = '      const textLines = (text) => String(text).split(/\\n/);';
+  const diff = diffChars(left, right);
+  assert.deepEqual(diff.oldSpans, [{ text: left, changed: true }]);
+  assert.deepEqual(diff.newSpans, [{ text: right, changed: true }]);
+});
+
+test('tiny matches inside a rewrite join the change', () => {
+  const diff = diffChars('const a = 1;', 'const b = compute(1, 2, 3);');
+  assert.equal(unchangedText(diff.oldSpans), 'const  = ;');
+  assert.equal(changedText(diff.newSpans), 'bcompute(1, 2, 3)');
+});
+
 test('AC19 identifier replace marks whole words', () => {
   const diff = diffChars('let par = 1;', 'let placeholder = 1;');
   assert.equal(changedText(diff.oldSpans), 'par');
