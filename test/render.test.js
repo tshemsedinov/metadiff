@@ -1851,7 +1851,7 @@ test('AC10 footer words highlight the bound letter', () => {
   const plain = stripAnsi(row);
   assert.match(
     plain,
-    /add {2}unstage {2}drop {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
   );
   assert.match(plain, /commit {2}pull {2}push/);
   assert.match(plain, /^ add {2}/);
@@ -1877,7 +1877,7 @@ test('AC10 footer words highlight the bound letter', () => {
   const dimRow = dim.rows[dim.rows.length - 1];
   assert.match(
     dimRow,
-    /add {2}unstage {2}drop {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
   );
   assert.match(dimRow, /commit {2}pull {2}push/);
   assert.ok(!dimRow.includes('q'));
@@ -1948,7 +1948,7 @@ test('files pane todos row dims add unstage drop', () => {
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(
     footer,
-    /add {2}unstage {2}drop {2}todo {2}branch {2}npm {2}file /,
+    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file /,
   );
   assert.match(footer, /commit {2}pull {2}push/);
   assert.ok(!footer.includes('q'));
@@ -1987,7 +1987,7 @@ test('files pane todos row dims add unstage drop', () => {
   const fileFooter = file.rows[file.rows.length - 1];
   assert.match(
     fileFooter,
-    /add {2}unstage {2}drop {2}todo {2}branch {2}npm {2}file/,
+    /add {2}unstage {2}drop {2}ignore {2}todo {2}branch {2}npm {2}file/,
   );
   assert.ok(file.buttons.find((hit) => hit.id === 'add'));
 });
@@ -2020,7 +2020,7 @@ test('diff pane dims add on staged and unstage on unstaged', () => {
   const stagedRow = staged.rows[staged.rows.length - 1];
   const rest = seq(THEME.buttonFg, THEME.buttonBg);
   const hot = seq(THEME.buttonHotFg, THEME.buttonBg);
-  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop/);
+  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop {2}ignore/);
   assert.equal(
     staged.buttons.find((hit) => hit.id === 'add'),
     undefined,
@@ -3476,7 +3476,7 @@ test('unit pane marks the current block and keeps other diffs', () => {
   assert.ok(!body.includes('+ later'));
   assert.match(render.headerText(view), /reslop: demo\/a\.js$/);
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /add {2}unstage {2}drop/);
+  assert.match(footer, /add {2}unstage {2}drop {2}ignore/);
   assert.ok(!footer.includes('mode'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'add'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'code'));
