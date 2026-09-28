@@ -2824,8 +2824,8 @@ test('major update asks y or n on the loaded status line', async () => {
   await session.openUpdate();
   session.draw();
   assert.equal(session.mode, 'confirmUpdate');
-  assert.equal(session.updateFrom, '0.1.5');
-  assert.equal(session.updateTo, '1.0.0');
+  assert.equal(session.updater.from, '0.1.5');
+  assert.equal(session.updater.to, '1.0.0');
   assert.deepEqual(installed, []);
   const text = session.lastFrame.text;
   assert.match(text, /update reslop 0\.1\.5 → 1\.0\.0\? y\/n/);
@@ -2871,10 +2871,10 @@ test('major prompt waits until the UI has loaded', async () => {
   });
   session.uiOpen = true;
   await session.openUpdate();
-  assert.equal(session.updateOffer, true);
+  assert.equal(session.updater.offer, true);
   assert.equal(session.didLoad, false);
   assert.equal(session.mode, 'review');
-  session.didLoad = true;
+  await session.openLoad();
   session.draw();
   assert.equal(session.mode, 'confirmUpdate');
 });
@@ -2962,7 +2962,7 @@ test('declined major asks again when 1.0.1 appears', async () => {
   next.draw();
   assert.deepEqual(installed, []);
   assert.equal(next.mode, 'confirmUpdate');
-  assert.equal(next.updateTo, '1.0.1');
+  assert.equal(next.updater.to, '1.0.1');
 });
 
 test('click status branch opens the branch list', () => {
