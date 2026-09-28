@@ -3098,13 +3098,54 @@ test('npm i shows progress until install finishes', async () => {
   };
   session.repo.addAsync = () => pending;
   session.dispatch('add');
+  assert.equal(session.current().origin, 'staged');
   assert.equal(session.busy, 'npm i');
   session.tickProgress();
   assert.equal(session.progressFrame, 1);
   finish();
   await pending;
-  await Promise.resolve();
+  for (let i = 0; i < 6; i++) await Promise.resolve();
   assert.equal(session.status, 'staged');
+  assert.equal(session.busy, '');
+});
+
+test('stage moves on while npm install is still running', async () => {
+  let finish;
+  const pending = new Promise((resolve) => {
+    finish = resolve;
+  });
+  const proposed = sampleItem('package.json');
+  proposed.reload = true;
+  proposed.dep = {
+    change: { propose: true, name: 'lodash' },
+    files: ['package.json'],
+  };
+  const other = sampleItem('b.js');
+  const { session, repo } = openSession([proposed, other]);
+  session.uiOpen = true;
+  let installs = 0;
+  session.repo.addAsync = () => {
+    installs += 1;
+    return pending;
+  };
+  session.repo.add = (top, item) => {
+    repo.added.push(item);
+  };
+  session.dispatch('add');
+  assert.equal(session.items[0].origin, 'staged');
+  assert.equal(installs, 0);
+  session.dispatch('next');
+  session.dispatch('add');
+  assert.equal(session.items[1].origin, 'staged');
+  assert.equal(repo.added.length, 0);
+  await Promise.resolve();
+  assert.equal(installs, 1);
+  assert.equal(repo.added.length, 0);
+  finish();
+  await pending;
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+  assert.equal(repo.added.length, 1);
+  assert.equal(repo.added[0].file.newPath, 'b.js');
   assert.equal(session.busy, '');
 });
 
