@@ -150,7 +150,7 @@ test('serializeReview groups todos then feedback with position', () => {
   assert.match(md, /status: editing/);
   assert.match(md, /# reslop review 2026-09-07-00/);
   assert.match(md, /## Agent instructions/);
-  assert.match(md, /^## TODOs$/m);
+  assert.match(md, /^## Backlog$/m);
   assert.match(md, /^## lib\/session\.js$/m);
   assert.ok(!md.includes('> lib/session.js'));
   assert.ok(!md.includes('### Todo'));
@@ -461,7 +461,15 @@ test('flushReview skips write when there are no notes', () => {
   }
 });
 
-test('serializeReview collects todos under TODOs not file headings', () => {
+test('parseReview reads a legacy TODOs heading as the backlog', () => {
+  const md = '---\nstatus: editing\n---\n\n## TODOs\n\n- [ ] keep\n';
+  const loaded = parseReview(md, '/repo/.review/x.md');
+  assert.equal(loaded.todos[0].file, 'TODOs');
+  assert.equal(loaded.todos[0].text, 'keep');
+  assert.match(serializeReview(loaded), /^## Backlog$/m);
+});
+
+test('serializeReview collects todos under Backlog not file headings', () => {
   const store = createStore('/tmp/x.md');
   addTodo(store, 'a.js', 'todo a');
   addTodo(store, 'b.js', 'todo b');
@@ -473,11 +481,11 @@ test('serializeReview collects todos under TODOs not file headings', () => {
     text: 'nit',
   });
   const md = serializeReview(store);
-  assert.match(md, /^## TODOs$/m);
+  assert.match(md, /^## Backlog$/m);
   assert.match(md, /- \[ \] todo a/);
   assert.match(md, /- \[ \] todo b/);
   const fileAt = md.indexOf('## a.js');
-  const todosAt = md.indexOf('## TODOs');
+  const todosAt = md.indexOf('## Backlog');
   assert.ok(todosAt >= 0 && todosAt < fileAt);
   assert.ok(!md.slice(fileAt).includes('todo a'));
   const loaded = parseReview(md, store.reviewPath);
