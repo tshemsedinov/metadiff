@@ -2143,7 +2143,7 @@ test('full mode ctrl-s saves the message', () => {
   assert.equal(repo.commits[0].message, 'one\ntwo');
 });
 
-test('full mode enter on an empty last line saves', () => {
+test('full mode enter keeps the blank line after the subject', () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
@@ -2155,8 +2155,45 @@ test('full mode enter on an empty last line saves', () => {
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'ship it\n');
   session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.editor.text, 'ship it\n\n');
+  assert.equal(repo.commits.length, 0);
+  session.pushInput('explain');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'compose');
+  session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'review');
-  assert.equal(repo.commits[0].message, 'ship it\n');
+  assert.equal(repo.commits[0].message, 'ship it\n\nexplain');
+});
+
+test('full mode enter three times saves a one-line message', () => {
+  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  session.pushInput('c');
+  session.pushInput('v');
+  session.pushInput('c');
+  session.pushInput('  ship it  ');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.editor.text, '  ship it  \n\n');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'review');
+  assert.equal(repo.commits[0].message, 'ship it');
+});
+
+test('saving a commit trims spaces and surrounding newlines', () => {
+  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  session.pushInput('c');
+  session.pushInput('v');
+  session.pushInput('c');
+  session.editor.replace('  ship it  \n \n  explain  \n\n');
+  session.handleEvent({ type: 'key', key: 'ctrl-s' });
+  assert.equal(session.mode, 'review');
+  assert.equal(repo.commits[0].message, 'ship it\n\nexplain');
 });
 
 test('editing a commit ignores clicks and scrolls on other commits', () => {
