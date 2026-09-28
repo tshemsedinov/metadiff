@@ -40,7 +40,6 @@ const setup = (extra = {}) => {
     nav,
     review: { store: notes },
     ui,
-    restartBlink: () => {},
   });
   return {
     composer,

@@ -5,6 +5,8 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 const events = require('node:events');
 const { EventEmitter } = events;
+const timers = require('node:timers/promises');
+const { setTimeout: sleep } = timers;
 
 const helpers = require('./helpers.js');
 const { sink } = helpers;
@@ -102,22 +104,22 @@ test('repeated listen and close restore listener and timer counts', () => {
       onData: () => {},
       onResize: () => {},
     });
-    term.startTimer('save', () => {}, 10);
-    term.startTimer('blink', () => {}, 10);
+    term.later('save', () => {}, 1000);
+    term.later('progress', () => {}, 1000);
   };
   start();
   assert.equal(stdin.listenerCount('data'), 1);
   assert.equal(stdout.listenerCount('resize'), 1);
   assert.equal(proc.listenerCount('SIGWINCH'), 1);
   assert.equal(term.hasTimer('save'), true);
-  assert.equal(term.hasTimer('blink'), true);
+  assert.equal(term.hasTimer('progress'), true);
   term.stopListening();
   term.clearTimers();
   assert.equal(stdin.listenerCount('data'), 0);
   assert.equal(stdout.listenerCount('resize'), 0);
   assert.equal(proc.listenerCount('SIGWINCH'), 0);
   assert.equal(term.hasTimer('save'), false);
-  assert.equal(term.hasTimer('blink'), false);
+  assert.equal(term.hasTimer('progress'), false);
   term.enter();
   start();
   term.close();
@@ -137,7 +139,7 @@ test('startup failure cleanup restores acquired terminal state', () => {
       onData: () => {},
       onResize: () => {},
     });
-    term.startTimer('save', () => {}, 10);
+    term.later('save', () => {}, 1000);
     throw new Error('boom');
   };
   try {
@@ -183,26 +185,30 @@ test('paint after dispose writes nothing', () => {
   assert.ok(closed.length > before.length);
 });
 
-test('stopping one progress id leaves the timer running', () => {
-  let started = 0;
-  let stopped = 0;
-  const term = {
-    startTimer: () => {
-      started += 1;
-    },
-    stopTimer: () => {
-      stopped += 1;
-    },
-  };
-  const progress = createProgress(term, () => {}, 80);
+test('progress ticks only while an id is active', () => {
+  const { term } = openTerm();
+  let ticks = 0;
+  const progress = createProgress(term, () => (ticks += 1), 1000);
   progress.start('busy');
   progress.start('install');
-  assert.equal(started, 1);
-  assert.equal(progress.size(), 2);
+  assert.equal(term.hasTimer('progress'), true);
   progress.stop('busy');
-  assert.equal(stopped, 0);
-  assert.equal(progress.size(), 1);
+  assert.equal(term.hasTimer('progress'), true);
   progress.stop('install');
-  assert.equal(stopped, 1);
-  assert.equal(progress.size(), 0);
+  assert.equal(term.hasTimer('progress'), false);
+  assert.equal(ticks, 0);
+});
+
+test('later runs once and can be scheduled again', async () => {
+  const { term } = openTerm();
+  let runs = 0;
+  term.later('save', () => (runs += 1), 5);
+  term.later('save', () => (runs += 10), 5);
+  await sleep(30);
+  assert.equal(runs, 1);
+  assert.equal(term.hasTimer('save'), false);
+  term.later('save', () => (runs += 1), 5);
+  await sleep(30);
+  assert.equal(runs, 2);
+  term.close();
 });

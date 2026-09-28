@@ -1107,7 +1107,7 @@ test('compose arrows move by visual wrap rows', () => {
   assert.equal(session.editor.cursor, 11);
 });
 
-test('compose cursor blinks by hiding and showing', () => {
+test('compose cursor uses the terminal blinking cursor', () => {
   const item = sampleItem('a.js');
   const { session, stdout } = openSession([item]);
   session.dispatch('feedback');
@@ -1116,14 +1116,8 @@ test('compose cursor blinks by hiding and showing', () => {
   assert.ok(on.includes('[1 q'));
   assert.ok(on.includes('[?12h'));
   assert.ok(on.includes('[?25h'));
-  session.tickBlink();
-  const hidden = stdout.dump().slice(on.length);
-  assert.ok(hidden.includes('[?25l'));
-  assert.ok(!hidden.includes('[?2026h'));
-  session.tickBlink();
-  const shown = stdout.dump().slice(on.length + hidden.length);
-  assert.ok(shown.includes('[?25h'));
-  assert.ok(!shown.includes('[?2026h'));
+  session.draw();
+  assert.equal(stdout.dump(), on);
 });
 
 test('enter and escape save feedback and return to browse', () => {
