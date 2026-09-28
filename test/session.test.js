@@ -843,10 +843,10 @@ test('AC14 files pane lists paths and enter opens', () => {
   assert.equal(session.pane, 'files');
   session.draw();
   const text = stdout.dump();
-  assert.match(text, /TODOs/);
+  assert.match(text, /: Project Backlog and Issues/);
   assert.ok(!text.includes('todo 1/3'));
   assert.ok(!text.includes('@@'));
-  assert.match(text, /Repository TODOs and Issues/);
+  assert.match(text, /Project Backlog and Issues/);
   assert.match(text, /a\.js/);
   assert.match(text, /b\.js/);
   session.dispatch('scrollDown');
@@ -1449,7 +1449,7 @@ test('t opens the repo todo page and lets you edit it', () => {
   const { session } = openSession([a, b]);
   const files = session.fileList();
   assert.equal(files[0].kind, 'todos');
-  assert.equal(files[0].path, 'Repository TODOs and Issues');
+  assert.equal(files[0].path, 'Project Backlog and Issues');
   assert.equal(files[0].remaining, 0);
   assert.equal(files[0].staged, 0);
   session.dispatch('todo');
@@ -3238,7 +3238,7 @@ test('unit scope lists every file sorted by path', () => {
   session.dispatch('file');
   const names = session.fileList().map((entry) => entry.path);
   assert.deepEqual(names, [
-    'Repository TODOs and Issues',
+    'Project Backlog and Issues',
     'a.js',
     'b.js',
     'z.js',

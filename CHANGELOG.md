@@ -4,6 +4,7 @@
 
 - Add instructions for agents to run tests using reslop
 - Show old log size on the npm screen and delete logs older than 5 days
+- Rename the todo list to Project Backlog and Issues
 - Remove circular dependencies between Git modules
 - Share rebase cleanup, dependency index writes, and session Git operations
 - Stage dependency changes without rewriting working files

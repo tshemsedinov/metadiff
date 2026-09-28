@@ -1753,7 +1753,7 @@ test('header last column uses the light grey bar background', () => {
 test('file list leads with repository TODOs and a count', () => {
   const files = [
     {
-      path: 'Repository TODOs and Issues',
+      path: 'Project Backlog and Issues',
       kind: 'todos',
       status: 'todos',
       remaining: 3,
@@ -1776,7 +1776,7 @@ test('file list leads with repository TODOs and a count', () => {
   );
   const lead = stripAnsi(frame.rows[2]);
   const file = stripAnsi(frame.rows[3]);
-  assert.match(lead, /▶ Repository TODOs and Issues/);
+  assert.match(lead, /▶ Project Backlog and Issues/);
   assert.match(lead, /1\/3\s*$/);
   assert.match(file, /a\.js/);
   assert.ok(!file.includes('Repository'));
@@ -1788,7 +1788,7 @@ test('file list leads with repository TODOs and a count', () => {
     fileCursor: 0,
     repoName: 'demo',
   });
-  assert.match(header, /demo: TODOs\s*$/);
+  assert.match(header, /demo: Project Backlog and Issues\s*$/);
   assert.ok(!header.includes('todo '));
   assert.ok(!/\d+\/\d+/.test(header));
   assert.ok(!header.includes('demo/'));
@@ -1925,7 +1925,7 @@ test('files pane todos row dims add unstage drop', () => {
     pane: 'files',
     files: [
       {
-        path: 'Repository TODOs and Issues',
+        path: 'Project Backlog and Issues',
         kind: 'todos',
         status: 'todos',
         remaining: 1,
@@ -2417,7 +2417,7 @@ test('file list dates are right-aligned', () => {
 test('file list TODOs n/m aligns with file staged/remaining', () => {
   const files = [
     {
-      path: 'Repository TODOs and Issues',
+      path: 'Project Backlog and Issues',
       kind: 'todos',
       status: 'todos',
       remaining: 5,
@@ -2921,16 +2921,16 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: false,
   });
   const body = stripAnsi(frame.rows.join('\n'));
-  const captionAt = body.indexOf('Repository TODOs and Issues');
+  const captionAt = body.indexOf('Project Backlog and Issues');
   const firstAt = body.indexOf('[ ] rewrite this');
   assert.ok(captionAt >= 0 && captionAt < firstAt);
   assert.match(body, /\[ \] rewrite this/);
   assert.match(body, /\[x\] already done/);
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('+'));
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('-'));
-  assert.match(body, /demo: TODOs/);
+  assert.match(body, /demo: Project Backlog and Issues/);
   assert.ok(!body.includes('todo 1/1'));
-  assert.ok(!body.includes('demo/TODOs'));
+  assert.ok(!body.includes('demo/Project Backlog and Issues'));
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(footer, /← {2}→ {2}x/);
   assert.ok(!footer.includes('q'));
@@ -2955,10 +2955,11 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: true,
   });
   const caption = colored.rows[2];
-  assert.match(stripAnsi(caption), /Repository TODOs and Issues/);
+  assert.match(stripAnsi(caption), /Project Backlog and Issues/);
   assert.ok(!stripAnsi(caption).includes('demo'));
-  assert.ok(caption.includes(BOLD));
-  assert.ok(caption.includes(fg(THEME.buttonHotFg)));
+  assert.ok(!caption.includes(BOLD));
+  assert.ok(!caption.includes(fg(THEME.buttonHotFg)));
+  assert.ok(caption.includes(fg(THEME.mutedFg)));
 });
 
 test('todo list stays visible while composing', () => {
@@ -3074,14 +3075,12 @@ test('checkbox marks use a contrast chip on todo and note rows', () => {
   const noteRow = note.rows.find((row) => row.includes('extract helper'));
   const openBg = bg(THEME.checkBg);
   const doneBg = bg(THEME.checkDoneBg);
-  assert.notDeepEqual(THEME.checkBg, THEME.ctxBg);
-  assert.notDeepEqual(THEME.checkBg, THEME.buttonBg);
-  assert.notDeepEqual(THEME.checkBg, THEME.noteBg);
-  assert.notDeepEqual(THEME.checkDoneBg, THEME.checkBg);
-  assert.ok(openRow.includes(openBg));
+  assert.ok(!openRow.includes(openBg));
   assert.ok(!openRow.includes(doneBg));
-  assert.ok(doneRow.includes(doneBg));
+  assert.ok(openRow.includes(bg(THEME.buttonBg)));
   assert.ok(!doneRow.includes(openBg));
+  assert.ok(!doneRow.includes(doneBg));
+  assert.ok(doneRow.includes(bg(THEME.ctxBg)));
   assert.ok(noteRow.includes(doneBg));
   assert.ok(noteRow.includes(bg(THEME.noteBg)));
 });
