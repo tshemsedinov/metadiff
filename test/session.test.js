@@ -3759,12 +3759,22 @@ test('files pane n opens npm scripts and bins', () => {
   assert.ok(!body.includes(' q'));
   session.pushInput('e');
   assert.equal(session.mode, 'compose');
-  assert.equal(session.editor.text, 'test: node --test');
-  session.editor.replace('nope');
+  assert.equal(session.editor.text, 'test');
+  session.draw();
+  body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(body, /node --test/);
+  session.editor.replace('bad name');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.status, 'name: command');
-  session.editor.replace('test: node --test test');
+  assert.equal(session.status, 'name');
+  session.editor.replace('test');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'compose');
+  assert.equal(session.editor.text, 'node --test');
+  const nameCursor = session.lastFrame.cursor;
+  session.draw();
+  assert.ok(session.lastFrame.cursor.x > (nameCursor?.x ?? 0));
+  session.editor.replace('node --test test');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'review');
   const file = path.join(cwd, 'package.json');
@@ -3815,6 +3825,53 @@ test('files pane n opens npm scripts and bins', () => {
   assert.equal(session.view().npmView, false);
   session.pushInput('q');
   assert.equal(session.done, true);
+});
+
+test('npm output v toggles raw text until the screen closes', () => {
+  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
+  );
+  const raw = ['✔ passes', `${cwd}/lib/app.js:4`, '✖ fails'].join('\n');
+  repo.runNpmCommand = (root, entry, onData, onClose) => {
+    onData(raw);
+    onClose({ status: 1, text: raw });
+    return { kill() {} };
+  };
+  session.pushInput('n');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.draw();
+  let body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.ok(!body.includes('✔'));
+  assert.match(body, /exit 1/);
+  const footer = () => stripAnsi(session.lastFrame.rows.at(-1));
+  assert.match(footer(), /verbose/);
+  session.handleEvent({ type: 'key', key: 'v' });
+  assert.equal(session.status, 'verbose');
+  session.draw();
+  body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(body, /✔ passes/);
+  assert.match(body, /lib\/app\.js:4/);
+  session.handleEvent({ type: 'key', key: 'v' });
+  assert.equal(session.status, 'filtered');
+  session.draw();
+  body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.ok(!body.includes('✔'));
+  session.handleEvent({ type: 'key', key: 'v' });
+  session.handleEvent({ type: 'key', key: 'r' });
+  session.draw();
+  body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(body, /✔ passes/);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.view().npmView, false);
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.draw();
+  body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.ok(!body.includes('✔'));
+  assert.match(body, /exit 1/);
 });
 
 const frameBody = (session) => {
