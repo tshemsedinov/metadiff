@@ -2028,7 +2028,8 @@ test('diff pane dims add on staged and unstage on unstaged', () => {
   const stagedRow = staged.rows[staged.rows.length - 1];
   const rest = seq(THEME.buttonFg, THEME.buttonBg);
   const hot = seq(THEME.buttonHotFg, THEME.buttonBg);
-  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop {2}ignore/);
+  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop/);
+  assert.ok(!stripAnsi(stagedRow).includes('ignore'));
   assert.equal(
     staged.buttons.find((hit) => hit.id === 'add'),
     undefined,
@@ -3484,7 +3485,8 @@ test('unit pane marks the current block and keeps other diffs', () => {
   assert.ok(!body.includes('+ later'));
   assert.match(render.headerText(view), /reslop: demo\/a\.js$/);
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /add {2}unstage {2}drop {2}ignore/);
+  assert.match(footer, /add {2}unstage {2}drop/);
+  assert.ok(!footer.includes('ignore'));
   assert.ok(!footer.includes('mode'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'add'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'code'));
