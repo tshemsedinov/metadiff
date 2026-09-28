@@ -13,7 +13,8 @@ const { addTask } = review;
 const items = require('../lib/session/items.js');
 const { restoredIndex, alignLoadedItems } = items;
 const watch = require('../lib/session/watch.js');
-const { ignoredRel, isOwnDirEvent, createDiskWatcher, DEBOUNCE_MS } = watch;
+const { ignoredRel, isOwnDirEvent, unchangedSince } = watch;
+const { createDiskWatcher, DEBOUNCE_MS } = watch;
 const helpers = require('./helpers.js');
 const { uiSink, tempDir } = helpers;
 
@@ -21,6 +22,11 @@ const wait = (ms) =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+
+const startWatcher = async (options) => {
+  await wait(20);
+  return createDiskWatcher(options);
+};
 
 const waitUntil = async (check, ms = 500) => {
   const start = Date.now();
@@ -94,7 +100,7 @@ test('disk watcher watches nested files when recursive is off', async () => {
   const nested = path.join(cwd, 'src', 'nested.js');
   fs.writeFileSync(nested, 'x\n');
   let n = 0;
-  const watcher = createDiskWatcher({
+  const watcher = await startWatcher({
     root: cwd,
     recursive: false,
     debounceMs: 20,
@@ -109,6 +115,20 @@ test('disk watcher watches nested files when recursive is off', async () => {
   } finally {
     watcher.close();
   }
+});
+
+test('events for paths untouched since watch start are stale', async () => {
+  const cwd = tempDir('reslop-watch-');
+  const file = path.join(cwd, 'a.js');
+  fs.writeFileSync(file, 'x\n');
+  await wait(20);
+  const since = Date.now();
+  assert.equal(unchangedSince(file, since), true);
+  assert.equal(unchangedSince(cwd, since), true);
+  assert.equal(unchangedSince(path.join(cwd, 'gone.js'), since), false);
+  await wait(20);
+  fs.writeFileSync(file, 'y\n');
+  assert.equal(unchangedSince(file, since), false);
 });
 
 test('ignoredRel skips review, modules, and git internals', () => {
@@ -145,7 +165,7 @@ test('review markdown notifies onReview and not onChange', async () => {
   fs.writeFileSync(file, '---\nstatus: editing\n---\n');
   let changes = 0;
   let reviews = 0;
-  const watcher = createDiskWatcher({
+  const watcher = await startWatcher({
     root: cwd,
     recursive: false,
     debounceMs: 20,
@@ -170,7 +190,7 @@ test('disk watcher debounces changes and ignores lock files', async () => {
   fs.mkdirSync(path.join(cwd, '.git'));
   fs.writeFileSync(path.join(cwd, 'a.js'), 'x\n');
   let n = 0;
-  const watcher = createDiskWatcher({
+  const watcher = await startWatcher({
     root: cwd,
     recursive: false,
     debounceMs: 20,
@@ -380,7 +400,7 @@ for (const recursive of [false, true]) {
     fs.writeFileSync(built, 'x\n');
     fs.writeFileSync(other, 'x\n');
     let n = 0;
-    const watcher = createDiskWatcher({
+    const watcher = await startWatcher({
       root: cwd,
       recursive,
       debounceMs: 20,
@@ -412,7 +432,7 @@ test('disk watcher keeps a code change during a review write', async () => {
   fs.writeFileSync(code, 'x\n');
   let changes = 0;
   let reviews = 0;
-  const watcher = createDiskWatcher({
+  const watcher = await startWatcher({
     root: cwd,
     recursive: false,
     debounceMs: 20,
