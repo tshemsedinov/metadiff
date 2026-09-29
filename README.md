@@ -11,8 +11,7 @@
 
 > Turn generated changes into owned changes
 
-Open a change, leave findings and a backlog, and prepare a repair plan
-for the agent.
+Open a change, leave findings and a backlog, and prepare a repair plan for the agent.
 
 ```text
 Review → Plan → Repair → Verify
