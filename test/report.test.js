@@ -18,6 +18,9 @@ const { winCommand } = reportRun;
 const helpers = require('./helpers.js');
 const { sink, tempDir } = helpers;
 
+const model = require('../lib/report-model.js');
+const { problem, groupReport } = model;
+
 const ROOT = '/repo';
 
 const rendered = (stdout, stderr, exit) => {
@@ -211,6 +214,109 @@ test('eslint JSON warnings keep exit 0', () => {
   assert.match(view.md, /warnings: 1/);
   assert.match(view.md, /no-unused-vars/);
   assert.match(view.md, /lib\/a\.js:3:1/);
+});
+
+test('cluster errors by normalized stack trace', () => {
+  const problems = [
+    problem({
+      message: 'Cannot read property id of undefined at user.js:10:5',
+      trace: 'at User.get (lib/user.js:10:5)\nat process.tick',
+    }),
+    problem({
+      message: 'Cannot read property id of undefined at user.js:25:12',
+      trace: 'at User.get (lib/user.js:25:12)\nat process.tick',
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].count, 2);
+  assert.equal(grouped[0].traces.length, 2);
+});
+
+test('cluster assertion failures with same stack and different values', () => {
+  const problems = [
+    problem({
+      code: 'ERR_ASSERTION',
+      operator: 'strictEqual',
+      expected: '3',
+      actual: '4',
+      message: 'expected 3, got 4',
+      trace: 'at add (lib/add.js:2:10)\nat Test.run (test/add.test.js:8:3)',
+    }),
+    problem({
+      code: 'ERR_ASSERTION',
+      operator: 'strictEqual',
+      expected: '1',
+      actual: '2',
+      message: 'expected 1, got 2',
+      trace: 'at add (lib/add.js:2:20)\nat Test.run (test/add.test.js:12:3)',
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].count, 2);
+});
+
+test('keep separate clusters for different stack roots', () => {
+  const problems = [
+    problem({
+      message: 'boom',
+      trace: 'at one (lib/a.js:1:1)',
+    }),
+    problem({
+      message: 'boom',
+      trace: 'at two (lib/b.js:1:1)',
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+});
+
+test('fall back to message when stack is empty', () => {
+  const problems = [
+    problem({ message: 'same failure' }),
+    problem({ message: 'same failure' }),
+    problem({ message: 'other failure' }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+  assert.equal(grouped[0].count, 2);
+  assert.equal(grouped[1].count, 1);
+});
+
+test('normalize message masks numbers and quoted literals', () => {
+  const quote = String.fromCharCode(39);
+  const problems = [
+    problem({
+      message: `Cannot read property ${quote}id${quote} of undefined`,
+    }),
+    problem({
+      message: `Cannot read property ${quote}name${quote} of undefined`,
+    }),
+    problem({ message: 'expected 3, got 4' }),
+    problem({ message: 'expected 10, got 20' }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+  assert.equal(grouped[0].count, 2);
+  assert.equal(grouped[1].count, 2);
+});
+
+test('full stack fingerprint keeps deeper frames', () => {
+  const deep = (leaf) =>
+    [
+      `at leaf (${leaf}:1:1)`,
+      'at mid (lib/mid.js:2:2)',
+      'at mid2 (lib/mid.js:3:3)',
+      'at mid3 (lib/mid.js:4:4)',
+      'at root (lib/root.js:5:5)',
+    ].join('\n');
+  const problems = [
+    problem({ message: 'boom', trace: deep('lib/a.js') }),
+    problem({ message: 'boom', trace: deep('lib/b.js') }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
 });
 
 test('similar eslint problems are grouped', () => {

@@ -2,6 +2,8 @@
 
 ## [Unreleased][unreleased]
 
+- Cluster test failures by normalized stack trace instead of expected/actual values
+
 ## [0.2.4][] - 2026-09-28
 
 - Add AI instructions to run `npm t` or `reslop t -- node --test`
