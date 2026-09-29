@@ -35,6 +35,35 @@ test('selectChangeSource does not treat review as a subcommand', () => {
   assert.deepEqual(selected.paths, ['review', url, 'lib']);
 });
 
+test('selectChangeSource recognizes GitHub and GitLab issue URLs', () => {
+  const gh = 'https://github.com/acme/app/issues/33';
+  const selected = selectChangeSource([gh, 'lib']);
+  assert.equal(selected.kind, 'issue');
+  assert.equal(selected.host, 'github');
+  assert.deepEqual(selected.issue, {
+    owner: 'acme',
+    repo: 'app',
+    number: 33,
+  });
+  assert.deepEqual(selected.paths, ['lib']);
+  const gl = 'https://gitlab.com/acme/app/-/issues/33';
+  const glSelected = selectChangeSource([gl]);
+  assert.equal(glSelected.kind, 'issue');
+  assert.equal(glSelected.host, 'gitlab');
+  assert.equal(glSelected.issue.project, 'acme/app');
+  assert.equal(glSelected.issue.number, 33);
+  assert.deepEqual(glSelected.paths, []);
+});
+
+test('selectChangeSource prefers pull and merge request URLs', () => {
+  const pr = selectChangeSource(['https://github.com/acme/app/pull/33']);
+  assert.equal(pr.kind, 'pr');
+  const mr = selectChangeSource([
+    'https://gitlab.com/acme/app/-/merge_requests/33',
+  ]);
+  assert.equal(mr.kind, 'mr');
+});
+
 test('selectChangeSource keeps local paths and commits', () => {
   assert.deepEqual(selectChangeSource([]), { kind: 'local', paths: [] });
   assert.deepEqual(selectChangeSource(['lib']), {

@@ -19,7 +19,7 @@ Review → Plan → Repair → Verify
 ```
 
 - Leave feedback, a project backlog, and in-place code proposals as a repair plan
-- Review uncommitted git diffs, a given commit, a GitHub PR, or a GitLab MR
+- Review uncommitted git diffs, a given commit, a GitHub PR, a GitLab MR, or an issue
 - File-scope review mode: not just diffs, with editor mode
 - Stage, unstage, or revert each contiguous block of diff lines
 - Auto-reload local diffs when files change, keeping the current screen
@@ -50,6 +50,7 @@ Requires Node.js `>=18.15.0`.
 - `reslop path/file` show only that path or file
 - `reslop 7ac260c` show that commit (read-only)
 - `reslop https://github.com/metarhia/metacom/pull/555` GitHub/GitLab PR/MR
+- `reslop https://github.com/owner/repo/issues/33` GitHub/GitLab issue
 - `reslop -n` start a new review even if the latest is still editing
 - `reslop -r` read-only mode
 - `reslop -light` light color theme (default dark)
@@ -75,7 +76,6 @@ Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 
 ## Future
 
-- Import issues from GitHub and GitLab
 - Search, blame, and file history in the review
 - Security and code-quality audit; propose a repair plan
 - Send anonymized code blocks for expert review

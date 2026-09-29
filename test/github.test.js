@@ -8,6 +8,7 @@ const github = require('../lib/github.js');
 const diff = require('../lib/diff/diff.js');
 const { parseGithubPrUrl, githubToken, loadPullRequest } = github;
 const { filterChangeFiles, prApiUrl, discussionToNotes } = github;
+const { parseGithubIssueUrl, loadIssue, issueToNotes, issueApiUrl } = github;
 const { parseDiff, itemsFromFiles } = diff;
 
 const PR = { owner: 'acme', repo: 'app', number: 123 };
@@ -644,4 +645,143 @@ test('loadPullRequest keeps comments if GraphQL resolved fails', async () => {
   assert.equal(loaded.imported.feedback.length, 1);
   assert.equal(loaded.imported.feedback[0].done, false);
   assert.match(loaded.imported.feedback[0].text, /use const/);
+});
+
+const ISSUE = { owner: 'acme', repo: 'app', number: 33 };
+
+const ISSUE_JSON = JSON.parse(`{
+  "number": 33,
+  "title": "Add issue import",
+  "body": "Seed the backlog",
+  "state": "open",
+  "html_url": "https://github.com/acme/app/issues/33",
+  "user": { "login": "alice" },
+  "labels": [{ "name": "enhancement" }, { "name": "bug" }]
+}`);
+
+const issueFetch = (issueJson, comments, status = 200) => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const headers = init.headers || {};
+    calls.push({
+      url: `${url}`,
+      auth: headers.Authorization || '',
+    });
+    if (`${url}`.includes('/comments')) {
+      return jsonResponse(200, comments);
+    }
+    return jsonResponse(status, issueJson);
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
+};
+
+test('parseGithubIssueUrl reads github issue URLs', () => {
+  const expected = { owner: 'acme', repo: 'app', number: 33 };
+  const urls = [
+    'https://github.com/acme/app/issues/33',
+    'https://github.com/acme/app/issues/33/',
+    'https://www.github.com/acme/app/issues/33',
+    'http://github.com/acme/app/issues/33',
+    'github.com/acme/app/issues/33',
+    'https://github.com/acme/app/issues/33?x=1',
+    'https://github.com/acme/app/issues/33#issuecomment-1',
+  ];
+  for (const url of urls) {
+    assert.deepEqual(parseGithubIssueUrl(url), expected, url);
+  }
+});
+
+test('parseGithubIssueUrl rejects non issue URLs', () => {
+  const urls = [
+    '',
+    'lib/parser.js',
+    'https://github.com/acme/app',
+    'https://github.com/acme/app/pull/33',
+    'https://github.com/acme/app/issues',
+    'https://gitlab.com/acme/app/issues/33',
+    'https://github.com/acme/app/issues/0',
+  ];
+  for (const url of urls) {
+    assert.equal(parseGithubIssueUrl(url), null, url);
+  }
+});
+
+test('loadIssue seeds backlog tasks from the issue and comments', async () => {
+  const comments = [
+    { user: { login: 'bob' }, body: 'please cover gitlab too' },
+    { user: { login: 'cara' }, body: '   ' },
+  ];
+  const fetchImpl = issueFetch(ISSUE_JSON, comments);
+  const loaded = await loadIssue(ISSUE, {
+    fetch: fetchImpl,
+    token: 'secret',
+  });
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(fetchImpl.calls[0].url, issueApiUrl(ISSUE));
+  assert.match(fetchImpl.calls[1].url, /\/issues\/33\/comments/);
+  assert.equal(fetchImpl.calls[0].auth, 'Bearer secret');
+  assert.equal(loaded.sourceLabel, '#33');
+  assert.deepEqual(loaded.items, []);
+  assert.equal(loaded.change.source, 'issue');
+  assert.equal(loaded.change.title, 'Add issue import');
+  assert.equal(loaded.change.author, 'alice');
+  assert.equal(loaded.change.status, 'open');
+  assert.equal(loaded.change.number, 33);
+  assert.equal(loaded.change.repository, 'acme/app');
+  assert.deepEqual(loaded.change.files, []);
+  assert.equal(loaded.change.base, '');
+  assert.equal(loaded.change.head, '');
+  assert.deepEqual(loaded.imported.feedback, []);
+  assert.equal(loaded.imported.tasks.length, 2);
+  const main = loaded.imported.tasks[0];
+  assert.equal(main.kind, 'todo');
+  assert.equal(main.file, 'issue');
+  assert.equal(main.done, false);
+  const head = '@alice issue at github [enhancement, bug]: Add issue import';
+  assert.equal(main.text, `${head}\n\nSeed the backlog`);
+  const comment = loaded.imported.tasks[1];
+  assert.equal(comment.file, 'issue');
+  assert.equal(comment.done, false);
+  const note = '@bob comment at github\n\nplease cover gitlab too';
+  assert.equal(comment.text, note);
+});
+
+test('loadIssue marks a closed issue done', async () => {
+  const closed = { ...ISSUE_JSON, state: 'closed' };
+  const fetchImpl = issueFetch(closed, []);
+  const loaded = await loadIssue(ISSUE, { fetch: fetchImpl });
+  assert.equal(loaded.change.status, 'closed');
+  assert.equal(loaded.imported.tasks.length, 1);
+  assert.equal(loaded.imported.tasks[0].done, true);
+});
+
+test('loadIssue rejects a pull request payload', async () => {
+  const pr = { ...ISSUE_JSON };
+  pr['pull_request'] = {
+    url: 'https://api.github.com/repos/acme/app/pulls/33',
+  };
+  const fetchImpl = issueFetch(pr, [{ user: { login: 'bob' }, body: 'nope' }]);
+  await assert.rejects(
+    () => loadIssue(ISSUE, { fetch: fetchImpl }),
+    /GitHub #33 is a pull request; open the \/pull\/ URL instead/,
+  );
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+test('issueToNotes skips empty comments', () => {
+  const notes = issueToNotes(
+    {
+      author: 'alice',
+      title: 'Title',
+      body: '',
+      labels: [],
+      state: 'open',
+    },
+    [{ user: { login: 'bob' }, body: '' }, { body: 'hi' }],
+  );
+  assert.deepEqual(notes.feedback, []);
+  assert.equal(notes.tasks.length, 2);
+  assert.equal(notes.tasks[0].text, '@alice issue at github: Title');
+  assert.equal(notes.tasks[1].text, '@unknown comment at github\n\nhi');
 });

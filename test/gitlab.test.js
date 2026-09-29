@@ -8,6 +8,7 @@ const gitlab = require('../lib/gitlab.js');
 const diff = require('../lib/diff/diff.js');
 const { parseGitlabMrUrl, gitlabToken, loadMergeRequest } = gitlab;
 const { mrApiUrl, discussionToNotes } = gitlab;
+const { parseGitlabIssueUrl, loadIssue, issueToNotes, issueApiUrl } = gitlab;
 const { parseDiff, itemsFromFiles } = diff;
 
 const MR = {
@@ -624,4 +625,168 @@ test('loadMergeRequest still opens when discussion import fails', async () => {
   });
   assert.equal(loaded.change.number, 123);
   assert.deepEqual(loaded.imported, { feedback: [], tasks: [] });
+});
+
+const ISSUE = {
+  host: 'gitlab.com',
+  project: 'acme/app',
+  number: 33,
+  origin: 'https://gitlab.com',
+};
+
+const ISSUE_JSON = JSON.parse(`{
+  "iid": 33,
+  "title": "Add issue import",
+  "description": "Seed the backlog",
+  "state": "opened",
+  "web_url": "https://gitlab.com/acme/app/-/issues/33",
+  "author": { "username": "alice" },
+  "labels": ["enhancement", "bug"],
+  "references": { "full": "acme/app#33" }
+}`);
+
+const issueFetch = (issueJson, notes, status = 200) => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const headers = init.headers || {};
+    calls.push({
+      url: `${url}`,
+      auth: headers['PRIVATE-TOKEN'] || '',
+    });
+    if (`${url}`.includes('/notes')) {
+      return jsonResponse(200, notes);
+    }
+    return jsonResponse(status, issueJson);
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
+};
+
+test('parseGitlabIssueUrl reads gitlab issue URLs', () => {
+  const urls = [
+    'https://gitlab.com/acme/app/-/issues/33',
+    'https://gitlab.com/acme/app/-/issues/33/',
+    'https://www.gitlab.com/acme/app/-/issues/33',
+    'http://gitlab.com/acme/app/-/issues/33',
+    'gitlab.com/acme/app/-/issues/33',
+    'https://gitlab.com/acme/app/-/issues/33?x=1',
+    'https://gitlab.com/acme/app/-/issues/33#note_9',
+    'https://gitlab.com/acme/app/issues/33',
+  ];
+  for (const url of urls) {
+    const parsed = parseGitlabIssueUrl(url);
+    assert.equal(parsed.host, 'gitlab.com', url);
+    assert.equal(parsed.project, 'acme/app', url);
+    assert.equal(parsed.number, 33, url);
+    assert.match(parsed.origin, /^https?:\/\/gitlab\.com$/, url);
+  }
+});
+
+test('parseGitlabIssueUrl reads nested groups and self-hosted hosts', () => {
+  const nested = parseGitlabIssueUrl(
+    'https://gitlab.example.com/group/sub/app/-/issues/9',
+  );
+  assert.deepEqual(nested, {
+    host: 'gitlab.example.com',
+    project: 'group/sub/app',
+    number: 9,
+    origin: 'https://gitlab.example.com',
+  });
+});
+
+test('parseGitlabIssueUrl rejects non issue URLs', () => {
+  const urls = [
+    '',
+    'lib/parser.js',
+    'https://gitlab.com/acme/app',
+    'https://gitlab.com/acme/app/-/merge_requests/33',
+    'https://gitlab.com/acme/app/-/issues',
+    'https://gitlab.com/acme/app/-/issues/0',
+  ];
+  for (const url of urls) {
+    assert.equal(parseGitlabIssueUrl(url), null, url);
+  }
+});
+
+test('loadIssue seeds backlog tasks from the issue and notes', async () => {
+  const notes = [
+    { author: { username: 'bob' }, body: 'please cover github too' },
+    {
+      author: { username: 'sys' },
+      body: 'changed the description',
+      system: true,
+    },
+    { author: { username: 'cara' }, body: '   ' },
+  ];
+  const fetchImpl = issueFetch(ISSUE_JSON, notes);
+  const loaded = await loadIssue(ISSUE, {
+    fetch: fetchImpl,
+    token: 'secret',
+  });
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(fetchImpl.calls[0].url, issueApiUrl(ISSUE));
+  assert.match(fetchImpl.calls[1].url, /\/issues\/33\/notes/);
+  assert.equal(fetchImpl.calls[0].auth, 'secret');
+  assert.equal(loaded.sourceLabel, '#33');
+  assert.deepEqual(loaded.items, []);
+  assert.equal(loaded.change.source, 'issue');
+  assert.equal(loaded.change.title, 'Add issue import');
+  assert.equal(loaded.change.author, 'alice');
+  assert.equal(loaded.change.status, 'opened');
+  assert.equal(loaded.change.number, 33);
+  assert.equal(loaded.change.repository, 'acme/app');
+  assert.equal(loaded.change.id, 'gitlab.com/acme/app/issues/33');
+  assert.deepEqual(loaded.imported.feedback, []);
+  assert.equal(loaded.imported.tasks.length, 2);
+  const main = loaded.imported.tasks[0];
+  assert.equal(main.file, 'issue');
+  assert.equal(main.done, false);
+  const head = '@alice issue at gitlab [enhancement, bug]: Add issue import';
+  assert.equal(main.text, `${head}\n\nSeed the backlog`);
+  const comment = loaded.imported.tasks[1];
+  const note = '@bob comment at gitlab\n\nplease cover github too';
+  assert.equal(comment.text, note);
+});
+
+test('loadIssue marks a closed GitLab issue done', async () => {
+  const closed = { ...ISSUE_JSON, state: 'closed' };
+  const fetchImpl = issueFetch(closed, []);
+  const loaded = await loadIssue(ISSUE, { fetch: fetchImpl });
+  assert.equal(loaded.change.status, 'closed');
+  assert.equal(loaded.imported.tasks[0].done, true);
+});
+
+test('issueToNotes skips system and empty notes', () => {
+  const notes = issueToNotes(
+    {
+      author: 'alice',
+      title: 'Title',
+      body: '',
+      labels: [],
+      state: 'opened',
+    },
+    [
+      { system: true, body: 'assigned', author: { username: 'sys' } },
+      { body: 'hi' },
+    ],
+  );
+  assert.deepEqual(notes.feedback, []);
+  assert.equal(notes.tasks.length, 2);
+  assert.equal(notes.tasks[0].text, '@alice issue at gitlab: Title');
+  const comment = '@unknown comment at gitlab\n\nhi';
+  assert.equal(notes.tasks[1].text, comment);
+});
+
+test('issueApiUrl encodes nested project paths', () => {
+  const nested = {
+    host: 'gitlab.example.com',
+    project: 'group/sub/app',
+    number: 9,
+    origin: 'https://gitlab.example.com',
+  };
+  const url = issueApiUrl(nested);
+  assert.equal(
+    url,
+    'https://gitlab.example.com/api/v4/projects/group%2Fsub%2Fapp/issues/9',
+  );
 });

@@ -91,7 +91,7 @@ test('unknown option exits 1', async () => {
   const usage = new RegExp(
     [
       'Usage: reslop \\[-n\\] \\[-r\\] \\[-light\\]',
-      '\\[path \\| commit \\| pr-url \\| mr-url\\]',
+      '\\[path \\| commit \\| pr-url \\| mr-url \\| issue-url\\]',
     ].join(' '),
   );
   assert.match(err, usage);
@@ -366,5 +366,116 @@ test('GitLab MR load errors exit 1', async () => {
     assert.match(proc.stderrText(), /GitLab merge request not found/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('GitHub issue URL loads local diffs and issue notes', async () => {
+  const repo = makeRepo();
+  try {
+    repo.write('a.txt', 'one\n');
+    repo.git(['add', 'a.txt']);
+    repo.git(['commit', '-m', 'init']);
+    repo.write('a.txt', 'two\n');
+    const url = 'https://github.com/acme/app/issues/33';
+    const proc = fakeProc(repo.dir, {
+      argv: ['node', 'reslop', url],
+      env: { GITHUB_TOKEN: 'secret' },
+    });
+    let seen = null;
+    const code = await run(proc, {
+      loadGithubIssue: async (issue, options) => {
+        seen = { issue, token: options.token };
+        return {
+          sourceLabel: '#33',
+          items: [],
+          change: {
+            source: 'issue',
+            title: 'Add issue import',
+            author: 'alice',
+            repository: 'acme/app',
+            number: 33,
+            status: 'open',
+            files: [],
+            base: '',
+            head: '',
+            url,
+          },
+          imported: {
+            feedback: [],
+            tasks: [
+              {
+                kind: 'todo',
+                file: 'issue',
+                text: '@alice issue at github: Add issue import',
+                done: false,
+              },
+            ],
+          },
+        };
+      },
+    });
+    assert.equal(code, 1);
+    assert.match(proc.stderrText(), /interactive terminal required/);
+    assert.doesNotMatch(proc.stderrText(), /not a git repository/);
+    assert.deepEqual(seen.issue, { owner: 'acme', repo: 'app', number: 33 });
+    assert.equal(seen.token, 'secret');
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('GitHub issue load errors exit 1', async () => {
+  const repo = makeRepo();
+  try {
+    repo.write('a.txt', 'ok\n');
+    repo.git(['add', 'a.txt']);
+    repo.git(['commit', '-m', 'init']);
+    const url = 'https://github.com/acme/app/issues/33';
+    const proc = fakeProc(repo.dir, {
+      argv: ['node', 'reslop', url],
+    });
+    const code = await run(proc, {
+      loadGithubIssue: async () => {
+        throw new Error('GitHub issue not found');
+      },
+    });
+    assert.equal(code, 1);
+    assert.match(proc.stderrText(), /GitHub issue not found/);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('GitLab issue URL loads the local working tree', async () => {
+  const repo = makeRepo();
+  try {
+    repo.write('a.txt', 'one\n');
+    repo.git(['add', 'a.txt']);
+    repo.git(['commit', '-m', 'init']);
+    repo.write('a.txt', 'two\n');
+    const url = 'https://gitlab.com/acme/app/-/issues/33';
+    const proc = fakeProc(repo.dir, {
+      argv: ['node', 'reslop', url],
+      env: { GITLAB_TOKEN: 'gl-secret' },
+    });
+    let seen = null;
+    const code = await run(proc, {
+      loadGitlabIssue: async (issue, options) => {
+        seen = { issue, token: options.token };
+        return {
+          sourceLabel: '#33',
+          items: [],
+          change: { source: 'issue', title: 'Import', number: 33 },
+          imported: { feedback: [], tasks: [] },
+        };
+      },
+    });
+    assert.equal(code, 1);
+    assert.match(proc.stderrText(), /interactive terminal required/);
+    assert.equal(seen.issue.project, 'acme/app');
+    assert.equal(seen.issue.number, 33);
+    assert.equal(seen.token, 'gl-secret');
+  } finally {
+    repo.cleanup();
   }
 });
