@@ -5,6 +5,9 @@
 - Compact related failure contexts in test runnter logs
 - Save the raw command output beside the reduced log
 - Improve test results rendering
+- Add a live dashboard as the start screen: files, diffs, commits, branches, npm, running commands, and tasks
+- Update the dashboard from file system events, without timers
+- Record `reslop t` runs under `.log/.runs/` to show progress and results on the dashboard
 
 ## [0.2.4][] - 2026-09-28
 

@@ -17,6 +17,7 @@ Open a change, leave findings and a backlog, and prepare a repair plan for the a
 Review → Plan → Repair → Verify
 ```
 
+- Live dashboard on start: files, diffs, commits, branches, npm, running commands, and tasks, updated as the disk changes
 - Leave feedback, a project backlog, and in-place code proposals as a repair plan
 - Review uncommitted git diffs, a given commit, a GitHub PR, or a GitLab MR
 - File-scope review mode: not just diffs, with editor mode
@@ -45,8 +46,8 @@ Requires Node.js `>=18.15.0`.
 
 ## Usage
 
-- `reslop` uncommitted diffs in this repository
-- `reslop path/file` show only that path or file
+- `reslop` live dashboard of this repository; press a block key to open its screen
+- `reslop path/file` show only that path or file (starts on the file list)
 - `reslop 7ac260c` show that commit (read-only)
 - `reslop https://github.com/metarhia/metacom/pull/555` GitHub/GitLab PR/MR
 - `reslop -n` start a new review even if the latest is still editing
@@ -64,6 +65,20 @@ Prefix each program in an npm script with `reslop t --`. Keep `&&` between those
 The report is Markdown: failures, diagnostics, and a short summary. Passing results are omitted and similar problems are grouped. The reduced report and the raw output are both saved under `.log/`. The report names the raw file for an agent to read when a detail is missing. Set `RESLOP_OUTPUT=raw` to pass the command through unchanged. The review screen runs scripts in raw mode and applies its own filter once.
 
 Run the full check with `npm t`. Run one or more test files with `reslop t -- node --test <files>`. New reviews include those two commands in the agent instructions.
+
+The dashboard has one tile per topic. Press its key or click the tile to open the screen, and `Esc` to come back (`Esc` on the dashboard quits):
+
+- `f` files: size, count, and lines per folder and extension
+- `d` diffs: added and removed lines, staged and unstaged, per folder and extension
+- `c` commits: count, pushed and unpushed, fixups, and the last commit
+- `b` branches: current branch, ahead and behind, and recently changed branches
+- `n` npm: dependencies, `node_modules` size, scripts, audit, and outdated
+- `r` run: commands started with `reslop t`, with progress and the result (opens the npm screen)
+- `t` tasks: done and total, feedback, and proposed code blocks
+
+Tiles are updated from file system events, not timers. On a small terminal the least important tiles are dropped. `reslop` with a path or a commit starts on the file list instead.
+
+`reslop t` records each run in `.log/.runs/` so that the dashboard can show commands started by an agent in another terminal.
 
 Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 

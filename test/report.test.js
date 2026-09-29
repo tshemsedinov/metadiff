@@ -15,6 +15,8 @@ const cli = require('../lib/cli.js');
 const { run } = cli;
 const reportRun = require('../lib/report-run.js');
 const { winCommand } = reportRun;
+const runsLib = require('../lib/runs.js');
+const { readRuns } = runsLib;
 const helpers = require('./helpers.js');
 const { sink, tempDir } = helpers;
 
@@ -495,6 +497,12 @@ const fakeProc = (cwd, extra = {}) => {
   };
 };
 
+const savedLogs = (dir) => {
+  const logDir = path.join(dir, '.log');
+  if (!fs.existsSync(logDir)) return [];
+  return fs.readdirSync(logDir).filter((name) => !name.startsWith('.'));
+};
+
 test('a pipe prints markdown and writes a log', async () => {
   const dir = tempDir('reslop-report-');
   const script = [
@@ -513,10 +521,10 @@ test('a pipe prints markdown and writes a log', async () => {
     assert.ok(text.startsWith(NOTICE_HEAD));
     assert.match(text, /passed: 1/);
     assert.ok(!text.includes('hidden'));
-    const names = fs.readdirSync(path.join(dir, '.log'));
-    const reduced = names.find((name) => !name.endsWith('.raw.log'));
-    const rawName = names.find((name) => name.endsWith('.raw.log'));
-    assert.equal(names.length, 2);
+    const logs = savedLogs(dir);
+    const reduced = logs.find((name) => !name.endsWith('.raw.log'));
+    const rawName = logs.find((name) => name.endsWith('.raw.log'));
+    assert.equal(logs.length, 2);
     const saved = fs.readFileSync(path.join(dir, '.log', reduced), 'utf8');
     assert.equal(saved, text);
     assert.match(text, /read the raw log `\.log\/.+\.raw\.log`/);
@@ -564,7 +572,7 @@ test('RESLOP_OUTPUT selects raw and rejects unknown', async () => {
     assert.equal(await run(raw), 0);
     assert.equal(fs.readFileSync(out, 'utf8'), '✔ hidden');
     assert.equal(raw.stdoutText(), '');
-    assert.ok(!fs.existsSync(path.join(dir, '.log')));
+    assert.deepEqual(savedLogs(dir), []);
     const pretty = fakeProc(dir, {
       argv: ['node', 'reslop', 't', '--', 'node', '-e', 'process.exit(0)'],
       env: { RESLOP_OUTPUT: 'pretty' },
@@ -618,6 +626,59 @@ test('capture mode and child status pass through', async () => {
     const missing = fakeProc(dir, { argv: ['node', 'reslop', 't'] });
     assert.equal(await run(missing), 1);
     assert.match(missing.stderrText(), /missing command/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a captured run leaves a finished run record', async () => {
+  const dir = tempDir('reslop-report-');
+  const script = [
+    'console.log("✔ one (1ms)")',
+    'console.log("✔ two (1ms)")',
+    'console.log("ℹ tests 2")',
+    'console.log("ℹ pass 2")',
+    'console.log("ℹ fail 0")',
+  ].join(';');
+  try {
+    const proc = fakeProc(dir, {
+      argv: ['node', 'reslop', 't', '--', 'node', '-e', script],
+    });
+    assert.equal(await run(proc), 0);
+    const [record] = readRuns(dir);
+    assert.equal(record.status, 'passed');
+    assert.equal(record.exit, 0);
+    assert.equal(record.progress.done, 2);
+    assert.equal(record.result.passed, 2);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing command leaves a failed run record', async () => {
+  const dir = tempDir('reslop-report-');
+  try {
+    const proc = fakeProc(dir, {
+      argv: ['node', 'reslop', 't', '--', 'node', '-e', 'process.exit(3)'],
+    });
+    assert.equal(await run(proc), 3);
+    const [record] = readRuns(dir);
+    assert.equal(record.status, 'failed');
+    assert.equal(record.exit, 3);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('nested captured commands do not add run records', async () => {
+  const dir = tempDir('reslop-report-');
+  try {
+    const proc = fakeProc(dir, {
+      argv: ['node', 'reslop', 't', '--', 'node', '-e', 'process.exit(0)'],
+      env: { RESLOP_CAPTURE: '1' },
+    });
+    assert.equal(await run(proc), 0);
+    assert.deepEqual(readRuns(dir), []);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
