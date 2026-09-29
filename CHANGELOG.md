@@ -2,6 +2,18 @@
 
 ## [Unreleased][unreleased]
 
+## [0.2.5][] - 2026-09-30
+
+- Remove UI and filesystem polling timers, refresh on events
+- Refresh the commits list when HEAD changes outside reslop
+- Update stage/unstage immediately, git/npm in the background
+- Add editor hotkeys Ctrl+X, Ctrl+C, and Ctrl+V
+- Improve diff calculation
+- Improve npm command and test edit/run
+- Refactor internals: simplify and add classes
+- Hothey "i" add to ignore lists: .gitignore, .npmignore
+- Rename TODO to tasks and improve TUI/TUX
+
 ## [0.2.4][] - 2026-09-28
 
 - Add AI instructions to run `npm t` or `reslop t -- node --test`
@@ -141,7 +153,8 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/tshemsedinov/reslop/compare/v0.2.0...v0.2.1
