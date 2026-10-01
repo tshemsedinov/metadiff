@@ -14,7 +14,7 @@ const { tempDir } = helpers;
 
 const { listCommands, reduceOutput, logFileName, writeLog } = npm;
 const { nextLogFile, saveLogs } = npm;
-const { staleLogFiles, removeStaleLogs, formatSize } = npm;
+const { staleLogFiles, removeStaleLogs } = npm;
 const { parseScriptLine, saveScript, removeScript, reorderScript } = npm;
 const { commandEnv, startNpm } = npm;
 
@@ -270,11 +270,6 @@ test('stale logs are files dated more than 5 days ago', () => {
   const found = staleLogFiles(root, now);
   assert.equal(found.bytes, 6);
   assert.equal(found.files.length, 1);
-  assert.equal(formatSize(0), '0b');
-  assert.equal(formatSize(6), '6b');
-  assert.equal(formatSize(1536), '1.5k');
-  assert.equal(formatSize(12 * 1024), '12k');
-  assert.equal(formatSize(1.5 * 1024 * 1024), '1.5m');
   assert.equal(staleLogFiles(tempDir('reslop-npm-'), now).bytes, 0);
   removeStaleLogs(root, now);
   assert.equal(fs.existsSync(path.join(dir, '2026-09-22-test-01.log')), false);

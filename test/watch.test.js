@@ -117,6 +117,37 @@ test('disk watcher watches nested files when recursive is off', async () => {
   }
 });
 
+test('a run record created after watch start is reported', async () => {
+  const cwd = tempDir('reslop-watch-');
+  const seen = new Set();
+  let changes = 0;
+  const watcher = await startWatcher({
+    root: cwd,
+    recursive: false,
+    debounceMs: 20,
+    onChange: () => {
+      changes += 1;
+    },
+    onPaths: (paths) => {
+      for (const rel of paths) seen.add(rel);
+    },
+  });
+  try {
+    await wait(40);
+    fs.mkdirSync(path.join(cwd, '.log', '.runs'), { recursive: true });
+    await wait(40);
+    const before = changes;
+    const file = path.join(cwd, '.log', '.runs', '1-2.json');
+    fs.writeFileSync(file, '{}');
+    const found = () => seen.has('.log/.runs/1-2.json');
+    assert.equal(await waitUntil(found, 1000), true);
+    await wait(80);
+    assert.equal(changes, before);
+  } finally {
+    watcher.close();
+  }
+});
+
 test('events for paths untouched since watch start are stale', async () => {
   const cwd = tempDir('reslop-watch-');
   const file = path.join(cwd, 'a.js');

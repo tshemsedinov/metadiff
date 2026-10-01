@@ -17,7 +17,7 @@ Open a change, leave findings and a backlog, and prepare a repair plan for the a
 Review → Plan → Repair → Verify
 ```
 
-- Live dashboard on start: files, diffs, commits, branches, npm, running commands, and tasks, updated as the disk changes
+- Live dashboard on start: files, diffs, commits, branches, npm, running commands, and tasks, updated real-time
 - Leave feedback, a project backlog, and in-place code proposals as a repair plan
 - Review uncommitted git diffs, a given commit, a GitHub PR, or a GitLab MR
 - File-scope review mode: not just diffs, with editor mode
@@ -69,12 +69,12 @@ Run the full check with `npm t`. Run one or more test files with `reslop t -- no
 The dashboard has one tile per topic. Press its key or click the tile to open the screen, and `Esc` to come back (`Esc` on the dashboard quits):
 
 - `f` files: size, count, and lines per folder, then extension, with the tree total on the last line
-- `d` diffs: added and removed lines, staged and unstaged, per folder and extension
+- `d` diffs: added and removed lines, staged blocks, and age, per folder and extension
 - `c` commits: the latest commits, with the count in the header
 - `b` branches: current branch, ahead and behind, and recently changed branches, with the local count in the header
-- `n` npm: dependencies, `node_modules` size in the header, the largest packages, audit, and outdated
-- `r` run: script names started with `reslop t`, with progress and the result (opens the npm screen)
-- `t` tasks: done and total, feedback, and proposed code blocks
+- `n` npm: dependencies, `node_modules` size, wanted/latest, audit, and outdated
+- `r` run: script names started with `reslop t`, with done, ok, fail, total tests, and duration in the header (opens the npm screen)
+- `t` tasks: done/total in the header, feedback, and proposed code blocks
 
 Tiles are updated from file system events, not timers. On a small terminal the least important tiles are dropped. `reslop` with a path or a commit starts on the file list instead.
 

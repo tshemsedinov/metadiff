@@ -592,6 +592,32 @@ test('RESLOP_OUTPUT selects raw and rejects unknown', async () => {
   }
 });
 
+test('raw mode records test counts and passes the output through', async () => {
+  const dir = tempDir('reslop-report-');
+  const script = [
+    'console.log("✔ one (1ms)")',
+    'console.log("ℹ tests 1")',
+    'console.log("ℹ pass 1")',
+    'console.log("ℹ fail 0")',
+  ].join(';');
+  try {
+    const proc = fakeProc(dir, {
+      argv: ['node', 'reslop', 't', '--', 'node', '-e', script],
+      env: { RESLOP_OUTPUT: 'raw' },
+    });
+    assert.equal(await run(proc), 0);
+    assert.match(proc.stdoutText(), /✔ one/);
+    assert.equal(savedLogs(dir).length, 0);
+    const [record] = readRuns(dir);
+    assert.equal(record.progress.done, 1);
+    assert.equal(record.result.tests, 1);
+    assert.equal(record.result.passed, 1);
+    assert.equal(record.result.failed, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('capture mode and child status pass through', async () => {
   const dir = tempDir('reslop-report-');
   try {

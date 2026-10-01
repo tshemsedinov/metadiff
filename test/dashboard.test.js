@@ -14,7 +14,7 @@ const { FileIndex, folderOf, extOf } = tree;
 const gitInfo = require('../lib/dashboard/git.js');
 const { readGitSummary, parseTrack, countFixups } = gitInfo;
 const dashModel = require('../lib/dashboard/model.js');
-const { scriptName, runName } = dashModel;
+const { scriptName, runName, buildModel, mergeRuns, groupChanges } = dashModel;
 const npmInfo = require('../lib/dashboard/npm.js');
 const { readNpmSummary } = npmInfo;
 const tiles = require('../lib/render/tiles.js');
@@ -23,9 +23,9 @@ const dashTable = require('../lib/render/dash-table.js');
 const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
 const { labelOf, pickGroups, withTitle, titleAside } = dashTable;
 const activity = require('../lib/render/dash-activity.js');
-const { runMetrics, branchesBlock } = activity;
+const { runMetrics, branchesBlock, runsBlock } = activity;
 const dashBlocks = require('../lib/render/dash-blocks.js');
-const { filesBlock, npmBlock } = dashBlocks;
+const { filesBlock, diffsBlock, npmBlock, tasksBlock } = dashBlocks;
 const dashboardRender = require('../lib/render/dashboard.js');
 const { TILES, paintBodyDashboard } = dashboardRender;
 const dashboardSession = require('../lib/session/dashboard.js');
@@ -39,7 +39,7 @@ const { Session } = session;
 const git = require('../lib/git.js');
 const { createGitRepo } = git;
 const ansi = require('../lib/ansi.js');
-const { stripAnsi } = ansi;
+const { stripAnsi, visibleWidth } = ansi;
 const helpers = require('./helpers.js');
 const { makeRepo, tempDir } = helpers;
 
@@ -319,7 +319,7 @@ test('readNpmSummary counts dependencies, scripts and modules', async () => {
       name: 'demo',
       scripts: { test: 'node --test', lint: 'eslint .' },
       dependencies: { a: '1' },
-      devDependencies: { b: '1', c: '1' },
+      devDependencies: { b: '1', c: '1', big: '1' },
     };
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
     const modules = path.join(dir, 'node_modules');
@@ -330,18 +330,28 @@ test('readNpmSummary counts dependencies, scripts and modules', async () => {
     const scoped = path.join(modules, '@scope', 'pkg');
     fs.mkdirSync(scoped, { recursive: true });
     fs.writeFileSync(path.join(scoped, 'i.js'), '123456');
+    const lock = {
+      packages: {
+        'node_modules/a': { version: '1.2.3' },
+        'node_modules/big': { dev: true },
+        'node_modules/@scope/pkg': { dev: true },
+      },
+    };
+    const stamp = path.join(modules, '.package-lock.json');
+    fs.writeFileSync(stamp, JSON.stringify(lock));
     const summary = await readNpmSummary(dir, null);
     assert.equal(summary.hasManifest, true);
     assert.equal(summary.name, 'demo');
     assert.equal(summary.deps, 1);
-    assert.equal(summary.dev, 2);
+    assert.equal(summary.dev, 3);
     assert.ok(summary.scripts.length >= 2);
-    assert.equal(summary.modules.bytes, 20);
+    const lockBytes = fs.statSync(stamp).size;
+    assert.equal(summary.modules.bytes, 20 + lockBytes);
     assert.equal(summary.modules.count, 3);
     assert.deepEqual(summary.modules.packages, [
-      { name: 'big', bytes: 9 },
-      { name: '@scope/pkg', bytes: 6 },
-      { name: 'a', bytes: 5 },
+      { name: 'a', bytes: 5, dev: false, version: '1.2.3' },
+      { name: 'big', bytes: 9, dev: true, version: '' },
+      { name: '@scope/pkg', bytes: 6, dev: true, version: '' },
     ]);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -531,8 +541,9 @@ test('a dashboard session shows every block with live data', async () => {
     assert.match(text, /run/);
     assert.match(text, /tasks/);
     assert.match(text, /main/);
-    assert.match(text, /\+0\/1/);
-    assert.match(text, /📁\s+lib/);
+    assert.match(text, /\+0\/1\s+-0\/0/);
+    assert.match(text, /0\/1/);
+    assert.match(text, /📁 lib/);
   } finally {
     close();
   }
@@ -812,15 +823,147 @@ test('the files share bar stays on a narrow tile', () => {
   const header = text(block.titleLine);
   const folder = text(block.lines[0]);
   const ext = text(block.lines[1]);
-  assert.match(header, /size/);
-  assert.match(header, /lines/);
-  assert.match(folder, /📁\s+lib/);
+  assert.equal(header.startsWith('files'), true);
+  assert.ok(folder.indexOf('lib') > 0);
+  const end = (line, value) => {
+    const at = line.lastIndexOf(value);
+    return visibleWidth(line.slice(0, at + value.length));
+  };
+  assert.equal(end(header, 'size'), end(folder, '40'));
+  assert.equal(end(header, 'lines'), end(folder, '8'));
+  assert.match(folder, /📁 lib/);
+  assert.equal(folder.includes('📁  '), false);
   assert.equal(ext.indexOf('*.js'), folder.indexOf('lib'));
   assert.equal(folder.includes('📄'), false);
   assert.match(ext, /\*\.js/);
   assert.equal(ext.includes('📄'), false);
   assert.match(folder, /[█░]/);
   assert.equal(folder.length, 36);
+});
+
+test('diff columns keep one space after the mark and fill the row', () => {
+  const group = (key) => ({
+    key,
+    added: 10,
+    removed: 3,
+    stagedAdded: 4,
+    stagedRemoved: 1,
+    staged: 1,
+    remaining: 2,
+    date: '2 days ago',
+  });
+  const model = {
+    diffs: {
+      files: 4,
+      dirs: [group('lib')],
+      exts: [group('.js')],
+      totals: {
+        added: 20,
+        removed: 6,
+        stagedAdded: 8,
+        stagedRemoved: 2,
+        staged: 2,
+        remaining: 4,
+      },
+      newest: '3 hours ago',
+      samples: [1, 4, 2],
+      delta: null,
+    },
+  };
+  const tile = { key: 'd', title: 'diffs' };
+  const block = diffsBlock(model, 40, 6, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const lines = block.lines.map(text);
+  const header = text(block.titleLine);
+  const folder = lines.find((line) => line.includes('lib'));
+  const ext = lines.find((line) => line.includes('*.js'));
+  const end = (line, value) => {
+    const at = line.lastIndexOf(value);
+    return visibleWidth(line.slice(0, at + value.length));
+  };
+  assert.equal(header.startsWith('diffs'), true);
+  assert.equal(header.includes('total'), false);
+  assert.equal(end(header, '+8/20'), end(folder, '+4/10'));
+  assert.equal(end(header, '-2/6'), end(folder, '-1/3'));
+  assert.equal(end(header, '2/4'), end(folder, '1/2'));
+  assert.equal(header.includes('3h ago'), false);
+  assert.ok(folder.includes('2d ago'));
+  model.diffs.delta = { added: 4, removed: 0, at: 1 };
+  const live = diffsBlock(model, 40, 6, { now: 1, frame: 0 }, tile);
+  const liveHeader = text(live.titleLine);
+  assert.equal(liveHeader.includes('3h ago'), false);
+  assert.ok(liveHeader.includes('▲+4'));
+  const mark = live.titleLine.find((part) => part.text === '▲+4');
+  assert.equal(mark.tone, 'add');
+  assert.match(folder, /📁 lib/);
+  assert.equal(folder.includes('📁  '), false);
+  assert.equal(ext.indexOf('*.js'), folder.indexOf('lib'));
+  assert.equal(visibleWidth(header), 40);
+  assert.equal(visibleWidth(folder), 40);
+  const trend = text(block.footer);
+  assert.equal(trend.startsWith('trend  '), true);
+  assert.equal(visibleWidth(trend), 40);
+  assert.equal(block.footer[1].tone, 'trend');
+});
+
+test('diff rows keep removals when the tile is narrow', () => {
+  const group = (key) => ({
+    key,
+    added: 34,
+    removed: 8,
+    stagedAdded: 12,
+    stagedRemoved: 3,
+    staged: 12,
+    remaining: 40,
+    date: '5 minutes ago',
+  });
+  const model = {
+    diffs: {
+      files: 12,
+      dirs: [group('lib')],
+      exts: [group('.js')],
+      totals: {
+        added: 34,
+        removed: 8,
+        stagedAdded: 12,
+        stagedRemoved: 3,
+        staged: 12,
+        remaining: 40,
+      },
+      newest: '5 minutes ago',
+      samples: [],
+      delta: null,
+    },
+  };
+  const tile = { key: 'd', title: 'diffs' };
+  const block = diffsBlock(model, 32, 6, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const folder = block.lines.map(text).find((line) => line.includes('lib'));
+  assert.ok(header.includes('+12/34'));
+  assert.ok(header.includes('-3/8'));
+  assert.ok(folder.includes('-3/8'));
+  assert.ok(folder.includes('12/40'));
+});
+
+test('file names stay whole when the tile is narrow', () => {
+  const model = {
+    files: {
+      ready: true,
+      total: { files: 2, bytes: 40, lines: 8 },
+      dirs: [{ key: 'node_modules', files: 2, bytes: 40, lines: 8 }],
+      exts: [{ key: '.js', files: 2, bytes: 40, lines: 8 }],
+      hot: { dirs: new Set(), exts: new Set() },
+      delta: null,
+    },
+  };
+  const tile = { key: 'f', title: 'files' };
+  const block = filesBlock(model, 22, 6, { now: 1 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const folder = text(block.lines[0]);
+  const ext = text(block.lines[1]);
+  assert.ok(folder.includes('node_modules'));
+  assert.equal(ext.indexOf('*.js'), folder.indexOf('node_modules'));
 });
 
 test('groups list folders before extensions', () => {
@@ -879,9 +1022,11 @@ test('the branches header shows the local count', () => {
   const header = block.titleLine.map((part) => part.text).join('');
   assert.equal(header.startsWith('branches'), true);
   assert.equal(header.endsWith('2'), true);
+  const count = block.titleLine.find((part) => part.text === '2');
+  assert.equal(count.tone, 'muted');
 });
 
-test('the npm tile lists the largest packages under the disk size', () => {
+test('the npm tile lists packages under the header counts', () => {
   const tile = { key: 'n', title: 'npm' };
   const model = {
     npm: {
@@ -895,7 +1040,7 @@ test('the npm tile lists the largest packages under the disk size', () => {
         count: 2,
         packages: [
           { name: 'big', bytes: 14 },
-          { name: 'small', bytes: 6 },
+          { name: 'small', bytes: 6, dev: true },
         ],
       },
       audit: 0,
@@ -910,10 +1055,205 @@ test('the npm tile lists the largest packages under the disk size', () => {
   const header = text(block.titleLine);
   const body = block.lines.map(text).join('\n');
   assert.equal(header.startsWith('npm'), true);
-  assert.equal(header.endsWith('20b'), true);
+  assert.match(header, /deps: 1/);
+  assert.match(header, /dev: 0/);
+  assert.match(header, /all: 2 \(20\)/);
+  assert.equal(header.includes('🚨'), false);
+  assert.equal(header.includes('⚠️'), false);
+  assert.equal(body.includes('deps'), false);
   assert.ok(body.indexOf('big') < body.indexOf('small'));
-  assert.match(body, /14b/);
-  assert.match(body, /6b/);
+  assert.match(body, /14/);
+  assert.match(body, /6/);
+  const tone = (value) => {
+    for (const line of block.lines) {
+      const part = line.find((item) => item.text === value);
+      if (part) return part.tone;
+    }
+    return '';
+  };
+  assert.equal(tone('name'), 'key');
+  assert.equal(tone('size'), 'key');
+  assert.equal(tone('big'), 'add');
+  assert.equal(tone('small'), 'sha');
+});
+
+test('the npm tile shows current, wanted, and latest', () => {
+  const tile = { key: 'n', title: 'npm' };
+  const model = {
+    npm: {
+      ready: true,
+      hasManifest: true,
+      deps: 3,
+      dev: 0,
+      optional: 0,
+      modules: {
+        bytes: 24,
+        count: 3,
+        packages: [
+          {
+            name: 'big',
+            bytes: 14,
+            current: '1.0.0',
+            wanted: '1.2.0',
+            latest: '2.0.0',
+          },
+          {
+            name: 'next',
+            bytes: 4,
+            current: '4.0.0',
+            wanted: '4.0.0',
+            latest: '5.0.0',
+          },
+          {
+            name: 'small',
+            bytes: 6,
+            current: '3.1.0',
+            wanted: '3.1.0',
+            latest: '3.1.0',
+            audit: true,
+          },
+        ],
+      },
+      audit: 1,
+      outdated: 2,
+      proposals: 0,
+      running: '',
+      changedAt: 0,
+    },
+  };
+  const block = npmBlock(model, 64, 10, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const body = block.lines.map(text);
+  const header = text(block.titleLine);
+  assert.match(header, /deps: 3/);
+  assert.match(header, /dev: 0/);
+  assert.match(header, /all: 3 \(24\)/);
+  assert.match(header, /🚨 1/);
+  assert.match(header, /⚠️ 2/);
+  assert.equal(body.join('\n').includes('deps'), false);
+  const labels = body.find((line) => line.includes('current'));
+  const heading = block.lines.find((line) =>
+    line.some((part) => part.text === 'current'),
+  );
+  const behind = block.lines.find((line) =>
+    line.some((part) => part.text === 'big'),
+  );
+  const ready = block.lines.find((line) =>
+    line.some((part) => part.text === 'small'),
+  );
+  const ahead = block.lines.find((line) =>
+    line.some((part) => part.text === 'next'),
+  );
+  const tone = (line, value) => {
+    const part = line.find((item) => item.text === value);
+    return part ? part.tone : '';
+  };
+  assert.ok(labels.includes('name'));
+  assert.ok(labels.includes('current'));
+  assert.ok(labels.includes('wanted'));
+  assert.ok(labels.includes('latest'));
+  assert.ok(labels.includes('size'));
+  assert.equal(tone(heading, 'name'), 'key');
+  assert.equal(tone(heading, 'size'), 'key');
+  assert.equal(tone(behind, 'big'), 'add');
+  assert.equal(tone(behind, '1.0.0'), 'warn');
+  assert.equal(tone(behind, '1.2.0'), 'warn');
+  assert.equal(tone(behind, '2.0.0'), 'warn');
+  assert.equal(tone(ready, '3.1.0'), 'error');
+  assert.equal(tone(ahead, '5.0.0'), 'warn');
+  assert.equal(tone(ahead, '4.0.0'), 'muted');
+  const narrow = npmBlock(model, 36, 10, { now: 1, frame: 0 }, tile);
+  const narrowText = narrow.lines.map(text).join('\n');
+  assert.match(narrowText, /big/);
+  assert.match(narrowText, /2\.0\.0/);
+  assert.match(narrowText, /5\.0\.0/);
+});
+
+test('npm packages take wanted and latest from the outdated report', () => {
+  const outdatedMap = new Map([
+    [
+      'big',
+      {
+        current: '1.0.0',
+        wanted: '1.2.0',
+        latest: '2.0.0',
+        type: 'dependencies',
+      },
+    ],
+  ]);
+  const model = buildModel({
+    now: 1,
+    frame: 0,
+    busy: false,
+    index: null,
+    fileDelta: null,
+    entries: [],
+    items: [],
+    sizeOf: () => 0,
+    totals: { added: 0, removed: 0 },
+    samples: [],
+    diffDelta: null,
+    git: null,
+    branch: '',
+    switches: [],
+    branchAt: new Map(),
+    marks: { npm: 0, commit: 0, branches: 0 },
+    npm: {
+      hasManifest: true,
+      deps: 2,
+      dev: 0,
+      optional: 0,
+      scripts: [],
+      modules: {
+        bytes: 20,
+        count: 2,
+        packages: [
+          { name: 'big', bytes: 14, version: '1.0.0' },
+          { name: 'small', bytes: 6, version: '3.1.0' },
+        ],
+      },
+    },
+    npmExtras: {
+      auditMap: new Map([['small', { severity: 'high' }]]),
+      outdatedMap,
+    },
+    npmRun: null,
+    runs: [],
+    notes: { tasks: 0, tasksDone: 0, feedback: 0, code: 0 },
+    store: { tasks: [] },
+  });
+  const packages = model.npm.modules.packages;
+  assert.deepEqual(packages[0], {
+    name: 'big',
+    bytes: 14,
+    dev: false,
+    audit: false,
+    current: '1.0.0',
+    wanted: '1.2.0',
+    latest: '2.0.0',
+  });
+  assert.deepEqual(packages[1], {
+    name: 'small',
+    bytes: 6,
+    dev: false,
+    audit: true,
+    current: '3.1.0',
+    wanted: '3.1.0',
+    latest: '3.1.0',
+  });
+});
+
+test('the tasks header shows done against the total', () => {
+  const tile = { key: 't', title: 'tasks' };
+  const model = {
+    tasks: { total: 8, done: 3, feedback: 1, code: 0, open: ['write tests'] },
+  };
+  const block = tasksBlock(model, 32, 6, { now: 1, frame: 0 }, tile);
+  const header = block.titleLine.map((part) => part.text).join('');
+  assert.equal(header.startsWith('tasks'), true);
+  assert.equal(header.endsWith('3/8'), true);
+  const count = block.titleLine.find((part) => part.text === '3/8');
+  assert.equal(count.tone, 'muted');
 });
 
 test('a title aside sits on the right of the header', () => {
@@ -942,16 +1282,17 @@ test('run rows show completed, passed and failed counts', () => {
     source: 'reslop t',
     result: { tests: 10, passed: 8, failed: 2 },
   });
-  assert.equal(metricText(passed), '10 done|8 ok|2 fail');
+  assert.equal(metricText(passed), '10|8|2|10');
   assert.equal(passed[2].align, 'r');
   const live = runMetrics({
     status: 'running',
     source: 'reslop t',
     done: 3,
     failed: 1,
+    expected: 12,
     result: null,
   });
-  assert.equal(metricText(live), '4 done|3 ok|1 fail');
+  assert.equal(metricText(live), '4|3|1|12');
   const failed = runMetrics({
     status: 'failed',
     source: 'reslop t',
@@ -963,16 +1304,151 @@ test('run rows show completed, passed and failed counts', () => {
   assert.equal(metricText(failed).includes('exit'), false);
 });
 
-test('run names prefer the npm script over the command', () => {
+test('run captions sit in the header with total and duration', () => {
+  const now = 1_000_000;
+  const model = {
+    busy: '',
+    runs: [
+      {
+        name: 'test',
+        status: 'passed',
+        source: 'reslop t',
+        startedAt: now - 3200,
+        endedAt: now - 200,
+        done: 8,
+        failed: 2,
+        expected: 10,
+        result: { tests: 10, passed: 8, failed: 2 },
+      },
+    ],
+  };
+  const tile = { key: 'r', title: 'run' };
+  const block = runsBlock(model, 48, 4, { now, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const row = text(block.lines[0]);
+  const end = (line, value, from = 0) => {
+    const at = line.indexOf(value, from);
+    return visibleWidth(line.slice(0, at + value.length));
+  };
+  assert.equal(header.startsWith('run'), true);
+  assert.equal(row.includes('done'), false);
+  assert.equal(end(header, 'done'), end(row, '10'));
+  assert.equal(end(header, 'ok'), end(row, '8'));
+  assert.equal(end(header, 'fail'), end(row, '2'));
+  assert.equal(end(header, 'total'), end(row, '10', row.indexOf('10') + 2));
+  assert.equal(end(header, 'duration'), end(row, '3.0s'));
+});
+
+test('a long run command keeps the columns and shows an ellipsis', () => {
+  const now = 1_000_000;
+  const name = 'node --test test/dashboard.test.js';
+  const model = {
+    busy: '',
+    runs: [
+      {
+        name,
+        status: 'passed',
+        source: 'reslop t',
+        startedAt: now - 3200,
+        endedAt: now - 200,
+        done: 8,
+        failed: 2,
+        expected: 10,
+        result: { tests: 10, passed: 8, failed: 2 },
+      },
+    ],
+  };
+  const tile = { key: 'r', title: 'run' };
+  const block = runsBlock(model, 40, 4, { now, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const row = text(block.lines[0]);
+  assert.ok(header.includes('duration'));
+  assert.ok(row.includes('3.0s'));
+  assert.ok(row.includes('…'));
+  assert.equal(row.includes(name), false);
+  assert.equal(visibleWidth(row), 40);
+});
+
+const runRecord = (command, script, startedAt, endedAt, extra = {}) => ({
+  id: `${startedAt}`,
+  command,
+  script,
+  status: extra.status || 'passed',
+  exit: extra.exit ?? 0,
+  startedAt,
+  endedAt,
+  progress: { done: 0, failed: 0, lines: 0, expected: 0 },
+  result: extra.result ?? null,
+});
+
+test('chained npm script steps share one run row', () => {
+  const lint = { errors: 1, warnings: 2, problems: 1 };
+  const list = mergeRuns(
+    [
+      runRecord('eslint .', 'lint', 1000, 2000, { result: lint }),
+      runRecord('prettier -c **/*.js', 'lint', 2086, 3000),
+      runRecord('eslint . --fix', 'fix', 8000, 9000),
+      runRecord('prettier --write **/*.js', 'fix', 9100, 10000, {
+        status: 'failed',
+        exit: 1,
+      }),
+      runRecord('npm run -s lint', 'test', 20000, 23000),
+      runRecord('eslint .', 'lint', 20100, 21000),
+      runRecord('prettier -c **/*.js', 'lint', 21100, 22900),
+      runRecord('node --test', 'test', 23100, 28000, {
+        result: { tests: 2, passed: 2, failed: 0 },
+      }),
+      runRecord('eslint .', 'lint', 40000, 41000),
+    ],
+    null,
+  );
+  assert.deepEqual(
+    list.map((run) => run.name),
+    ['lint', 'test', 'lint', 'fix', 'lint'],
+  );
+  const fix = list.find((run) => run.name === 'fix');
+  assert.equal(fix.status, 'failed');
+  assert.equal(fix.exit, 1);
+  const first = list.at(-1);
+  assert.equal(first.startedAt, 1000);
+  assert.equal(first.endedAt, 3000);
+  assert.equal(first.result.errors, 1);
+  assert.equal(first.result.warnings, 2);
+});
+
+test('diff groups keep staged lines apart from the total', () => {
+  const groups = groupChanges([
+    {
+      path: 'lib/a.js',
+      added: 5,
+      removed: 2,
+      stagedAdded: 3,
+      stagedRemoved: 1,
+      staged: 1,
+      remaining: 2,
+      date: '1 hour ago',
+    },
+  ]);
+  const folder = groups.dirs[0];
+  assert.equal(folder.stagedAdded, 3);
+  assert.equal(folder.added, 5);
+  assert.equal(folder.stagedRemoved, 1);
+  assert.equal(folder.removed, 2);
+  assert.equal(groups.exts[0].stagedAdded, 3);
+});
+
+test('run names use the npm script, or the command', () => {
   assert.equal(scriptName('npm run test'), 'test');
   assert.equal(scriptName('npm run -s lint'), 'lint');
   assert.equal(scriptName('npm test'), 'test');
   assert.equal(scriptName('/usr/bin/eslint .'), 'eslint');
   assert.equal(runName({ command: 'node --test', script: 'test' }), 'test');
   const nested = { command: 'npm run -s lint', script: 'test' };
-  assert.equal(runName(nested), 'test');
+  assert.equal(runName(nested), 'lint');
   assert.equal(runName({ command: 'eslint .', script: 'lint' }), 'lint');
-  assert.equal(runName({ command: 'node --test', script: '' }), 'node');
+  assert.equal(runName({ command: 'node --test', script: '' }), 'node --test');
 });
 
 test('stat pairs become label and value table rows', () => {

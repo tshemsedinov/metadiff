@@ -3763,7 +3763,7 @@ test('npm status line shows the old log size', () => {
     pane: 'npm',
     npmCommands: [{ name: 'test', command: 'node --test', kind: 'script' }],
     npmCursor: 0,
-    npmLogs: 'old logs 6b',
+    npmLogs: 'old logs 6',
     repoName: 'demo',
     status: '',
     counts: {},
@@ -3776,7 +3776,7 @@ test('npm status line shows the old log size', () => {
   });
   const status = stripAnsi(frame.rows.at(-2));
   const footer = stripAnsi(frame.rows.at(-1));
-  assert.match(status, /old logs 6b/);
+  assert.match(status, /old logs 6/);
   assert.match(footer, /delete/);
   assert.match(footer, /cleanup/);
   const colored = render.renderFrame(view, {
@@ -3786,7 +3786,7 @@ test('npm status line shows the old log size', () => {
   });
   const row = colored.rows.at(-2);
   const blue = seq(THEME.shaFg, THEME.chromeBg);
-  assert.ok(row.includes(`${blue}old logs 6b`));
+  assert.ok(row.includes(`${blue}old logs 6`));
   assert.ok(!row.includes(`${blue}0/0`));
   view.npmLogs = '';
   const empty = render.renderFrame(view, {
