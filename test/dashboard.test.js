@@ -13,12 +13,19 @@ const tree = require('../lib/dashboard/tree.js');
 const { FileIndex, folderOf, extOf } = tree;
 const gitInfo = require('../lib/dashboard/git.js');
 const { readGitSummary, parseTrack, countFixups } = gitInfo;
+const dashModel = require('../lib/dashboard/model.js');
+const { scriptName, runName } = dashModel;
 const npmInfo = require('../lib/dashboard/npm.js');
 const { readNpmSummary } = npmInfo;
 const tiles = require('../lib/render/tiles.js');
-const { layoutTiles, GAP_X, GAP_Y } = tiles;
+const { layoutTiles, GAP_X, GAP_Y, seg } = tiles;
 const dashTable = require('../lib/render/dash-table.js');
-const { cell, flexCell, tableLines, stat, pairRows } = dashTable;
+const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
+const { labelOf, pickGroups, withTitle, titleAside } = dashTable;
+const activity = require('../lib/render/dash-activity.js');
+const { runMetrics, branchesBlock } = activity;
+const dashBlocks = require('../lib/render/dash-blocks.js');
+const { filesBlock, npmBlock } = dashBlocks;
 const dashboardRender = require('../lib/render/dashboard.js');
 const { TILES, paintBodyDashboard } = dashboardRender;
 const dashboardSession = require('../lib/session/dashboard.js');
@@ -104,6 +111,28 @@ test('a running record with a dead process is reported as aborted', () => {
   assert.equal(settleRecord(record, () => true).status, 'running');
   const passed = { status: 'passed', pid: 1 };
   assert.equal(settleRecord(passed, () => false).status, 'passed');
+});
+
+const scriptEnv = (name) => {
+  const env = {};
+  env['npm_lifecycle_event'] = name;
+  return env;
+};
+
+test('a run records the npm script that started it', () => {
+  const dir = tempDir('reslop-runs-');
+  try {
+    const run = startRun(dir, 'node --test', { env: scriptEnv('test') });
+    assert.equal(readRuns(dir)[0].script, 'test');
+    run.finish(0);
+    const lint = startRun(dir, 'eslint . --fix', { env: scriptEnv('fix') });
+    const runs = readRuns(dir);
+    const saved = runs.find((item) => item.command.startsWith('eslint'));
+    assert.equal(saved.script, 'fix');
+    lint.finish(0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a failed run keeps its exit code', () => {
@@ -233,6 +262,8 @@ test('readGitSummary reports commits, branches and pushed state', async () => {
     assert.equal(summary.commits.fixups, 1);
     assert.equal(summary.commits.pushed, null);
     assert.equal(summary.commits.last.subject, 'fixup! first');
+    assert.equal(summary.commits.recent[0].subject, 'fixup! first');
+    assert.equal(summary.commits.recent[1].subject, 'first');
     assert.equal(summary.rebase, null);
     const names = summary.branches.map((b) => b.name).sort();
     assert.deepEqual(names, ['main', 'topic']);
@@ -275,6 +306,7 @@ test('readGitSummary survives a repository without commits', async () => {
     const summary = await readGitSummary(repo.dir);
     assert.equal(summary.commits.total, 0);
     assert.equal(summary.commits.last, null);
+    assert.deepEqual(summary.commits.recent, []);
   } finally {
     repo.cleanup();
   }
@@ -293,14 +325,24 @@ test('readNpmSummary counts dependencies, scripts and modules', async () => {
     const modules = path.join(dir, 'node_modules');
     fs.mkdirSync(path.join(modules, 'a'), { recursive: true });
     fs.writeFileSync(path.join(modules, 'a', 'i.js'), '12345');
+    fs.mkdirSync(path.join(modules, 'big'), { recursive: true });
+    fs.writeFileSync(path.join(modules, 'big', 'i.js'), '123456789');
+    const scoped = path.join(modules, '@scope', 'pkg');
+    fs.mkdirSync(scoped, { recursive: true });
+    fs.writeFileSync(path.join(scoped, 'i.js'), '123456');
     const summary = await readNpmSummary(dir, null);
     assert.equal(summary.hasManifest, true);
     assert.equal(summary.name, 'demo');
     assert.equal(summary.deps, 1);
     assert.equal(summary.dev, 2);
     assert.ok(summary.scripts.length >= 2);
-    assert.equal(summary.modules.bytes, 5);
-    assert.equal(summary.modules.count, 1);
+    assert.equal(summary.modules.bytes, 20);
+    assert.equal(summary.modules.count, 3);
+    assert.deepEqual(summary.modules.packages, [
+      { name: 'big', bytes: 9 },
+      { name: '@scope/pkg', bytes: 6 },
+      { name: 'a', bytes: 5 },
+    ]);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -490,7 +532,7 @@ test('a dashboard session shows every block with live data', async () => {
     assert.match(text, /tasks/);
     assert.match(text, /main/);
     assert.match(text, /\+0\/1/);
-    assert.match(text, /lib\//);
+    assert.match(text, /📁\s+lib/);
   } finally {
     close();
   }
@@ -509,13 +551,19 @@ test('the dashboard follows files changing on disk', async () => {
   }
 });
 
-test('the dashboard shows a running command from a run record', async () => {
+test('the dashboard shows a run by script name', async () => {
   const { ui, repo, close } = await openDashboard();
   try {
     assert.ok(await waitUntil(() => /first commit/.test(frameText(ui))));
-    const run = startRun(repo.dir, 'node --test');
+    const run = startRun(repo.dir, 'node --test', { env: scriptEnv('test') });
     run.feed(`${PASS}\n`);
-    const seen = () => /node --test/.test(frameText(ui));
+    const seen = () => {
+      const text = frameText(ui);
+      const runs = ui.dashboard.view().runs;
+      const listed = runs.some((item) => item.name === 'test');
+      const hidden = !text.includes('node --test');
+      return listed && text.includes('test') && hidden;
+    };
     assert.ok(await waitUntil(seen));
     run.finish(0, null);
     const finished = () => ui.dashboard.view().runs.length > 0;
@@ -738,6 +786,193 @@ test('a flexible middle column takes the free width', () => {
   assert.equal(lines[1].length, 20);
   assert.ok(lines[0].endsWith(' 1'));
   assert.ok(lines[1].endsWith('22'));
+});
+
+test('the root folder is labeled with a slash', () => {
+  assert.equal(labelOf('.', true), '/');
+  assert.equal(labelOf('lib', true), 'lib');
+  assert.equal(labelOf('.js', false), '*.js');
+  assert.equal(labelOf('(none)', false), '(none)');
+});
+
+test('the files share bar stays on a narrow tile', () => {
+  const model = {
+    files: {
+      ready: true,
+      total: { files: 4, bytes: 80, lines: 12 },
+      dirs: [{ key: 'lib', files: 2, bytes: 40, lines: 8 }],
+      exts: [{ key: '.js', files: 4, bytes: 80, lines: 12 }],
+      hot: { dirs: new Set(), exts: new Set() },
+      delta: null,
+    },
+  };
+  const tile = { key: 'f', title: 'files' };
+  const block = filesBlock(model, 36, 8, { now: 1 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const folder = text(block.lines[0]);
+  const ext = text(block.lines[1]);
+  assert.match(header, /size/);
+  assert.match(header, /lines/);
+  assert.match(folder, /📁\s+lib/);
+  assert.equal(ext.indexOf('*.js'), folder.indexOf('lib'));
+  assert.equal(folder.includes('📄'), false);
+  assert.match(ext, /\*\.js/);
+  assert.equal(ext.includes('📄'), false);
+  assert.match(folder, /[█░]/);
+  assert.equal(folder.length, 36);
+});
+
+test('groups list folders before extensions', () => {
+  const folders = ['a', 'b', 'c'];
+  const exts = ['js', 'md'];
+  const picked = pickGroups(folders, exts, 2);
+  assert.deepEqual(picked.dirs, ['a', 'b']);
+  assert.deepEqual(picked.exts, []);
+  const rest = pickGroups(folders, exts, 4);
+  assert.deepEqual(rest.dirs, folders);
+  assert.deepEqual(rest.exts, ['js']);
+});
+
+test('header totals share columns with the rows beneath', () => {
+  const tile = { key: 'f', title: 'files' };
+  const rows = [
+    [cell(' lib/'), cell('3', 'text', 'r'), cell('800', 'text', 'r')],
+    [cell(' .js'), cell('9', 'text', 'r'), cell('20', 'text', 'r')],
+  ];
+  const head = [cell('12', 'text', 'r', true), cell('820', 'text', 'r', true)];
+  const block = withTitle(tile, head, rows, 32);
+  const text = (line) => line.map((item) => item.text).join('');
+  const header = text(block.titleLine);
+  const folder = text(block.lines[0]);
+  const ext = text(block.lines[1]);
+  const end = (line, value) => line.indexOf(value) + value.length;
+  assert.equal(header.startsWith('files'), true);
+  assert.equal(end(header, '12'), end(folder, '3'));
+  assert.equal(end(header, '12'), end(ext, '9'));
+  assert.equal(end(header, '820'), end(folder, '800'));
+});
+
+test('the branches header shows the local count', () => {
+  const tile = { key: 'b', title: 'branches' };
+  const entry = (name, current) => ({
+    name,
+    current,
+    at: 1,
+    subject: name,
+    ahead: 0,
+    behind: 0,
+    upstream: '',
+    gone: false,
+  });
+  const model = {
+    branches: {
+      ready: true,
+      list: [entry('main', true), entry('next', false)],
+      rebase: null,
+      switches: [],
+      hot: new Map(),
+    },
+  };
+  const ctx = { now: 10, frame: 0 };
+  const block = branchesBlock(model, 32, 6, ctx, tile);
+  const header = block.titleLine.map((part) => part.text).join('');
+  assert.equal(header.startsWith('branches'), true);
+  assert.equal(header.endsWith('2'), true);
+});
+
+test('the npm tile lists the largest packages under the disk size', () => {
+  const tile = { key: 'n', title: 'npm' };
+  const model = {
+    npm: {
+      ready: true,
+      hasManifest: true,
+      deps: 1,
+      dev: 0,
+      optional: 0,
+      modules: {
+        bytes: 20,
+        count: 2,
+        packages: [
+          { name: 'big', bytes: 14 },
+          { name: 'small', bytes: 6 },
+        ],
+      },
+      audit: 0,
+      outdated: 0,
+      proposals: 0,
+      running: '',
+      changedAt: 0,
+    },
+  };
+  const block = npmBlock(model, 36, 8, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const body = block.lines.map(text).join('\n');
+  assert.equal(header.startsWith('npm'), true);
+  assert.equal(header.endsWith('20b'), true);
+  assert.ok(body.indexOf('big') < body.indexOf('small'));
+  assert.match(body, /14b/);
+  assert.match(body, /6b/);
+});
+
+test('a title aside sits on the right of the header', () => {
+  const tile = { key: 'c', title: 'commits' };
+  const line = titleAside(tile, [seg('12', 'text', true)], 20);
+  const text = line.map((item) => item.text).join('');
+  assert.equal(text.length, 20);
+  assert.equal(text.startsWith('commits'), true);
+  assert.equal(text.endsWith('12'), true);
+});
+
+test('dashboard ages stay at minutes', () => {
+  const now = 1_000_000;
+  assert.equal(ago(now - 5000, now), '<1m ago');
+  assert.equal(ago(now - 45 * 1000, now), '<1m ago');
+  assert.equal(ago(now - 30 * 60 * 1000, now), '30m ago');
+  assert.equal(ago(now - 3 * 3600 * 1000, now), '3h ago');
+});
+
+const metricText = (cells) =>
+  cells.map((item) => item.segs.map((part) => part.text).join('')).join('|');
+
+test('run rows show completed, passed and failed counts', () => {
+  const passed = runMetrics({
+    status: 'passed',
+    source: 'reslop t',
+    result: { tests: 10, passed: 8, failed: 2 },
+  });
+  assert.equal(metricText(passed), '10 done|8 ok|2 fail');
+  assert.equal(passed[2].align, 'r');
+  const live = runMetrics({
+    status: 'running',
+    source: 'reslop t',
+    done: 3,
+    failed: 1,
+    result: null,
+  });
+  assert.equal(metricText(live), '4 done|3 ok|1 fail');
+  const failed = runMetrics({
+    status: 'failed',
+    source: 'reslop t',
+    exit: 1,
+    result: null,
+    done: 0,
+    failed: 0,
+  });
+  assert.equal(metricText(failed).includes('exit'), false);
+});
+
+test('run names prefer the npm script over the command', () => {
+  assert.equal(scriptName('npm run test'), 'test');
+  assert.equal(scriptName('npm run -s lint'), 'lint');
+  assert.equal(scriptName('npm test'), 'test');
+  assert.equal(scriptName('/usr/bin/eslint .'), 'eslint');
+  assert.equal(runName({ command: 'node --test', script: 'test' }), 'test');
+  const nested = { command: 'npm run -s lint', script: 'test' };
+  assert.equal(runName(nested), 'test');
+  assert.equal(runName({ command: 'eslint .', script: 'lint' }), 'lint');
+  assert.equal(runName({ command: 'node --test', script: '' }), 'node');
 });
 
 test('stat pairs become label and value table rows', () => {

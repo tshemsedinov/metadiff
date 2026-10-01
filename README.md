@@ -68,12 +68,12 @@ Run the full check with `npm t`. Run one or more test files with `reslop t -- no
 
 The dashboard has one tile per topic. Press its key or click the tile to open the screen, and `Esc` to come back (`Esc` on the dashboard quits):
 
-- `f` files: size, count, and lines per folder and extension
+- `f` files: size, count, and lines per folder, then extension, with the tree total on the last line
 - `d` diffs: added and removed lines, staged and unstaged, per folder and extension
-- `c` commits: count, pushed and unpushed, fixups, and the last commit
-- `b` branches: current branch, ahead and behind, and recently changed branches
-- `n` npm: dependencies, `node_modules` size, scripts, audit, and outdated
-- `r` run: commands started with `reslop t`, with progress and the result (opens the npm screen)
+- `c` commits: the latest commits, with the count in the header
+- `b` branches: current branch, ahead and behind, and recently changed branches, with the local count in the header
+- `n` npm: dependencies, `node_modules` size in the header, the largest packages, audit, and outdated
+- `r` run: script names started with `reslop t`, with progress and the result (opens the npm screen)
 - `t` tasks: done and total, feedback, and proposed code blocks
 
 Tiles are updated from file system events, not timers. On a small terminal the least important tiles are dropped. `reslop` with a path or a commit starts on the file list instead.
