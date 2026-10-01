@@ -13,6 +13,7 @@ const helpers = require('./helpers.js');
 const { tempDir } = helpers;
 
 const { listCommands, reduceOutput, logFileName, writeLog } = npm;
+const { nextLogFile, saveLogs } = npm;
 const { staleLogFiles, removeStaleLogs, formatSize } = npm;
 const { parseScriptLine, saveScript, removeScript, reorderScript } = npm;
 const { commandEnv, startNpm } = npm;
@@ -205,7 +206,7 @@ test('reduceOutput omits the exit line while the process is running', () => {
   assert.equal(text, 'Error: boom\n');
 });
 
-test('log names are dated and numbered', () => {
+test('log names are dated and numbered', async () => {
   const now = new Date(2026, 8, 22);
   const expected = '2026-09-22-test-unit-01.log';
   assert.equal(logFileName('test:unit', '2026-09-22', 1), expected);
@@ -225,6 +226,15 @@ test('log names are dated and numbered', () => {
   const trimmed = writeLog(root, 'trim', padded, now);
   const savedTrim = path.join(root, '.log', trimmed);
   assert.equal(fs.readFileSync(savedTrim, 'utf8'), 'hello\n  at app\n');
+  const slot = nextLogFile(root, 'test', now);
+  const pair = await saveLogs(slot, 'reduced\n', 'raw output\n');
+  assert.equal(pair.reduced, '2026-09-22-test-03.log');
+  assert.equal(pair.raw, '2026-09-22-test-03.raw.log');
+  const dir = path.join(root, '.log');
+  const reducedPath = path.join(dir, pair.reduced);
+  const rawPath = path.join(dir, pair.raw);
+  assert.equal(fs.readFileSync(reducedPath, 'utf8'), 'reduced\n');
+  assert.equal(fs.readFileSync(rawPath, 'utf8'), 'raw output\n');
 });
 
 test('parseScriptLine splits on the first colon', () => {
