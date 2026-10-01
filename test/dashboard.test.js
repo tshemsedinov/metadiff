@@ -1071,8 +1071,8 @@ test('the npm tile lists packages under the header counts', () => {
     }
     return '';
   };
-  assert.equal(tone('name'), 'key');
-  assert.equal(tone('size'), 'key');
+  assert.equal(tone('name'), '');
+  assert.equal(tone('size'), 'muted');
   assert.equal(tone('big'), 'add');
   assert.equal(tone('small'), 'sha');
 });
@@ -1148,13 +1148,13 @@ test('the npm tile shows current, wanted, and latest', () => {
     const part = line.find((item) => item.text === value);
     return part ? part.tone : '';
   };
-  assert.ok(labels.includes('name'));
+  assert.equal(labels.includes('name'), false);
   assert.ok(labels.includes('current'));
   assert.ok(labels.includes('wanted'));
   assert.ok(labels.includes('latest'));
   assert.ok(labels.includes('size'));
-  assert.equal(tone(heading, 'name'), 'key');
-  assert.equal(tone(heading, 'size'), 'key');
+  assert.equal(tone(heading, 'current'), 'muted');
+  assert.equal(tone(heading, 'size'), 'muted');
   assert.equal(tone(behind, 'big'), 'add');
   assert.equal(tone(behind, '1.0.0'), 'warn');
   assert.equal(tone(behind, '1.2.0'), 'warn');

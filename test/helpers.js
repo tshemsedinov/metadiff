@@ -42,7 +42,14 @@ const makeRepo = () => {
   };
   const read = (rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   const exists = (rel) => fs.existsSync(path.join(dir, rel));
-  const cleanup = () => fs.rmSync(dir, { recursive: true, force: true });
+  const cleanup = () => {
+    fs.rmSync(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+  };
   return { dir, git, write, read, exists, cleanup };
 };
 
