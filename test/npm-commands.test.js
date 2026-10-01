@@ -12,10 +12,10 @@ const { stripAnsi } = ansi;
 const helpers = require('./helpers.js');
 const { tempDir } = helpers;
 
-const { listCommands, reduceOutput, logFileName, writeLog } = npm;
+const { listCommands, reduceOutput, logFileName } = npm;
 const { nextLogFile, saveLogs } = npm;
 const { staleLogFiles, removeStaleLogs } = npm;
-const { parseScriptLine, saveScript, removeScript, reorderScript } = npm;
+const { saveScript, removeScript, reorderScript } = npm;
 const { commandEnv, startNpm } = npm;
 
 const writeJson = (file, body) => {
@@ -211,39 +211,21 @@ test('log names are dated and numbered', async () => {
   const expected = '2026-09-22-test-unit-01.log';
   assert.equal(logFileName('test:unit', '2026-09-22', 1), expected);
   const root = tempDir('reslop-npm-log-');
-  const first = writeLog(root, 'test', 'exit 0\n', now);
-  const second = writeLog(root, 'test', 'exit 1\n', now);
-  assert.equal(first, '2026-09-22-test-01.log');
-  assert.equal(second, '2026-09-22-test-02.log');
-  const saved = path.join(root, '.log', first);
-  assert.equal(fs.readFileSync(saved, 'utf8'), 'exit 0\n');
-  assert.ok(!fs.existsSync(path.join(root, first)));
-  const colored = '\x1b[31mError\x1b[0m\n';
-  const name = writeLog(root, 'color', colored, now);
-  const plain = fs.readFileSync(path.join(root, '.log', name), 'utf8');
-  assert.equal(plain, 'Error\n');
-  const padded = 'hello  \n  at app \n';
-  const trimmed = writeLog(root, 'trim', padded, now);
-  const savedTrim = path.join(root, '.log', trimmed);
-  assert.equal(fs.readFileSync(savedTrim, 'utf8'), 'hello\n  at app\n');
-  const slot = nextLogFile(root, 'test', now);
-  const pair = await saveLogs(slot, 'reduced\n', 'raw output\n');
-  assert.equal(pair.reduced, '2026-09-22-test-03.log');
-  assert.equal(pair.raw, '2026-09-22-test-03.raw.log');
   const dir = path.join(root, '.log');
-  const reducedPath = path.join(dir, pair.reduced);
-  const rawPath = path.join(dir, pair.raw);
-  assert.equal(fs.readFileSync(reducedPath, 'utf8'), 'reduced\n');
-  assert.equal(fs.readFileSync(rawPath, 'utf8'), 'raw output\n');
-});
-
-test('parseScriptLine splits on the first colon', () => {
-  assert.deepEqual(parseScriptLine('test: node --test'), {
-    name: 'test',
-    command: 'node --test',
-  });
-  assert.equal(parseScriptLine('nope'), null);
-  assert.equal(parseScriptLine(': echo'), null);
+  const read = (name) => fs.readFileSync(path.join(dir, name), 'utf8');
+  const first = nextLogFile(root, 'test', now);
+  await saveLogs(first, 'exit 0\n', 'raw output\n');
+  assert.equal(first.name, '2026-09-22-test-01.log');
+  assert.equal(first.rawName, '2026-09-22-test-01.raw.log');
+  assert.equal(read(first.name), 'exit 0\n');
+  assert.equal(read(first.rawName), 'raw output\n');
+  assert.ok(!fs.existsSync(path.join(root, first.name)));
+  const second = nextLogFile(root, 'test', now);
+  assert.equal(second.name, '2026-09-22-test-02.log');
+  const colored = nextLogFile(root, 'color', now);
+  await saveLogs(colored, '\x1b[31mError\x1b[0m\n', 'hello  \n  at app \n');
+  assert.equal(read(colored.name), 'Error\n');
+  assert.equal(read(colored.rawName), 'hello\n  at app\n');
 });
 
 test('save remove and reorder scripts', () => {

@@ -5,8 +5,7 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const remote = require('../lib/remote.js');
-const { createTransport, parseLinkNext, parseNextPage, noteFromLocation } =
-  remote;
+const { RemoteClient, parseLinkNext, parseNextPage, noteFromLocation } = remote;
 const diff = require('../lib/diff/diff.js');
 const { parseDiff, itemsFromFiles } = diff;
 
@@ -21,18 +20,13 @@ index 1111111..2222222 100644
  keep
 `;
 
-const requestPolicy = {
-  retry: { attempts: 1 },
-  isRetryable: () => false,
-  wrapNetwork: (error) => error,
-  missingFetch: () => new Error('fetch is not available'),
-  toHttpError: (status, body) => {
-    const error = new Error(`${body || status}`);
-    error.status = status;
-    return error;
-  },
-  parsePage: (text) => JSON.parse(text),
-};
+const createClient = (nextPage = parseLinkNext) =>
+  new RemoteClient({
+    name: 'Test',
+    subject: 'change',
+    headers: () => ({}),
+    nextPage,
+  });
 
 const jsonOk = (body, headers = {}) => ({
   ok: true,
@@ -43,16 +37,12 @@ const jsonOk = (body, headers = {}) => ({
 
 test('abort stops retry wait', async () => {
   const ac = new AbortController();
-  const transport = createTransport({
+  const pending = createClient().request('https://example.test/x', {
     fetch: async () => {
       throw new Error('reset');
     },
     signal: ac.signal,
-  });
-  const pending = transport.request('https://example.test/x', {
-    ...requestPolicy,
     retry: { attempts: 3, delayMs: 30_000 },
-    isRetryable: () => true,
   });
   await new Promise((resolve) => {
     setImmediate(resolve);
@@ -72,14 +62,13 @@ test('abort stops retry wait', async () => {
 test('request passes abort signal to fetch', async () => {
   const ac = new AbortController();
   let received;
-  const transport = createTransport({
+  await createClient().request('https://example.test/x', {
     fetch: async (_url, init) => {
       received = init.signal;
       return jsonOk('ok');
     },
     signal: ac.signal,
   });
-  await transport.request('https://example.test/x', requestPolicy);
   assert.equal(received, ac.signal);
 });
 
@@ -94,15 +83,11 @@ test('listPages follows Link rel=next', async () => {
     ],
     ['https://api.test/items?page=2', jsonOk('[{"id":2}]')],
   ]);
-  const transport = createTransport({
+  const items = await createClient().list('https://api.test/items', {
     fetch: async (url) => {
       calls.push(`${url}`);
       return pages.get(`${url}`);
     },
-  });
-  const items = await transport.listPages('https://api.test/items', {
-    ...requestPolicy,
-    nextPage: (headers) => parseLinkNext(headers),
   });
   assert.deepEqual(items, [{ id: 1 }, { id: 2 }]);
   assert.deepEqual(calls, [
@@ -113,7 +98,8 @@ test('listPages follows Link rel=next', async () => {
 
 test('listPages falls back to x-next-page', async () => {
   const calls = [];
-  const transport = createTransport({
+  const client = createClient(parseNextPage);
+  const items = await client.list('https://api.test/items', {
     fetch: async (url) => {
       calls.push(`${url}`);
       if (`${url}` === 'https://api.test/items') {
@@ -121,10 +107,6 @@ test('listPages falls back to x-next-page', async () => {
       }
       return jsonOk('[{"id":2}]');
     },
-  });
-  const items = await transport.listPages('https://api.test/items', {
-    ...requestPolicy,
-    nextPage: parseNextPage,
   });
   assert.deepEqual(items, [{ id: 1 }, { id: 2 }]);
   assert.equal(calls[1], 'https://api.test/items?page=2');

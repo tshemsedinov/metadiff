@@ -2,66 +2,58 @@
 'use strict';
 
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const childProcess = require('node:child_process');
 const { spawnSync } = childProcess;
 
 const utilities = require('../lib/utilities.js');
-const { IS_WIN, spawnBase } = utilities;
+const { spawnBase } = utilities;
+const paths = require('./install-paths.js');
+const { IS_WIN, MARK_BEGIN, MARK_END, home, destDir, dest } = paths;
+const { stripMarkedBlock } = paths;
 
-const root = path.resolve(__dirname, '..');
-const binSrc = path.join(root, 'bin', 'reslop.js');
-const home = os.homedir();
-const destDir = process.env.RESLOP_BIN_DIR
-  ? path.resolve(process.env.RESLOP_BIN_DIR)
-  : path.join(home, '.local', 'bin');
-const destName = IS_WIN ? 'reslop.cmd' : 'reslop';
-const dest = path.join(destDir, destName);
-
-const MARK_BEGIN = '# >>> reslop >>>';
-const MARK_END = '# <<< reslop <<<';
+const binSrc = path.join(path.resolve(__dirname, '..'), 'bin', 'reslop.js');
 
 const shellBlock = `${MARK_BEGIN}
 export PATH="$HOME/.local/bin:$PATH"
 ${MARK_END}
 `;
 
-const stripMarkedBlock = (text) => {
-  if (!text.includes(MARK_BEGIN)) return text;
-  return text.replace(
-    new RegExp(`${MARK_BEGIN}[\\s\\S]*?${MARK_END}\\n?`, 'm'),
-    '',
-  );
-};
-
-const readTextOrEmpty = (filePath) => {
-  try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return '';
-  }
-};
-
 const upsertShellConfig = (filePath) => {
-  let text = readTextOrEmpty(filePath);
-  text = stripMarkedBlock(text);
+  let text = stripMarkedBlock(fs.readFileSync(filePath, 'utf8'));
   if (text.length && !text.endsWith('\n')) text += '\n';
-  text += `\n${shellBlock}`;
-  fs.writeFileSync(filePath, text);
+  fs.writeFileSync(filePath, `${text}\n${shellBlock}`);
   console.log(`reslop: updated ${filePath}`);
 };
 
 const removeMarkedBlock = (filePath) => {
   if (!fs.existsSync(filePath)) return;
   try {
-    let text = fs.readFileSync(filePath, 'utf8');
+    const text = fs.readFileSync(filePath, 'utf8');
     if (!text.includes(MARK_BEGIN)) return;
-    text = stripMarkedBlock(text);
-    fs.writeFileSync(filePath, text);
+    fs.writeFileSync(filePath, stripMarkedBlock(text));
     console.log(`reslop: cleaned old block from ${filePath}`);
   } catch (error) {
     console.log(`reslop: skip ${filePath} (${error.message})`);
+  }
+};
+
+const installWrapper = (linkError) => {
+  try {
+    fs.unlinkSync(dest);
+  } catch {
+    // ignore missing dest
+  }
+  const wrapper = `#!/usr/bin/env bash
+exec node ${JSON.stringify(binSrc)} "$@"
+`;
+  try {
+    fs.writeFileSync(dest, wrapper, { mode: 0o755, flag: 'wx' });
+    console.log(`reslop: installed wrapper ${dest}`);
+    console.log(`(symlink failed: ${linkError.message}; used wrapper instead)`);
+  } catch (error) {
+    console.error(`reslop: could not install bin at ${dest}: ${error.message}`);
+    process.exit(1);
   }
 };
 
@@ -72,50 +64,27 @@ const installBin = () => {
     // Windows
   }
   fs.mkdirSync(destDir, { recursive: true });
-
   try {
     fs.lstatSync(dest);
     fs.unlinkSync(dest);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
-
   if (IS_WIN) {
     const quoted = `"${binSrc.replaceAll('"', '')}"`;
-    const wrapper = `@echo off\r\nnode ${quoted} %*\r\n`;
-    fs.writeFileSync(dest, wrapper);
+    fs.writeFileSync(dest, `@echo off\r\nnode ${quoted} %*\r\n`);
     console.log(`reslop: installed ${dest}`);
     return;
   }
-
   try {
     fs.symlinkSync(binSrc, dest);
     console.log(`reslop: linked ${dest} → ${binSrc}`);
   } catch (error) {
-    try {
-      fs.unlinkSync(dest);
-    } catch {
-      // ignore missing dest
-    }
-    const wrapper = `#!/usr/bin/env bash
-exec node ${JSON.stringify(binSrc)} "$@"
-`;
-    try {
-      fs.writeFileSync(dest, wrapper, { mode: 0o755, flag: 'wx' });
-      console.log(`reslop: installed wrapper ${dest}`);
-      console.log(`(symlink failed: ${error.message}; used wrapper instead)`);
-    } catch (writeError) {
-      console.error(
-        `reslop: could not install bin at ${dest}: ${writeError.message}`,
-      );
-      process.exit(1);
-    }
+    installWrapper(error);
   }
 };
 
-installBin();
-
-if (!IS_WIN) {
+const installShellPath = () => {
   const bashrcd = path.join(home, '.bashrc.d');
   const dropIn = path.join(bashrcd, 'reslop.sh');
   try {
@@ -128,7 +97,6 @@ if (!IS_WIN) {
   } catch (error) {
     console.log(`reslop: skip shell drop-in (${error.message})`);
   }
-
   try {
     const envDir = path.join(home, '.config', 'environment.d');
     fs.mkdirSync(envDir, { recursive: true });
@@ -138,7 +106,6 @@ if (!IS_WIN) {
   } catch (error) {
     console.log(`reslop: skip environment.d (${error.message})`);
   }
-
   for (const rc of [path.join(home, '.zshrc'), path.join(home, '.profile')]) {
     if (!fs.existsSync(rc)) continue;
     try {
@@ -147,7 +114,10 @@ if (!IS_WIN) {
       console.log(`reslop: skip ${rc} (${error.message})`);
     }
   }
-}
+};
+
+installBin();
+if (!IS_WIN) installShellPath();
 
 const check = spawnSync(
   dest,
@@ -160,23 +130,8 @@ if (check.error) {
   process.exit(1);
 }
 
-const ready = IS_WIN
-  ? [
-      '',
-      'Ready. Add this directory to PATH if needed:',
-      '',
-      `  ${destDir}`,
-      '',
-      'Then run reslop from any git repository.',
-      '',
-    ]
-  : [
-      '',
-      'Ready. Apply in this terminal:',
-      '',
-      '  source ~/.bashrc.d/reslop.sh',
-      '',
-      'Then run reslop from any git repository.',
-      '',
-    ];
-console.log(ready.join('\n'));
+const pathStep = IS_WIN
+  ? ['Ready. Add this directory to PATH if needed:', '', `  ${destDir}`]
+  : ['Ready. Apply in this terminal:', '', '  source ~/.bashrc.d/reslop.sh'];
+const ready = ['', ...pathStep, '', 'Then run reslop from any git repository.'];
+console.log([...ready, ''].join('\n'));

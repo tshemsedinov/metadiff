@@ -46,8 +46,8 @@ test('AC2 muted line color differs from strong char color', () => {
     height: 16,
     color: true,
   });
-  assert.ok(frame.text.includes(render.delCharBg()));
-  assert.ok(frame.text.includes(render.addCharBg()));
+  assert.ok(frame.text.includes(bg(THEME.delCharBg)));
+  assert.ok(frame.text.includes(bg(THEME.addCharBg)));
   assert.ok(frame.text.includes(fg(CODE_FG.variable)));
   assert.ok(!frame.text.includes(fg(THEME.delLineFg)));
   assert.equal(frame.rows.length, 16);
@@ -310,8 +310,8 @@ test('AC23 staged lines are grey with plus and minus marks', () => {
   });
   assert.ok(frame.text.includes(bg(THEME.stagedDelCharBg)));
   assert.ok(frame.text.includes(bg(THEME.stagedAddCharBg)));
-  assert.ok(!frame.text.includes(render.delCharBg()));
-  assert.ok(!frame.text.includes(render.addCharBg()));
+  assert.ok(!frame.text.includes(bg(THEME.delCharBg)));
+  assert.ok(!frame.text.includes(bg(THEME.addCharBg)));
   const plain = render.renderFrame(view, {
     width: 80,
     height: 16,
@@ -551,7 +551,7 @@ test('quit prompt paints f and c yellow on grey copy', () => {
   });
   const statusRow = colored.rows[colored.rows.length - 2];
   const plain = stripAnsi(statusRow);
-  assert.equal(plain.startsWith(render.QUIT_PROMPT), true);
+  assert.equal(plain.startsWith(' finish as ready  continue next time'), true);
   assert.ok(plain.includes('finish as ready'));
   assert.ok(plain.includes('continue next time'));
   assert.ok(!plain.includes('discard'));
@@ -1549,7 +1549,7 @@ test('update prompt paints y and n on the status line', () => {
   const statusRow = colored.rows[colored.rows.length - 2];
   const buttons = colored.rows[colored.rows.length - 1];
   const plain = stripAnsi(statusRow);
-  assert.equal(plain.startsWith(render.updatePrompt('0.1.5', '1.0.0')), true);
+  assert.equal(plain.startsWith(' update reslop 0.1.5 → 1.0.0? y/n'), true);
   assert.match(plain, /update reslop 0\.1\.5 → 1\.0\.0\? y\/n/);
   assert.match(stripAnsi(colored.rows[2]), /a\.js/);
   assert.match(stripAnsi(buttons), /add/i);
@@ -1590,7 +1590,7 @@ test('drop branch prompt paints y and n on the status line', () => {
   });
   const statusRow = colored.rows[colored.rows.length - 2];
   const plain = stripAnsi(statusRow);
-  assert.equal(plain.startsWith(render.dropPrompt('feat')), true);
+  assert.equal(plain.startsWith(' drop feat? y/n'), true);
   assert.match(plain, /drop feat\? y\/n/);
   const warn = fg(THEME.warnFg);
   assert.equal(statusRow.split(warn).length - 1, 2);
@@ -1621,7 +1621,7 @@ test('rejected push prompt paints f for force push', () => {
   });
   const statusRow = colored.rows[colored.rows.length - 2];
   const plain = stripAnsi(statusRow);
-  assert.equal(plain.startsWith(render.PUSH_PROMPT), true);
+  assert.equal(plain.startsWith(' Need force-push? force push'), true);
   assert.ok(plain.includes('Need force-push?'));
   assert.ok(plain.includes('force push'));
   assert.ok(statusRow.includes(fg(THEME.warnFg)));

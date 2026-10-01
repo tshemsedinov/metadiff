@@ -5,9 +5,11 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const github = require('../lib/github.js');
+const remote = require('../lib/remote.js');
 const diff = require('../lib/diff/diff.js');
 const { parseGithubPrUrl, githubToken, loadPullRequest } = github;
-const { filterChangeFiles, prApiUrl, discussionToNotes } = github;
+const { prApiUrl, discussionToNotes } = github;
+const { filterChangeFiles } = remote;
 const { parseDiff, itemsFromFiles } = diff;
 
 const PR = { owner: 'acme', repo: 'app', number: 123 };

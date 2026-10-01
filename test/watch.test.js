@@ -14,7 +14,7 @@ const items = require('../lib/session/items.js');
 const { restoredIndex, alignLoadedItems } = items;
 const watch = require('../lib/session/watch.js');
 const { ignoredRel, isOwnDirEvent, unchangedSince } = watch;
-const { createDiskWatcher, DEBOUNCE_MS } = watch;
+const { DiskWatcher, DEBOUNCE_MS } = watch;
 const helpers = require('./helpers.js');
 const { uiSink, tempDir } = helpers;
 
@@ -25,7 +25,7 @@ const wait = (ms) =>
 
 const startWatcher = async (options) => {
   await wait(20);
-  return createDiskWatcher(options);
+  return new DiskWatcher(options);
 };
 
 const waitUntil = async (check, ms = 500) => {
@@ -490,7 +490,7 @@ test('leaving todos reloads the file list', () => {
   const b = sampleItem('b.js');
   const { session, repo } = openWatched([a]);
   session.uiOpen = true;
-  session.composer.openTasksPage();
+  session.composer.tasks.openTasksPage();
   repo.setItems([a, b]);
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
@@ -503,8 +503,8 @@ test('editing a todo applies a deferred reload on exit', () => {
   const b = sampleItem('b.js');
   const { session, repo } = openWatched([a]);
   session.uiOpen = true;
-  session.composer.openTasksPage();
-  session.composer.editFocusedTask();
+  session.composer.tasks.openTasksPage();
+  session.composer.tasks.editFocusedTask();
   assert.equal(session.mode, 'compose');
   repo.setItems([a, b]);
   session.lifecycle.onDiskChange();

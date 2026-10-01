@@ -10,7 +10,7 @@ const { tempDir } = helpers;
 const reportParse = require('../lib/report-parse.js');
 const { buildDocument } = reportParse;
 const reportRender = require('../lib/report-render.js');
-const { renderMarkdown } = reportRender;
+const { renderDocument } = reportRender;
 const reportView = require('../lib/render/report.js');
 const { renderReport } = reportView;
 const renderNpm = require('../lib/render/npm.js');
@@ -57,7 +57,7 @@ test('TUI report uses tables and one stack while logs keep Markdown', () => {
   const doc = document();
   const output = renderReport(doc);
   const plain = stripAnsi(output);
-  const log = renderMarkdown(doc);
+  const log = renderDocument(doc);
   assert.ok(output.includes(TABLE_KEY));
   assert.match(plain, /✖ comparison 1 {2}× 3/);
   assert.match(plain, /expected\s+3/);
@@ -139,7 +139,7 @@ test(prettyView, async () => {
   const root = tempDir();
   try {
     let finish = null;
-    const { createNpmController } = require('../lib/session/npm.js');
+    const { NpmController } = require('../lib/session/npm.js');
     const ui = {
       top: root,
       nav: { npmCursor: 0 },
@@ -154,8 +154,8 @@ test(prettyView, async () => {
         },
       },
     };
-    const controller = createNpmController(ui);
-    controller.state.commands = [{ name: 'test', kind: 'script' }];
+    const controller = new NpmController(ui);
+    controller.commands = [{ name: 'test', kind: 'script' }];
     controller.run();
     controller.toggleVerbose();
     await finish({ text: raw, status: 1 });

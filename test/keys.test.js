@@ -5,12 +5,13 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const keys = require('../lib/keys.js');
-const { FILES_DISABLED, FILES_HIDDEN } = keys;
-const { FILES_TASKS_DISABLED, FILES_GIT_DISABLED } = keys;
-const { DIFF_DISABLED, TASKS_DISABLED, BRANCHES_DISABLED } = keys;
-const { COMMITS_DISABLED, UNIT_DISABLED } = keys;
-const { decodeChunk, actionFromKey, hitAction } = keys;
-const { disabledActions } = keys;
+const { decodeChunk, hitAction } = keys;
+const actions = require('../lib/session/actions.js');
+const { FILES_DISABLED, FILES_HIDDEN } = actions;
+const { FILES_TASKS_DISABLED, FILES_GIT_DISABLED } = actions;
+const { DIFF_DISABLED, TASKS_DISABLED, BRANCHES_DISABLED } = actions;
+const { COMMITS_DISABLED, UNIT_DISABLED } = actions;
+const { actionFromKey, disabledActions } = actions;
 const render = require('../lib/render/render.js');
 const { layoutButtons } = render;
 
@@ -181,29 +182,29 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
 test('layoutButtons hitboxes cover labels', () => {
   const layout = layoutButtons(160);
   assert.equal(layout.hits[0].id, 'add');
-  assert.ok(!layout.parts.some((part) => part.action.id === 'reload'));
-  assert.ok(!layout.parts.some((part) => part.action.id === 'newBranch'));
-  assert.ok(!layout.parts.some((part) => part.action.id === 'files'));
+  assert.ok(!layout.parts.some((part) => part.id === 'reload'));
+  assert.ok(!layout.parts.some((part) => part.id === 'newBranch'));
+  assert.ok(!layout.parts.some((part) => part.id === 'files'));
   assert.equal(layout.parts[0].label, 'add');
   assert.equal(layout.parts[0].letter, 'a');
   assert.equal(layout.parts[0].piece, ' add');
   assert.equal(layout.parts[1].piece, '  unstage');
   assert.ok(!layout.parts[0].piece.includes('['));
-  assert.equal(layout.parts[1].action.id, 'unstage');
-  assert.equal(layout.parts[3].action.id, 'ignore');
-  assert.equal(layout.parts[4].action.id, 'commit');
-  assert.equal(layout.parts[5].action.id, 'prev');
-  assert.equal(layout.parts[6].action.id, 'next');
+  assert.equal(layout.parts[1].id, 'unstage');
+  assert.equal(layout.parts[3].id, 'ignore');
+  assert.equal(layout.parts[4].id, 'commit');
+  assert.equal(layout.parts[5].id, 'prev');
+  assert.equal(layout.parts[6].id, 'next');
   assert.equal(hitAction(layout.hits, layout.hits[0].x0), 'add');
   const diff80 = layoutButtons(80, { hidden: DIFF_DISABLED });
   assert.equal(diff80.parts[0].label, 'add');
-  assert.ok(!diff80.parts.some((part) => part.action.id === 'reload'));
-  assert.ok(!diff80.parts.some((part) => part.action.id === 'commit'));
+  assert.ok(!diff80.parts.some((part) => part.id === 'reload'));
+  assert.ok(!diff80.parts.some((part) => part.id === 'commit'));
   const letters = layoutButtons(20, { compact: true });
   assert.equal(letters.parts[0].label, 'a');
   assert.equal(letters.parts[0].piece, ' a');
   assert.ok(!letters.parts[0].piece.includes('['));
-  const prev = letters.parts.find((part) => part.action.id === 'prev');
+  const prev = letters.parts.find((part) => part.id === 'prev');
   assert.equal(prev.label, '←');
   const off = layoutButtons(160, { hidden: FILES_DISABLED });
   const hitIds = off.hits.map((hit) => hit.id);
@@ -216,7 +217,7 @@ test('layoutButtons hitboxes cover labels', () => {
   assert.equal(hitIds.includes('pull'), false);
   assert.equal(hitIds.includes('push'), false);
   assert.equal(hitIds.includes('newBranch'), false);
-  const ids = off.parts.map((part) => part.action.id);
+  const ids = off.parts.map((part) => part.id);
   assert.equal(ids.includes('layout'), false);
   assert.equal(ids.includes('feedback'), false);
   assert.equal(ids.includes('code'), false);
@@ -225,7 +226,7 @@ test('layoutButtons hitboxes cover labels', () => {
     hidden: FILES_HIDDEN,
     extra: ['file', 'commit', 'pull', 'push'],
   });
-  const filesIds = filesHint.parts.map((part) => part.action.id);
+  const filesIds = filesHint.parts.map((part) => part.id);
   assert.deepEqual(filesIds, [
     'add',
     'unstage',
@@ -243,13 +244,13 @@ test('layoutButtons hitboxes cover labels', () => {
     hidden: FILES_HIDDEN,
     extra: ['diff', 'commit', 'pull', 'push'],
   });
-  const diffIds = diffHint.parts.map((part) => part.action.id);
+  const diffIds = diffHint.parts.map((part) => part.id);
   assert.ok(diffIds.includes('diff'));
   assert.ok(!diffIds.includes('file'));
   assert.ok(!filesIds.includes('prev'));
   assert.ok(!filesIds.includes('next'));
   const todo = layoutButtons(160, { hidden: TASKS_DISABLED });
-  const todoIds = todo.parts.map((part) => part.action.id);
+  const todoIds = todo.parts.map((part) => part.id);
   assert.equal(todoIds.includes('commit'), false);
   assert.equal(todoIds.includes('tasks'), false);
   assert.equal(todoIds.includes('open'), false);
@@ -258,13 +259,13 @@ test('layoutButtons hitboxes cover labels', () => {
     extra: ['commit', 'pull', 'push'],
     disabled: FILES_GIT_DISABLED,
   });
-  const dimAdd = dim.parts.find((part) => part.action.id === 'add');
+  const dimAdd = dim.parts.find((part) => part.id === 'add');
   assert.equal(dimAdd.disabled, true);
   assert.equal(
     dim.hits.find((hit) => hit.id === 'add'),
     undefined,
   );
-  assert.ok(dim.parts.some((part) => part.action.id === 'commit'));
+  assert.ok(dim.parts.some((part) => part.id === 'commit'));
   assert.ok(dim.hits.some((hit) => hit.id === 'commit'));
 });
 
@@ -318,12 +319,12 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
     extra: branchIds,
     disabled: ['rebase', 'drop'],
   });
-  assert.ok(branchLayout.parts.some((part) => part.action.id === 'drop'));
-  assert.ok(branchLayout.parts.some((part) => part.action.id === 'pull'));
+  assert.ok(branchLayout.parts.some((part) => part.id === 'drop'));
+  assert.ok(branchLayout.parts.some((part) => part.id === 'pull'));
   assert.ok(branchLayout.hits.some((hit) => hit.id === 'pull'));
   assert.ok(branchLayout.hits.some((hit) => hit.id === 'push'));
-  assert.ok(!branchLayout.parts.some((part) => part.action.id === 'prev'));
-  assert.ok(!branchLayout.parts.some((part) => part.action.id === 'next'));
+  assert.ok(!branchLayout.parts.some((part) => part.id === 'prev'));
+  assert.ok(!branchLayout.parts.some((part) => part.id === 'next'));
   assert.equal(
     branchLayout.hits.find((hit) => hit.id === 'drop'),
     undefined,
@@ -333,8 +334,8 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
     extra: branchIds,
     disabled: ['pull', 'push'],
   });
-  assert.ok(ontoLayout.parts.some((part) => part.action.id === 'pull'));
-  assert.ok(ontoLayout.parts.some((part) => part.action.id === 'push'));
+  assert.ok(ontoLayout.parts.some((part) => part.id === 'pull'));
+  assert.ok(ontoLayout.parts.some((part) => part.id === 'push'));
   assert.equal(
     ontoLayout.hits.find((hit) => hit.id === 'pull'),
     undefined,
@@ -389,18 +390,18 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
     extra: commitIds,
     disabled: ['commit', 'fixup', 'apply'],
   });
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'commit'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'amend'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'apply'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'reword'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'drop'));
-  const view = commitLayout.parts.find((part) => part.action.id === 'view');
+  assert.ok(commitLayout.parts.some((part) => part.id === 'commit'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'amend'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'apply'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'reword'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'drop'));
+  const view = commitLayout.parts.find((part) => part.id === 'view');
   assert.equal(view.label, 'view');
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'view'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'pull'));
-  assert.ok(commitLayout.parts.some((part) => part.action.id === 'push'));
-  assert.ok(!commitLayout.parts.some((part) => part.action.id === 'prev'));
-  assert.ok(!commitLayout.parts.some((part) => part.action.id === 'layout'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'pull'));
+  assert.ok(commitLayout.parts.some((part) => part.id === 'push'));
+  assert.ok(!commitLayout.parts.some((part) => part.id === 'prev'));
+  assert.ok(!commitLayout.parts.some((part) => part.id === 'layout'));
   assert.equal(
     commitLayout.hits.find((hit) => hit.id === 'commit'),
     undefined,
