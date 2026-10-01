@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const cli = require('../lib/cli.js');
-const { run, parseArgv, resolveScope } = cli;
+const { run, parseArgv, resolveScope, loadSession } = cli;
 const git = require('../lib/git.js');
 const { createGitRepo } = git;
 const helpers = require('./helpers.js');
@@ -366,5 +366,25 @@ test('GitLab MR load errors exit 1', async () => {
     assert.match(proc.stderrText(), /GitLab merge request not found/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a local session without paths opens on the dashboard', async () => {
+  const repo = makeRepo();
+  try {
+    repo.write('a.js', 'one\n');
+    repo.git(['add', '.']);
+    repo.git(['commit', '-m', 'first']);
+    const proc = fakeProc(repo.dir);
+    const plain = await loadSession(proc, {}, parseArgv([]));
+    assert.equal(plain.pane, 'dashboard');
+    assert.equal(plain.dashboardHome, true);
+    const scoped = await loadSession(proc, {}, parseArgv(['a.js']));
+    assert.equal(scoped.pane, 'files');
+    assert.equal(scoped.dashboardHome, false);
+    const rev = await loadSession(proc, {}, parseArgv(['HEAD']));
+    assert.equal(rev.pane, 'files');
+  } finally {
+    repo.cleanup();
   }
 });

@@ -42,7 +42,14 @@ const makeRepo = () => {
   };
   const read = (rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   const exists = (rel) => fs.existsSync(path.join(dir, rel));
-  const cleanup = () => fs.rmSync(dir, { recursive: true, force: true });
+  const cleanup = () => {
+    fs.rmSync(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+  };
   return { dir, git, write, read, exists, cleanup };
 };
 
@@ -84,6 +91,28 @@ const sampleHunk = (lines) => ({
   lines,
 });
 
+const RETRYABLE = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+
+const wait = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const removeTree = async (dir) => {
+  const options = { recursive: true, force: true };
+  const limit = 12;
+  for (let attempt = 0; attempt < limit; attempt++) {
+    try {
+      await fs.promises.rm(dir, options);
+      return;
+    } catch (error) {
+      const locked = RETRYABLE.has(error.code);
+      if (!locked || attempt === limit - 1) throw error;
+      await wait(50 * (attempt + 1));
+    }
+  }
+};
+
 const reviewView = (item, extra = {}) => ({
   item,
   index: 0,
@@ -103,4 +132,5 @@ module.exports = {
   ttySink,
   sampleHunk,
   reviewView,
+  removeTree,
 };

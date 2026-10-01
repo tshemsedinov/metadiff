@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const ansi = require('../lib/ansi.js');
 
 const { visibleWidth, codeFg, CODE_FG, THEME, PALETTES, fg } = ansi;
+const { trimVisible } = ansi;
 const { setTheme, themeName, clipAnsi, stripAnsi, RESET } = ansi;
 const { foregroundOn, bg } = ansi;
 
@@ -59,6 +60,14 @@ test('setTheme swaps colors in place and rejects unknown names', () => {
   } finally {
     setTheme('dark');
   }
+});
+
+test('trimVisible keeps a fitting string and marks a cut', () => {
+  assert.equal(trimVisible('short', 8), 'short');
+  const cut = trimVisible('node --test test/dashboard.test.js', 10);
+  assert.equal(cut, 'node --te…');
+  assert.equal(visibleWidth(trimVisible('node --test', 1)), 1);
+  assert.equal(trimVisible('node --test', 1), '…');
 });
 
 test('clipAnsi keeps color codes and cuts on visible width', () => {

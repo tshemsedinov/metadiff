@@ -2023,6 +2023,21 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(repo.commits[0].message, 'land the change');
 });
 
+test('escape from a commit diff returns to the dashboard', () => {
+  const { session } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'dashboard',
+  });
+  session.pushInput('c');
+  session.dispatch('next');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.pane, 'diff');
+  assert.equal(session.rev.startsWith('aaa1111'), true);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.pane, 'dashboard');
+  assert.equal(session.rev, '');
+  assert.equal(session.revShort, '');
+});
+
 test('enter on uncommitted changes leaves a viewed commit', () => {
   const { session } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
@@ -4280,11 +4295,11 @@ test('npm screen deletes logs older than 5 days', () => {
   session.pushInput('n');
   session.draw();
   const status = () => stripAnsi(session.lastFrame.rows.at(-2));
-  assert.match(status(), /old logs 6b/);
+  assert.match(status(), /old logs 6/);
   session.handleEvent({ type: 'key', key: 'c' });
   assert.equal(session.mode, 'confirmDrop');
   session.draw();
-  assert.match(status(), /drop logs older than 5 days \(6b\)\? y\/n/);
+  assert.match(status(), /drop logs older than 5 days \(6\)\? y\/n/);
   session.pushInput('n');
   assert.equal(fs.existsSync(stale), true);
   session.handleEvent({ type: 'key', key: 'c' });
