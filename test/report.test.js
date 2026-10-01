@@ -10,7 +10,7 @@ const reportParse = require('../lib/report-parse.js');
 const { buildDocument } = reportParse;
 const render = require('../lib/report-render.js');
 
-const { renderMarkdown, NOTICE, NOTICE_HEAD, displayMessage } = render;
+const { renderDocument, notice, NOTICE_HEAD, displayMessage } = render;
 const cli = require('../lib/cli.js');
 const { run } = cli;
 const reportRun = require('../lib/report-run.js');
@@ -29,7 +29,7 @@ const rendered = (stdout, stderr, exit) => {
   const doc = buildDocument(stdout, stderr, ROOT, exit, '');
   return {
     doc,
-    md: renderMarkdown(doc),
+    md: renderDocument(doc),
   };
 };
 
@@ -72,7 +72,7 @@ test('TAP keeps failures, fields, and a user trace', () => {
   assert.ok(!view.md.includes('node:internal'));
   assert.ok(!view.md.includes(ROOT));
   assert.match(view.md, /exit: 1\n$/);
-  assert.ok(view.md.startsWith(NOTICE));
+  assert.ok(view.md.startsWith(notice()));
   assert.ok(view.md.indexOf('# ') < view.md.lastIndexOf('exit:'));
 });
 

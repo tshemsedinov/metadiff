@@ -7,12 +7,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const runs = require('../lib/runs.js');
-const { createTracker, startRun, readRuns, settleRecord } = runs;
+const { Tracker, RunRecorder, readRuns, settleRecord } = runs;
 const { summarizeDocument, isRunsRel, commandLabel } = runs;
 const tree = require('../lib/dashboard/tree.js');
 const { FileIndex, folderOf, extOf } = tree;
 const gitInfo = require('../lib/dashboard/git.js');
-const { readGitSummary, parseTrack, countFixups } = gitInfo;
+const { readGitSummary, parseTrack } = gitInfo;
 const dashModel = require('../lib/dashboard/model.js');
 const { scriptName, runName, buildModel, mergeRuns, groupChanges } = dashModel;
 const npmInfo = require('../lib/dashboard/npm.js');
@@ -21,7 +21,7 @@ const tiles = require('../lib/render/tiles.js');
 const { layoutTiles, GAP_X, GAP_Y, seg } = tiles;
 const dashTable = require('../lib/render/dash-table.js');
 const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
-const { labelOf, pickGroups, withTitle, titleAside } = dashTable;
+const { labelOf, pickGroups, titleAside } = dashTable;
 const activity = require('../lib/render/dash-activity.js');
 const { runMetrics, branchesBlock, runsBlock } = activity;
 const dashBlocks = require('../lib/render/dash-blocks.js');
@@ -31,9 +31,9 @@ const { TILES, paintBodyDashboard } = dashboardRender;
 const dashboardSession = require('../lib/session/dashboard.js');
 const { classify, ageDelay } = dashboardSession;
 const watch = require('../lib/session/watch.js');
-const { createDiskWatcher, UNKNOWN_PATH } = watch;
-const keys = require('../lib/keys.js');
-const { actionFromKey, DASH_BLOCKS } = keys;
+const { DiskWatcher, UNKNOWN_PATH } = watch;
+const actions = require('../lib/session/actions.js');
+const { actionFromKey, DASH_BLOCKS } = actions;
 const session = require('../lib/session.js');
 const { Session } = session;
 const git = require('../lib/git.js');
@@ -60,7 +60,7 @@ const waitUntil = async (check, ms = 3000) => {
 const PASS = '✔ ok (1ms)';
 
 test('the tracker counts passing and failing test lines', () => {
-  const tracker = createTracker();
+  const tracker = new Tracker();
   tracker.feed(`${PASS}\n✖ broken (1ms)\nplain\n✔ half`);
   assert.equal(tracker.progress.done, 1);
   assert.equal(tracker.progress.failed, 1);
@@ -81,7 +81,7 @@ test('a run record is written, updated, finished and read back', () => {
   try {
     let now = 1000;
     const clock = () => now;
-    const run = startRun(dir, 'node --test', { now: clock });
+    const run = new RunRecorder(dir, 'node --test', { now: clock });
     const [live] = readRuns(dir);
     assert.equal(live.status, 'running');
     assert.equal(live.command, 'node --test');
@@ -96,8 +96,8 @@ test('a run record is written, updated, finished and read back', () => {
     assert.equal(done.result.tests, 2);
     assert.equal(done.endedAt, 2000);
     now += 1000;
-    const second = startRun(dir, 'node --test', { now: clock });
-    assert.ok(second.id);
+    const second = new RunRecorder(dir, 'node --test', { now: clock });
+    assert.ok(second.record.id);
     const expected = readRuns(dir).find((r) => r.status === 'running');
     assert.equal(expected.progress.expected, 2);
   } finally {
@@ -122,10 +122,12 @@ const scriptEnv = (name) => {
 test('a run records the npm script that started it', () => {
   const dir = tempDir('reslop-runs-');
   try {
-    const run = startRun(dir, 'node --test', { env: scriptEnv('test') });
+    const run = new RunRecorder(dir, 'node --test', { env: scriptEnv('test') });
     assert.equal(readRuns(dir)[0].script, 'test');
     run.finish(0);
-    const lint = startRun(dir, 'eslint . --fix', { env: scriptEnv('fix') });
+    const lint = new RunRecorder(dir, 'eslint . --fix', {
+      env: scriptEnv('fix'),
+    });
     const runs = readRuns(dir);
     const saved = runs.find((item) => item.command.startsWith('eslint'));
     assert.equal(saved.script, 'fix');
@@ -138,7 +140,7 @@ test('a run records the npm script that started it', () => {
 test('a failed run keeps its exit code', () => {
   const dir = tempDir('reslop-runs-');
   try {
-    const run = startRun(dir, 'eslint .');
+    const run = new RunRecorder(dir, 'eslint .');
     run.finish(2);
     const [record] = readRuns(dir);
     assert.equal(record.status, 'failed');
@@ -193,7 +195,7 @@ test('FileIndex sizes files per folder and per extension', async () => {
     const js = exts.find((e) => e.key === '.js');
     assert.equal(js.files, 2);
     assert.ok(!dirs.some((d) => d.key === 'skip'));
-    assert.equal(index.sizeOf('lib/a.js'), 8);
+    assert.equal(index.entries.get('lib/a.js').size, 8);
   } finally {
     repo.cleanup();
   }
@@ -237,17 +239,16 @@ test('FileIndex ignores node_modules and git internals on touch', async () => {
   }
 });
 
-test('git summary parts parse tracking and fixups', () => {
+test('git branch tracking is parsed from the upstream track', () => {
   assert.deepEqual(parseTrack('[ahead 2, behind 1]'), {
     ahead: 2,
     behind: 1,
     gone: false,
   });
   assert.equal(parseTrack('[gone]').gone, true);
-  assert.equal(countFixups('fixup! a\nplain\nsquash! b\namend! c'), 3);
 });
 
-test('readGitSummary reports commits, branches and pushed state', async () => {
+test('readGitSummary reports commits and branches', async () => {
   const repo = makeRepo();
   try {
     repo.write('a.js', 'one\n');
@@ -259,8 +260,6 @@ test('readGitSummary reports commits, branches and pushed state', async () => {
     const summary = await readGitSummary(repo.dir);
     assert.equal(summary.branch, 'main');
     assert.equal(summary.commits.total, 2);
-    assert.equal(summary.commits.fixups, 1);
-    assert.equal(summary.commits.pushed, null);
     assert.equal(summary.commits.last.subject, 'fixup! first');
     assert.equal(summary.commits.recent[0].subject, 'fixup! first');
     assert.equal(summary.commits.recent[1].subject, 'first');
@@ -273,7 +272,7 @@ test('readGitSummary reports commits, branches and pushed state', async () => {
   }
 });
 
-test('readGitSummary splits pushed from unpushed commits', async () => {
+test('readGitSummary tracks branches against their upstream', async () => {
   const origin = makeRepo();
   const clone = makeRepo();
   try {
@@ -289,8 +288,6 @@ test('readGitSummary splits pushed from unpushed commits', async () => {
     clone.git(['commit', '-m', 'local']);
     const summary = await readGitSummary(clone.dir);
     assert.equal(summary.commits.total, 2);
-    assert.equal(summary.commits.unpushed, 1);
-    assert.equal(summary.commits.pushed, 1);
     const main = summary.branches.find((b) => b.name === 'main');
     assert.equal(main.ahead, 1);
     assert.equal(main.behind, 0);
@@ -341,10 +338,8 @@ test('readNpmSummary counts dependencies, scripts and modules', async () => {
     fs.writeFileSync(stamp, JSON.stringify(lock));
     const summary = await readNpmSummary(dir, null);
     assert.equal(summary.hasManifest, true);
-    assert.equal(summary.name, 'demo');
     assert.equal(summary.deps, 1);
     assert.equal(summary.dev, 3);
-    assert.ok(summary.scripts.length >= 2);
     const lockBytes = fs.statSync(stamp).size;
     assert.equal(summary.modules.bytes, 20 + lockBytes);
     assert.equal(summary.modules.count, 3);
@@ -396,7 +391,7 @@ test('the disk watcher reports changed paths and run records', async () => {
   await wait(20);
   const seen = new Set();
   let changes = 0;
-  const watcher = createDiskWatcher({
+  const watcher = new DiskWatcher({
     root: dir,
     debounceMs: 30,
     onChange: () => {
@@ -566,7 +561,9 @@ test('the dashboard shows a run by script name', async () => {
   const { ui, repo, close } = await openDashboard();
   try {
     assert.ok(await waitUntil(() => /first commit/.test(frameText(ui))));
-    const run = startRun(repo.dir, 'node --test', { env: scriptEnv('test') });
+    const run = new RunRecorder(repo.dir, 'node --test', {
+      env: scriptEnv('test'),
+    });
     run.feed(`${PASS}\n`);
     const seen = () => {
       const text = frameText(ui);
@@ -865,7 +862,6 @@ test('diff columns keep one space after the mark and fill the row', () => {
         staged: 2,
         remaining: 4,
       },
-      newest: '3 hours ago',
       samples: [1, 4, 2],
       delta: null,
     },
@@ -930,7 +926,6 @@ test('diff rows keep removals when the tile is narrow', () => {
         staged: 12,
         remaining: 40,
       },
-      newest: '5 minutes ago',
       samples: [],
       delta: null,
     },
@@ -977,25 +972,6 @@ test('groups list folders before extensions', () => {
   assert.deepEqual(rest.exts, ['js']);
 });
 
-test('header totals share columns with the rows beneath', () => {
-  const tile = { key: 'f', title: 'files' };
-  const rows = [
-    [cell(' lib/'), cell('3', 'text', 'r'), cell('800', 'text', 'r')],
-    [cell(' .js'), cell('9', 'text', 'r'), cell('20', 'text', 'r')],
-  ];
-  const head = [cell('12', 'text', 'r', true), cell('820', 'text', 'r', true)];
-  const block = withTitle(tile, head, rows, 32);
-  const text = (line) => line.map((item) => item.text).join('');
-  const header = text(block.titleLine);
-  const folder = text(block.lines[0]);
-  const ext = text(block.lines[1]);
-  const end = (line, value) => line.indexOf(value) + value.length;
-  assert.equal(header.startsWith('files'), true);
-  assert.equal(end(header, '12'), end(folder, '3'));
-  assert.equal(end(header, '12'), end(ext, '9'));
-  assert.equal(end(header, '820'), end(folder, '800'));
-});
-
 test('the branches header shows the local count', () => {
   const tile = { key: 'b', title: 'branches' };
   const entry = (name, current) => ({
@@ -1034,7 +1010,6 @@ test('the npm tile lists packages under the header counts', () => {
       hasManifest: true,
       deps: 1,
       dev: 0,
-      optional: 0,
       modules: {
         bytes: 20,
         count: 2,
@@ -1045,9 +1020,7 @@ test('the npm tile lists packages under the header counts', () => {
       },
       audit: 0,
       outdated: 0,
-      proposals: 0,
       running: '',
-      changedAt: 0,
     },
   };
   const block = npmBlock(model, 36, 8, { now: 1, frame: 0 }, tile);
@@ -1085,7 +1058,6 @@ test('the npm tile shows current, wanted, and latest', () => {
       hasManifest: true,
       deps: 3,
       dev: 0,
-      optional: 0,
       modules: {
         bytes: 24,
         count: 3,
@@ -1116,9 +1088,7 @@ test('the npm tile shows current, wanted, and latest', () => {
       },
       audit: 1,
       outdated: 2,
-      proposals: 0,
       running: '',
-      changedAt: 0,
     },
   };
   const block = npmBlock(model, 64, 10, { now: 1, frame: 0 }, tile);
@@ -1188,13 +1158,10 @@ test('npm packages take wanted and latest from the outdated report', () => {
     index: null,
     fileDelta: null,
     entries: [],
-    items: [],
-    sizeOf: () => 0,
     totals: { added: 0, removed: 0 },
     samples: [],
     diffDelta: null,
     git: null,
-    branch: '',
     switches: [],
     branchAt: new Map(),
     marks: { npm: 0, commit: 0, branches: 0 },
@@ -1202,14 +1169,12 @@ test('npm packages take wanted and latest from the outdated report', () => {
       hasManifest: true,
       deps: 2,
       dev: 0,
-      optional: 0,
-      scripts: [],
       modules: {
         bytes: 20,
         count: 2,
         packages: [
-          { name: 'big', bytes: 14, version: '1.0.0' },
-          { name: 'small', bytes: 6, version: '3.1.0' },
+          { name: 'big', bytes: 14, dev: false, version: '1.0.0' },
+          { name: 'small', bytes: 6, dev: false, version: '3.1.0' },
         ],
       },
     },

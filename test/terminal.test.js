@@ -13,9 +13,9 @@ const { sink } = helpers;
 const sys = require('../lib/utilities.js');
 const { watchResize } = sys;
 const terminal = require('../lib/session/terminal.js');
-const { createTerminal, ENTER_TERM, LEAVE_TERM } = terminal;
+const { Terminal, ENTER_TERM, LEAVE_TERM } = terminal;
 const progress = require('../lib/session/progress.js');
-const { createProgress } = progress;
+const { Progress } = progress;
 
 const fakeStdin = () => {
   const stdin = new EventEmitter();
@@ -34,7 +34,7 @@ const openTerm = (extra = {}) => {
   const stdin = extra.stdin ?? fakeStdin();
   const stdout = extra.stdout ?? sink();
   const proc = extra.proc ?? new EventEmitter();
-  const term = createTerminal({
+  const term = new Terminal({
     stdin,
     stdout,
     proc,
@@ -98,7 +98,7 @@ test('repeated listen and close restore listener and timer counts', () => {
   const stdin = fakeStdin();
   const stdout = emitSink();
   const proc = new EventEmitter();
-  const term = createTerminal({ stdin, stdout, proc });
+  const term = new Terminal({ stdin, stdout, proc });
   const start = () => {
     term.startListening({
       onData: () => {},
@@ -188,7 +188,7 @@ test('paint after dispose writes nothing', () => {
 test('progress ticks only while an id is active', () => {
   const { term } = openTerm();
   let ticks = 0;
-  const progress = createProgress(term, () => (ticks += 1), 1000);
+  const progress = new Progress(term, () => (ticks += 1), 1000);
   progress.start('busy');
   progress.start('install');
   assert.equal(term.hasTimer('progress'), true);

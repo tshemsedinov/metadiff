@@ -5,7 +5,7 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const compose = require('../lib/session/compose.js');
-const { createComposer } = compose;
+const { Composer } = compose;
 const navigation = require('../lib/session/navigation.js');
 const { Navigation } = navigation;
 const review = require('../lib/review.js');
@@ -17,6 +17,7 @@ const setup = (extra = {}) => {
   const flushed = [];
   const ui = {
     nav,
+    review: { store: notes },
     mode: 'review',
     status: '',
     layout: 'unified',
@@ -36,11 +37,7 @@ const setup = (extra = {}) => {
     ignoreWatch: () => {},
     reloadAfterChange: (afterLoad) => afterLoad(),
   };
-  const composer = createComposer({
-    nav,
-    review: { store: notes },
-    ui,
-  });
+  const composer = new Composer(ui);
   return {
     composer,
     notes,
@@ -53,41 +50,41 @@ const setup = (extra = {}) => {
 
 test('commit save returns a command and does not close compose', () => {
   const { composer, flushed, getMode } = setup();
-  composer.state.commitKind = 'commit';
+  composer.commitKind = 'commit';
   composer.openCompose('commit', 'land it');
   const result = composer.saveCompose();
   assert.deepEqual(result, { kind: 'commit' });
-  assert.equal(composer.state.composeKind, 'commit');
+  assert.equal(composer.composeKind, 'commit');
   assert.equal(getMode(), 'compose');
   assert.equal(flushed.length, 0);
 });
 
 test('autosave never returns a git command for commit or branch', () => {
   const { composer, flushed } = setup();
-  composer.state.commitKind = 'commit';
+  composer.commitKind = 'commit';
   composer.openCompose('commit', 'land it');
   assert.equal(composer.autosave(), undefined);
-  assert.equal(composer.state.composeKind, 'commit');
+  assert.equal(composer.composeKind, 'commit');
   assert.equal(flushed.length, 0);
   composer.closeCompose();
   composer.openCompose('branch', 'feat');
   assert.equal(composer.autosave(), undefined);
-  assert.equal(composer.state.composeKind, 'branch');
+  assert.equal(composer.composeKind, 'branch');
   assert.equal(flushed.length, 0);
 });
 
 test('page home and end move in a multiline compose editor', () => {
   const { composer } = setup();
   composer.openCompose('code', 'aaa\nbbb\nccc');
-  assert.equal(composer.state.editor.cursor, 11);
+  assert.equal(composer.editor.cursor, 11);
   composer.handleKey('home');
-  assert.equal(composer.state.editor.cursor, 8);
+  assert.equal(composer.editor.cursor, 8);
   composer.handleKey('end');
-  assert.equal(composer.state.editor.cursor, 11);
+  assert.equal(composer.editor.cursor, 11);
   composer.handleKey('pageUp');
-  assert.equal(composer.state.editor.linePos().line, 0);
+  assert.equal(composer.editor.linePos().line, 0);
   composer.handleKey('pageDown');
-  assert.equal(composer.state.editor.linePos().line, 2);
+  assert.equal(composer.editor.linePos().line, 2);
 });
 
 test('ctrl arrows move by word in compose editors', () => {
@@ -95,15 +92,15 @@ test('ctrl arrows move by word in compose editors', () => {
   for (const kind of kinds) {
     const { composer } = setup();
     composer.openCompose(kind, 'hello world');
-    composer.state.editor.home();
+    composer.editor.home();
     composer.handleKey('ctrl-right');
-    assert.equal(composer.state.editor.cursor, 5);
+    assert.equal(composer.editor.cursor, 5);
     composer.handleKey('ctrl-right');
-    assert.equal(composer.state.editor.cursor, 11);
+    assert.equal(composer.editor.cursor, 11);
     composer.handleKey('ctrl-left');
-    assert.equal(composer.state.editor.cursor, 6);
+    assert.equal(composer.editor.cursor, 6);
     composer.handleKey('ctrl-left');
-    assert.equal(composer.state.editor.cursor, 0);
+    assert.equal(composer.editor.cursor, 0);
   }
 });
 
@@ -112,7 +109,7 @@ test('escape cancels branch compose without a command', () => {
   composer.openCompose('branch', 'feat');
   const result = composer.handleKey('escape');
   assert.equal(result, null);
-  assert.equal(composer.state.composeKind, null);
+  assert.equal(composer.composeKind, null);
   assert.equal(getMode(), 'review');
   assert.equal(getStatus(), '');
 });

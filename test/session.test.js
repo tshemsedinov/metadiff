@@ -511,8 +511,8 @@ test('PR add and revert are read only and feedback attaches', () => {
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   const note = session.notes.feedback.get('lib/a.js:1:1:0');
   assert.equal(note.text, 'prefer const');
-  assert.equal(session.counts().pr, 1);
-  assert.equal(session.counts().feedback, 1);
+  assert.equal(session.view().counts.pr, 1);
+  assert.equal(session.view().counts.feedback, 1);
   session.dispatch('next');
   assert.equal(session.status, 'saved');
   session.dispatch('prev');
@@ -1090,9 +1090,9 @@ test('f maps feedback to the hunk location', () => {
   assert.equal(note.text, 'extract helper');
   assert.equal(note.file, 'a.js');
   assert.equal(note.newStart, 1);
-  assert.equal(session.counts().feedback, 1);
-  assert.equal(session.counts().tasks, 0);
-  assert.equal(session.idleNoteText(), '[ ] extract helper');
+  assert.equal(session.view().counts.feedback, 1);
+  assert.equal(session.view().counts.tasks, 0);
+  assert.equal(session.composer.idleNoteText(), '[ ] extract helper');
 });
 
 test('compose arrows move by visual wrap rows', () => {
@@ -1286,7 +1286,7 @@ test('exact template text hides the template list', () => {
   assert.match(body, /extract helper/);
   assert.ok(!body.includes('add tests'));
   assert.equal(session.lastFrame.templateHits.length, 0);
-  assert.deepEqual(session.shownTemplates(), []);
+  assert.deepEqual(session.composer.templates.shownTemplates(), []);
 });
 
 test('existing unique feedback hides the template list', () => {
@@ -1331,7 +1331,7 @@ test('e edits added lines in the reviewed file', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
   assert.equal(session.notes.code.size, 0);
-  assert.equal(session.counts().code, 0);
+  assert.equal(session.view().counts.code, 0);
   assert.equal(repo.edited.length, 1);
   assert.equal(repo.edited[0].text, 'b2\n');
   assert.equal(repo.edited[0].item.file.newPath, 'a.js');
@@ -1347,7 +1347,7 @@ test('e on a read-only commit keeps a code proposal', () => {
   assert.equal(repo.edited.length, 0);
   const note = session.notes.code.get('a.js:1:1:0');
   assert.equal(note.text, 'b2');
-  assert.equal(session.counts().code, 1);
+  assert.equal(session.view().counts.code, 1);
 });
 
 test('code save equal to original drops the proposal', () => {
@@ -1356,7 +1356,7 @@ test('code save equal to original drops the proposal', () => {
   session.dispatch('code');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.notes.code.size, 0);
-  assert.equal(session.counts().code, 0);
+  assert.equal(session.view().counts.code, 0);
   assert.equal(repo.stagedPaths.length, 0);
 });
 
@@ -1376,7 +1376,7 @@ test('todo list scrolls the focused row into view', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 12;
   for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
-  session.composer.openTasksPage();
+  session.composer.tasks.openTasksPage();
   session.tasksFocus = 0;
   session.draw();
   const top = stripAnsi(session.lastFrame.rows.join('\n'));
@@ -1468,8 +1468,8 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.current().origin, 'task');
   assert.deepEqual(session.view().tasks, ['[ ] rewrite loop', '[ ] ']);
   assert.equal(session.view().total, 2);
-  assert.equal(session.counts().tasks, 1);
-  assert.equal(session.counts().feedback, 0);
+  assert.equal(session.view().counts.tasks, 1);
+  assert.equal(session.view().counts.feedback, 0);
   assert.equal(session.fileList()[0].remaining, 1);
   assert.equal(session.fileList()[0].staged, 0);
   assert.equal(session.tasksFocus, 0);
@@ -1482,7 +1482,7 @@ test('t opens the repo todo page and lets you edit it', () => {
   session.dispatch('next');
   assert.equal(session.current().origin, 'unstaged');
   assert.equal(session.current().file.newPath, 'a.js');
-  assert.equal(session.idleNoteText(), '');
+  assert.equal(session.composer.idleNoteText(), '');
   session.dispatch('tasks');
   assert.equal(session.current().origin, 'task');
   assert.equal(session.mode, 'compose');
@@ -1503,7 +1503,7 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.current().file.newPath, 'a.js');
   session.dispatch('next');
   assert.equal(session.current().file.newPath, 'b.js');
-  assert.equal(session.idleNoteText(), '');
+  assert.equal(session.composer.idleNoteText(), '');
   session.dispatch('prev');
   session.dispatch('prev');
   assert.equal(session.current().origin, 'task');
@@ -1564,7 +1564,7 @@ test('enter and click edit the focused todo', () => {
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
-  session.startDraftCompose();
+  session.composer.tasks.startDraftCompose();
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
@@ -1631,7 +1631,7 @@ test('todo list stays on screen while composing', () => {
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
-  session.startDraftCompose();
+  session.composer.tasks.startDraftCompose();
   session.pushInput('draft two');
   assert.equal(session.mode, 'compose');
   session.draw();
@@ -1668,7 +1668,7 @@ test('delete and backspace remove the selected todo', () => {
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
-  session.startDraftCompose();
+  session.composer.tasks.startDraftCompose();
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
@@ -3170,7 +3170,7 @@ test('pull shows progress until git finishes', async () => {
   session.pushInput('p');
   assert.equal(repo.pulls.length, 0);
   assert.equal(session.busy, 'pulling');
-  assert.equal(session.viewStatus(), 'pulling');
+  assert.equal(session.view().status, 'pulling');
   assert.equal(session.progressFrame, 0);
   session.tickProgress();
   assert.equal(session.progressFrame, 1);

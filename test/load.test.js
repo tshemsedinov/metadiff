@@ -5,7 +5,9 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const load = require('../lib/session/load.js');
-const { isAbortError, LoadCoordinator, tagLoaded } = load;
+const { LoadCoordinator, tagLoaded } = load;
+const utilities = require('../lib/utilities.js');
+const { isAbort } = utilities;
 const session = require('../lib/session.js');
 const { Session } = session;
 const helpers = require('./helpers.js');
@@ -26,9 +28,9 @@ const sampleItem = (name) => ({
   blockId: 0,
 });
 
-test('isAbortError recognizes ABORT codes', () => {
-  assert.equal(isAbortError({ code: 'ABORT' }), true);
-  assert.equal(isAbortError(new Error('nope')), false);
+test('isAbort recognizes ABORT codes', () => {
+  assert.equal(isAbort({ code: 'ABORT' }), true);
+  assert.equal(isAbort(new Error('nope')), false);
 });
 
 test('stale generation is not accepted after bump', () => {
@@ -37,8 +39,8 @@ test('stale generation is not accepted after bump', () => {
   const tagged = tagLoaded({ items: [1] }, first);
   assert.equal(tagged.generation, first);
   const second = loader.bump();
-  assert.equal(loader.accept(first), false);
-  assert.equal(loader.accept(second), true);
+  assert.equal(loader.isCurrent(first), false);
+  assert.equal(loader.isCurrent(second), true);
   assert.equal(loader.isCurrent(first), false);
 });
 
@@ -98,8 +100,8 @@ test('reset invalidates generations without reusing them', () => {
   const current = loader.bump();
 
   assert.equal(signal.aborted, true);
-  assert.equal(loader.accept(old), false);
-  assert.equal(loader.accept(current), true);
+  assert.equal(loader.isCurrent(old), false);
+  assert.equal(loader.isCurrent(current), true);
 });
 
 test('resetState allows a second openLoad after a completed load', async () => {

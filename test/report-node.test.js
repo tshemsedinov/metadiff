@@ -12,7 +12,7 @@ const { tempDir } = helpers;
 const reportParse = require('../lib/report-parse.js');
 const { buildDocument } = reportParse;
 const render = require('../lib/report-render.js');
-const { renderMarkdown } = render;
+const { renderDocument } = render;
 const reportView = require('../lib/render/report.js');
 const { renderReport } = reportView;
 
@@ -82,7 +82,7 @@ for (const reporter of ['tap', 'spec']) {
       assert.match(missing.message, /reading 'id'/);
       assert.equal(missing.traces.length, 1);
       assert.equal(missing.related.length, 1);
-      const preview = renderMarkdown(doc);
+      const preview = renderDocument(doc);
       assert.ok(!preview.includes('hidden pass'));
       assert.ok(!preview.includes('node:'));
       assert.ok(!preview.includes(root));
@@ -103,8 +103,8 @@ for (const reporter of ['tap', 'spec']) {
           },
         },
       };
-      const controller = npm.createNpmController(ui);
-      controller.state.commands = [{ name: 'test', kind: 'script' }];
+      const controller = new npm.NpmController(ui);
+      controller.commands = [{ name: 'test', kind: 'script' }];
       await controller.run();
       const output = renderReport(doc);
       assert.equal(controller.output, output);
@@ -115,7 +115,7 @@ for (const reporter of ['tap', 'spec']) {
       const reduced = logs.find((name) => !name.endsWith('.raw.log'));
       const rawName = logs.find((name) => name.endsWith('.raw.log'));
       assert.equal(logs.length, 2);
-      const md = renderMarkdown(doc, rawName);
+      const md = renderDocument(doc, rawName);
       const logText = md
         .split('\n')
         .map((line) => line.trimEnd())

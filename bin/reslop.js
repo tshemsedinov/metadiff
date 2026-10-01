@@ -16,12 +16,7 @@ const fail = (reason) => {
   process.exit(1);
 };
 
-process.on('uncaughtException', (error) => fail(error));
-process.on('unhandledRejection', (reason) => fail(reason));
+process.on('uncaughtException', fail);
+process.on('unhandledRejection', fail);
 
-run(process).then(
-  (code) => {
-    process.exit(code);
-  },
-  (error) => fail(error),
-);
+run(process).then((code) => process.exit(code), fail);

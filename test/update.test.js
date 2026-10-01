@@ -8,10 +8,12 @@ const os = require('node:os');
 const path = require('node:path');
 
 const update = require('../lib/update.js');
-const { parseVersion, cmpVersion, isNpmInstall, cacheFile } = update;
+const { isNpmInstall, cacheFile } = update;
 const { readCache, writeCache, isFresh, planUpdate } = update;
 const { checkUpdate, markSkipped } = update;
 const { CHECK_INTERVAL_MS } = update;
+const utilities = require('../lib/utilities.js');
+const { parseVersion, cmpVersion } = utilities;
 const helpers = require('./helpers.js');
 const { tempDir } = helpers;
 
@@ -107,25 +109,25 @@ test('isFresh is true inside the check interval', () => {
 });
 
 test('planUpdate installs patch and minor and confirms major', () => {
-  assert.deepEqual(planUpdate('0.1.5', { latest: '0.1.5' }), {
+  assert.deepEqual(planUpdate('0.1.5', { compatible: '0.1.5' }), {
     action: 'none',
   });
-  assert.deepEqual(planUpdate('0.1.5', { latest: '0.1.6' }), {
+  assert.deepEqual(planUpdate('0.1.5', { compatible: '0.1.6' }), {
     action: 'install',
     current: '0.1.5',
     latest: '0.1.6',
   });
-  assert.deepEqual(planUpdate('0.1.5', { latest: '0.2.0' }), {
+  assert.deepEqual(planUpdate('0.1.5', { compatible: '0.2.0' }), {
     action: 'install',
     current: '0.1.5',
     latest: '0.2.0',
   });
-  assert.deepEqual(planUpdate('0.1.5', { latest: '1.0.0' }), {
+  assert.deepEqual(planUpdate('0.1.5', { major: '1.0.0' }), {
     action: 'confirm',
     current: '0.1.5',
     latest: '1.0.0',
   });
-  assert.deepEqual(planUpdate('0.1.5', { latest: '1.0.0', skipped: '1.0.0' }), {
+  assert.deepEqual(planUpdate('0.1.5', { major: '1.0.0', skipped: '1.0.0' }), {
     action: 'none',
   });
 });

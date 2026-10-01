@@ -10,11 +10,11 @@ const { tempDir } = helpers;
 const reportParse = require('../lib/report-parse.js');
 const { buildDocument } = reportParse;
 const reportRender = require('../lib/report-render.js');
-const { renderMarkdown } = reportRender;
+const { renderDocument } = reportRender;
 
 const parsed = (lines, root = '/repo') => {
   const doc = buildDocument(lines.join('\n'), '', root, 1, 'test');
-  return { report: doc.reports[0], md: renderMarkdown(doc) };
+  return { report: doc.reports[0], md: renderDocument(doc) };
 };
 
 const textFailure = (number, name, message, caller) => [
@@ -286,7 +286,7 @@ test('TUI groups and saves TAP without a version header', async () => {
     ]
       .join('\n')
       .replaceAll('/repo', root);
-    const { createNpmController } = require('../lib/session/npm.js');
+    const { NpmController } = require('../lib/session/npm.js');
     const ui = {
       top: root,
       nav: { npmCursor: 0 },
@@ -299,8 +299,8 @@ test('TUI groups and saves TAP without a version header', async () => {
         },
       },
     };
-    const controller = createNpmController(ui);
-    controller.state.commands = [{ name: 'test', kind: 'script' }];
+    const controller = new NpmController(ui);
+    controller.commands = [{ name: 'test', kind: 'script' }];
     await controller.run();
     assert.match(controller.output, /× 2/);
     assert.ok(!controller.output.includes('## '));

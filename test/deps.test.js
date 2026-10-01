@@ -5,6 +5,8 @@ const { test } = nodeTest;
 const assert = require('node:assert/strict');
 
 const deps = require('../lib/deps.js');
+const depsDiff = require('../lib/deps-diff.js');
+const manifest = require('../lib/manifest.js');
 const diff = require('../lib/diff/diff.js');
 const git = require('../lib/git.js');
 const gitDeps = require('../lib/git-deps.js');
@@ -21,11 +23,11 @@ const ansi = require('../lib/ansi.js');
 const { stripAnsi, THEME, bg } = ansi;
 const { parseDiff, itemsFromFiles } = diff;
 const { load, loadExtras, addItem, unstageItem, revertItem } = git;
-const { foldDepItems, readSections, diffSections } = deps;
-const { mergeResolved, lockEntries, lockPackageCount } = deps;
-const { mergeDepFile, collectUsedNames, parseAuditReport } = deps;
-const { parseOutdatedReport, applyWantedRange, proposeDepItems } = deps;
-const { patchedFromRange, mergeProposedItems } = deps;
+const { foldDepItems, collectUsedNames, parseAuditReport } = deps;
+const { parseOutdatedReport, proposeDepItems, mergeProposedItems } = deps;
+const { diffSections, mergeResolved } = depsDiff;
+const { readSections, lockEntries, lockPackageCount } = manifest;
+const { mergeDepFile, applyWantedRange, patchedFromRange } = manifest;
 
 const pkgJson = (dependencies, extra = {}) => {
   const body = { name: 'demo', ...extra, dependencies };
