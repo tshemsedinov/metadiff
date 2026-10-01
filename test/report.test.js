@@ -106,6 +106,17 @@ test('node:test spec reads the object on the last frame', () => {
   const quote = String.fromCharCode(39);
   const raw = [
     '✖ adds',
+    '  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:',
+    '  ',
+    '  1 !== 2',
+    '      at TestContext.<anonymous> (test/highlight.test.js:15:10)',
+    '      at Test.run (node:internal/test_runner/test:1:1) {',
+    '    generatedMessage: true,',
+    `    code: ${quote}ERR_ASSERTION${quote},`,
+    '    actual: 1,',
+    '    expected: 2,',
+    '    operator: strictEqual',
+    '  }',
     'ℹ tests 1',
     'ℹ pass 0',
     'ℹ fail 1',
@@ -127,6 +138,7 @@ test('node:test spec reads the object on the last frame', () => {
   ].join('\n');
   const view = rendered(raw, '', 1);
   assert.equal(view.doc.reports[0].problems.length, 1);
+  assert.equal(view.doc.reports[0].problems[0].count, 1);
   assert.ok(!view.md.includes('failing tests'));
   assert.ok(!view.md.includes('\n{'));
   assert.ok(!view.md.includes('node:internal'));
