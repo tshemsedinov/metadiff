@@ -3833,7 +3833,7 @@ test('l toggles the theme and is typed as text while composing', () => {
   }
 });
 
-test('files pane n opens npm scripts and bins', () => {
+test('files pane n opens npm scripts and bins', async () => {
   const { session, cwd, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
@@ -3895,6 +3895,7 @@ test('files pane n opens npm scripts and bins', () => {
   assert.equal(session.status, 'not a script');
   session.handleEvent({ type: 'key', key: 'home' });
   const ran = [];
+  let written = null;
   repo.runNpmCommand = (root, entry, onData, onClose) => {
     ran.push(entry.name);
     const lines = [
@@ -3905,7 +3906,7 @@ test('files pane n opens npm scripts and bins', () => {
     ];
     const text = lines.join('\n');
     onData(text);
-    onClose({ status: 1, text });
+    written = onClose({ status: 1, text });
     return { kill() {} };
   };
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -3918,6 +3919,7 @@ test('files pane n opens npm scripts and bins', () => {
   assert.ok(!body.includes('✔'));
   assert.ok(!body.includes(cwd));
   const stamp = dateStamp();
+  await written;
   const logPath = path.join(cwd, '.log', `${stamp}-lint-01.log`);
   const log = fs.readFileSync(logPath, 'utf8');
   assert.match(log, /exit 1/);

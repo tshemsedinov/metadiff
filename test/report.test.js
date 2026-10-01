@@ -10,13 +10,16 @@ const reportParse = require('../lib/report-parse.js');
 const { buildDocument } = reportParse;
 const render = require('../lib/report-render.js');
 
-const { renderMarkdown, NOTICE } = render;
+const { renderMarkdown, NOTICE, NOTICE_HEAD, displayMessage } = render;
 const cli = require('../lib/cli.js');
 const { run } = cli;
 const reportRun = require('../lib/report-run.js');
 const { winCommand } = reportRun;
 const helpers = require('./helpers.js');
 const { sink, tempDir } = helpers;
+
+const model = require('../lib/report-model.js');
+const { problem, groupReport } = model;
 
 const ROOT = '/repo';
 
@@ -66,8 +69,9 @@ test('TAP keeps failures, fields, and a user trace', () => {
   assert.ok(!view.md.includes('passes'));
   assert.ok(!view.md.includes('node:internal'));
   assert.ok(!view.md.includes(ROOT));
-  assert.match(view.md, /exit: 1/);
+  assert.match(view.md, /exit: 1\n$/);
   assert.ok(view.md.startsWith(NOTICE));
+  assert.ok(view.md.indexOf('# ') < view.md.lastIndexOf('exit:'));
 });
 
 test('node:test spec drops passes and keeps stats', () => {
@@ -102,6 +106,17 @@ test('node:test spec reads the object on the last frame', () => {
   const quote = String.fromCharCode(39);
   const raw = [
     '✖ adds',
+    '  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:',
+    '  ',
+    '  1 !== 2',
+    '      at TestContext.<anonymous> (test/highlight.test.js:15:10)',
+    '      at Test.run (node:internal/test_runner/test:1:1) {',
+    '    generatedMessage: true,',
+    `    code: ${quote}ERR_ASSERTION${quote},`,
+    '    actual: 1,',
+    '    expected: 2,',
+    '    operator: strictEqual',
+    '  }',
     'ℹ tests 1',
     'ℹ pass 0',
     'ℹ fail 1',
@@ -123,6 +138,7 @@ test('node:test spec reads the object on the last frame', () => {
   ].join('\n');
   const view = rendered(raw, '', 1);
   assert.equal(view.doc.reports[0].problems.length, 1);
+  assert.equal(view.doc.reports[0].problems[0].count, 1);
   assert.ok(!view.md.includes('failing tests'));
   assert.ok(!view.md.includes('\n{'));
   assert.ok(!view.md.includes('node:internal'));
@@ -131,6 +147,14 @@ test('node:test spec reads the object on the last frame', () => {
   assert.match(view.md, /expected: 2/);
   assert.match(view.md, /actual: 1/);
   assert.match(view.md, /test\/highlight\.test\.js:15:10/);
+  assert.match(view.md, /> Expected values to be strictly equal\n/);
+  assert.ok(!view.md.includes('```'));
+  assert.ok(!view.md.includes('- message:'));
+  assert.ok(!view.md.includes('severity:'));
+  assert.ok(!view.md.includes('generatedMessage'));
+  assert.ok(!view.md.includes('diff:'));
+  assert.ok(!view.md.includes('1 !== 2'));
+  assert.ok(!view.md.includes('equal:\n\n'));
 });
 
 test('jest JSON keeps failed tests only', () => {
@@ -187,6 +211,74 @@ test('tsc, eslint stylish, and prettier stay separate', () => {
   assert.ok(!view.md.includes('unix'));
 });
 
+test('message drops a parsed diff and a trailing colon', () => {
+  const quote = String.fromCharCode(39);
+  const actual = `${quote}error: patch failed: f.txt:1${quote}`;
+  const diff = [
+    'Expected values to be strictly equal:',
+    '+ actual - expected',
+    '',
+    `+ ${actual}`,
+    `- ${quote}staged${quote}`,
+  ].join('\n');
+  const shown = displayMessage({
+    expected: 'staged',
+    actual: 'error: patch failed: f.txt:1',
+    message: diff,
+  });
+  assert.equal(shown, 'Expected values to be strictly equal');
+  const colored = [
+    'Expected values to be strictly equal:',
+    'actual expected',
+    `${quote}error: pastch failged: f.txt:1${quote}`,
+  ].join('\n');
+  const plain = displayMessage({
+    expected: 'staged',
+    actual: 'error: patch failed: f.txt:1',
+    message: colored,
+  });
+  assert.equal(plain, 'Expected values to be strictly equal');
+  const kept = displayMessage({
+    expected: '',
+    actual: '',
+    message: 'error: patch failed: f.txt:1',
+  });
+  assert.equal(kept, 'error: patch failed: f.txt:1');
+});
+
+test('a passing prettier check stays out of a failed run', () => {
+  const raw = [
+    'Checking formatting...',
+    'All matched files use Prettier code style!',
+    'TAP version 13',
+    'not ok 1 - adds',
+    '  ---',
+    '  error: boom',
+    '  ...',
+    '1..1',
+  ].join('\n');
+  const view = rendered(raw, '', 1);
+  assert.equal(view.doc.ok, false);
+  assert.ok(!view.md.includes('# prettier'));
+  assert.ok(!view.md.includes('errors: 0'));
+  assert.match(view.md, /# test/);
+  assert.match(view.md, /boom/);
+});
+
+test('prettier file warnings on stderr stay in the report', () => {
+  const stdout = 'Checking formatting...\n';
+  const stderr = [
+    '[warn] lib/b.js',
+    '[warn] Code style issues found in the above file.',
+  ].join('\n');
+  const view = rendered(stdout, stderr, 1);
+  assert.match(view.md, /# prettier/);
+  assert.match(view.md, /ok: false/);
+  assert.match(view.md, /errors: 1/);
+  assert.match(view.md, /lib\/b\.js/);
+  assert.ok(!view.md.includes('# stderr'));
+});
+
 test('eslint JSON warnings keep exit 0', () => {
   const raw = JSON.stringify([
     {
@@ -209,8 +301,120 @@ test('eslint JSON warnings keep exit 0', () => {
   assert.equal(view.doc.exit, 0);
   assert.match(view.md, /ok: true/);
   assert.match(view.md, /warnings: 1/);
+  assert.match(view.md, /severity: warning/);
   assert.match(view.md, /no-unused-vars/);
   assert.match(view.md, /lib\/a\.js:3:1/);
+});
+
+test('cluster errors by normalized stack trace', () => {
+  const problems = [
+    problem({
+      message: 'Cannot read property id of undefined at user.js:10:5',
+      trace: 'at User.get (lib/user.js:10:5)\nat process.tick',
+    }),
+    problem({
+      message: 'Cannot read property id of undefined at user.js:25:12',
+      trace: 'at User.get (lib/user.js:25:12)\nat process.tick',
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].count, 2);
+  assert.equal(grouped[0].traces.length, 1);
+  assert.equal(grouped[0].related.length, 1);
+});
+
+test('raw error identity keeps different assertion values separate', () => {
+  const problems = [
+    problem({
+      code: 'ERR_ASSERTION',
+      operator: 'strictEqual',
+      expected: '3',
+      actual: '4',
+      message: 'expected 3, got 4',
+      trace: 'at add (lib/add.js:2:10)\nat Test.run (test/add.test.js:8:3)',
+      key: model.errorKey(
+        { code: 'ERR_ASSERTION', expected: '3', actual: '4' },
+        'at add (lib/add.js:2:10)',
+        ROOT,
+      ),
+    }),
+    problem({
+      code: 'ERR_ASSERTION',
+      operator: 'strictEqual',
+      expected: '1',
+      actual: '2',
+      message: 'expected 1, got 2',
+      trace: 'at add (lib/add.js:2:20)\nat Test.run (test/add.test.js:12:3)',
+      key: model.errorKey(
+        { code: 'ERR_ASSERTION', expected: '1', actual: '2' },
+        'at add (lib/add.js:2:10)',
+        ROOT,
+      ),
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+});
+
+test('keep separate clusters for different stack roots', () => {
+  const problems = [
+    problem({
+      message: 'boom',
+      trace: 'at one (lib/a.js:1:1)',
+    }),
+    problem({
+      message: 'boom',
+      trace: 'at two (lib/b.js:1:1)',
+    }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+});
+
+test('fall back to message when stack is empty', () => {
+  const problems = [
+    problem({ message: 'same failure' }),
+    problem({ message: 'same failure' }),
+    problem({ message: 'other failure' }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
+  assert.equal(grouped[0].count, 2);
+  assert.equal(grouped[1].count, 1);
+});
+
+test('message identity preserves numbers and quoted literals', () => {
+  const quote = String.fromCharCode(39);
+  const problems = [
+    problem({
+      message: `Cannot read property ${quote}id${quote} of undefined`,
+    }),
+    problem({
+      message: `Cannot read property ${quote}name${quote} of undefined`,
+    }),
+    problem({ message: 'expected 3, got 4' }),
+    problem({ message: 'expected 10, got 20' }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 4);
+});
+
+test('full stack fingerprint keeps deeper frames', () => {
+  const deep = (leaf) =>
+    [
+      `at leaf (${leaf}:1:1)`,
+      'at mid (lib/mid.js:2:2)',
+      'at mid2 (lib/mid.js:3:3)',
+      'at mid3 (lib/mid.js:4:4)',
+      'at root (lib/root.js:5:5)',
+    ].join('\n');
+  const problems = [
+    problem({ message: 'boom', trace: deep('lib/a.js') }),
+    problem({ message: 'boom', trace: deep('lib/b.js') }),
+  ];
+  const grouped = groupReport({ tool: 'node:test', problems }).problems;
+  assert.equal(grouped.length, 2);
 });
 
 test('similar eslint problems are grouped', () => {
@@ -225,7 +429,8 @@ test('similar eslint problems are grouped', () => {
   assert.match(view.md, /omitted: 1/);
   assert.equal(view.doc.reports[0].problems.length, 2);
   const traces = view.md.split('trace:').length - 1;
-  assert.equal(traces, 4);
+  assert.equal(traces, 2);
+  assert.match(view.md, /- related:\n {2}- /);
 });
 
 test('audit, outdated, and ls JSON omit trees', () => {
@@ -242,7 +447,7 @@ test('audit, outdated, and ls JSON omit trees', () => {
   });
   const auditView = rendered(audit, '', 1);
   assert.match(auditView.md, /leftpad/);
-  assert.match(auditView.md, /high/);
+  assert.match(auditView.md, /severity: high/);
   assert.match(auditView.md, /fix: 1.2.0/);
   assert.ok(!auditView.md.includes('vulnerabilities'));
   const outdated = JSON.stringify({
@@ -305,13 +510,19 @@ test('a pipe prints markdown and writes a log', async () => {
     const code = await run(proc);
     assert.equal(code, 0);
     const text = proc.stdoutText();
-    assert.ok(text.startsWith(NOTICE));
+    assert.ok(text.startsWith(NOTICE_HEAD));
     assert.match(text, /passed: 1/);
     assert.ok(!text.includes('hidden'));
-    const logs = fs.readdirSync(path.join(dir, '.log'));
-    assert.equal(logs.length, 1);
-    const saved = fs.readFileSync(path.join(dir, '.log', logs[0]), 'utf8');
+    const names = fs.readdirSync(path.join(dir, '.log'));
+    const reduced = names.find((name) => !name.endsWith('.raw.log'));
+    const rawName = names.find((name) => name.endsWith('.raw.log'));
+    assert.equal(names.length, 2);
+    const saved = fs.readFileSync(path.join(dir, '.log', reduced), 'utf8');
     assert.equal(saved, text);
+    assert.match(text, /read the raw log `\.log\/.+\.raw\.log`/);
+    const raw = fs.readFileSync(path.join(dir, '.log', rawName), 'utf8');
+    assert.match(raw, /✔ hidden/);
+    assert.match(raw, /ℹ tests 1/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

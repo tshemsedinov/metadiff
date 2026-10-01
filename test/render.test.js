@@ -3611,7 +3611,9 @@ test('npm output keeps a line margin and a two-space gutter', () => {
   const body = frame.rows.slice(1, 1 + bodyH).map((row) => stripAnsi(row));
   assert.equal(body[0].trim(), '');
   assert.equal(body[body.length - 1].trim(), '');
-  assert.equal(body[1].slice(0, 8), '  line-2');
+  assert.equal(body[1].slice(0, 2), '  ');
+  assert.ok(body[1].includes('x'));
+  assert.ok(body.some((row) => row.startsWith('  line-1')));
   assert.ok(body[1].endsWith('  '));
   assert.equal(body[1].length, 40);
   assert.ok(!body[1].includes('x'.repeat(40)));
