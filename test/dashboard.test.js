@@ -41,7 +41,7 @@ const { createGitRepo } = git;
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, visibleWidth } = ansi;
 const helpers = require('./helpers.js');
-const { makeRepo, tempDir } = helpers;
+const { makeRepo, tempDir, removeTree } = helpers;
 
 const wait = (ms) =>
   new Promise((resolve) => {
@@ -516,10 +516,10 @@ const openDashboard = async (rows = 40, columns = 120) => {
   ui.uiOpen = true;
   ui.lifecycle.startWatch();
   ui.dashboard.start();
-  const close = () => {
+  const close = async () => {
     ui.lifecycle.stopWatch();
     ui.dashboard.stop();
-    repo.cleanup();
+    await removeTree(repo.dir);
   };
   return { ui, repo, close };
 };
@@ -545,7 +545,7 @@ test('a dashboard session shows every block with live data', async () => {
     assert.match(text, /0\/1/);
     assert.match(text, /📁 lib/);
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -558,7 +558,7 @@ test('the dashboard follows files changing on disk', async () => {
     const grew = () => ui.dashboard.view().files.total.lines > before;
     assert.ok(await waitUntil(grew));
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -580,7 +580,7 @@ test('the dashboard shows a run by script name', async () => {
     const finished = () => ui.dashboard.view().runs.length > 0;
     assert.ok(await waitUntil(finished));
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -615,7 +615,7 @@ test('hotkeys open screens and Esc returns to the dashboard', async () => {
     assert.equal(ui.pane, 'dashboard');
     assert.equal(ui.nav.tasksOpen, false);
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -629,7 +629,7 @@ test('Esc on the dashboard quits', async () => {
     press(ui, 'escape');
     assert.equal(quit, 1);
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -639,7 +639,7 @@ test('other keys do nothing on the dashboard', async () => {
     for (const key of ['j', 'k', 'down', 'up', 's', 'u', 'x']) press(ui, key);
     assert.equal(ui.pane, 'dashboard');
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -658,7 +658,7 @@ test('the footer offers the block buttons and opens screens', async () => {
     ui.handleEvent({ type: 'mouse', kind: 'release', press: false, ...at });
     assert.equal(ui.pane, 'commits');
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -673,7 +673,7 @@ test('a click on a tile opens its screen', async () => {
     ui.handleEvent({ type: 'mouse', kind: 'release', press: false, ...at });
     assert.equal(ui.pane, 'branches');
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -684,7 +684,7 @@ test('the dashboard stays responsive on a tiny terminal', async () => {
     assert.ok(text.length > 0);
     assert.equal(ui.lastFrame.rows.length, 8);
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -696,7 +696,7 @@ test('the dashboard paints color tiles on a black page', async () => {
     const raw = ui.lastFrame.rows.join('\n');
     assert.ok(raw.includes('\x1b['));
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -734,7 +734,7 @@ test('the dashboard pads below the header and above the footer', async () => {
     assert.ok(footer > 2);
     assert.equal(rows[footer - 2].trim(), '');
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -750,7 +750,7 @@ test('block captions have no key prefix and a lighter header', async () => {
     const head = ansi.THEME.dashHeadBg.join(';');
     assert.ok(raw.includes(`48;2;${head}m`));
   } finally {
-    close();
+    await close();
   }
 });
 
@@ -769,7 +769,7 @@ test('table rows alternate a darker background on even lines', async () => {
     assert.ok(colorOf(4).has(`48;2;${even}m`));
     assert.ok(colorOf(5).has(`48;2;${odd}m`));
   } finally {
-    close();
+    await close();
   }
 });
 
