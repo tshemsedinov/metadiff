@@ -18,7 +18,7 @@ const { scriptName, runName, buildModel, mergeRuns, groupChanges } = dashModel;
 const npmInfo = require('../lib/dashboard/npm.js');
 const { readNpmSummary } = npmInfo;
 const tiles = require('../lib/render/tiles.js');
-const { layoutTiles, GAP_X, GAP_Y, seg } = tiles;
+const { layoutTiles, GAP_X, GAP_Y, seg, paintTile } = tiles;
 const dashTable = require('../lib/render/dash-table.js');
 const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
 const { labelOf, pickGroups, titleAside } = dashTable;
@@ -39,7 +39,7 @@ const { Session } = session;
 const git = require('../lib/git.js');
 const { createGitRepo } = git;
 const ansi = require('../lib/ansi.js');
-const { stripAnsi, visibleWidth } = ansi;
+const { stripAnsi, visibleWidth, THEME, bg } = ansi;
 const helpers = require('./helpers.js');
 const { makeRepo, tempDir, removeTree } = helpers;
 
@@ -864,7 +864,7 @@ test('diff columns keep one space after the mark and fill the row', () => {
         staged: 2,
         remaining: 4,
       },
-      samples: [1, 4, 2],
+      activity: { minutes: [], live: false },
       delta: null,
     },
   };
@@ -899,9 +899,53 @@ test('diff columns keep one space after the mark and fill the row', () => {
   assert.equal(visibleWidth(header), 40);
   assert.equal(visibleWidth(folder), 40);
   const trend = text(block.footer);
-  assert.equal(trend.startsWith('trend  '), true);
+  assert.equal(trend.startsWith('activity '), true);
   assert.equal(visibleWidth(trend), 40);
-  assert.equal(block.footer[1].tone, 'trend');
+  assert.equal(block.footer[0].tone, 'muted');
+});
+
+test('diff activity scrolls minutes left and blinks the current one', () => {
+  const minute = 60_000;
+  const now = 3 * minute;
+  const totals = {
+    added: 1,
+    removed: 0,
+    stagedAdded: 0,
+    stagedRemoved: 0,
+    staged: 0,
+    remaining: 1,
+  };
+  const model = {
+    diffs: {
+      files: 1,
+      dirs: [],
+      exts: [],
+      totals,
+      activity: {
+        minutes: [
+          { at: 1, level: 10, marks: ['commit'] },
+          { at: 2, level: 20, marks: [] },
+          { at: 3, level: 400, marks: ['fail', 'commit'] },
+        ],
+        live: true,
+      },
+      delta: null,
+    },
+  };
+  const tile = { key: 'd', title: 'diffs' };
+  const text = (line) => line.map((part) => part.text).join('');
+  const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
+  const footer = text(block.footer);
+  assert.equal(footer.startsWith('activity '), true);
+  assert.equal(visibleWidth(footer), 40);
+  assert.ok(footer.indexOf('●') < footer.indexOf('·'));
+  assert.ok(footer.indexOf('·') < footer.indexOf('✖'));
+  assert.equal(footer.endsWith('✖'), true);
+  assert.deepEqual(block.footer.at(-1).bg, THEME.heat4);
+  const flash = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
+  assert.deepEqual(flash.footer.at(-1).bg, THEME.heatBlink);
+  const painted = paintTile(tile, flash, 42, 4, true);
+  assert.ok(painted.at(-1).includes(bg(THEME.heatBlink)));
 });
 
 test('diff rows keep removals when the tile is narrow', () => {
@@ -928,7 +972,7 @@ test('diff rows keep removals when the tile is narrow', () => {
         staged: 12,
         remaining: 40,
       },
-      samples: [],
+      activity: { minutes: [], live: false },
       delta: null,
     },
   };
@@ -1161,7 +1205,7 @@ test('npm packages take wanted and latest from the outdated report', () => {
     fileDelta: null,
     entries: [],
     totals: { added: 0, removed: 0 },
-    samples: [],
+    activity: { minutes: [], live: false },
     diffDelta: null,
     git: null,
     switches: [],
