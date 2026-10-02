@@ -2,12 +2,27 @@
 
 ## [Unreleased][unreleased]
 
+## [0.2.6][] - 2026-10-02
+
+- Add a live dashboard as the start screen
 - Compact related failure contexts in test runnter logs
 - Save the raw command output beside the reduced log
 - Improve test results rendering
-- Add a live dashboard as the start screen: files, diffs, commits, branches, npm, running commands, and tasks
 - Update the dashboard from file system events, without timers
-- Record `reslop t` runs under `.log/.runs/` to show progress and results on the dashboard
+- Record `reslop t` runs under `.log/.runs/` show progress on the dashboard
+- Implement tasks screen: backlog, issues, bugs, features
+
+## [0.2.5][] - 2026-09-30
+
+- Remove UI and filesystem polling timers, refresh on events
+- Refresh the commits list when HEAD changes outside reslop
+- Update stage/unstage immediately, git/npm in the background
+- Add editor hotkeys Ctrl+X, Ctrl+C, and Ctrl+V
+- Improve diff calculation
+- Improve npm command and test edit/run
+- Refactor internals: simplify and add classes
+- Hothey "i" add to ignore lists: .gitignore, .npmignore
+- Rename TODO to tasks and improve TUI/TUX
 
 ## [0.2.4][] - 2026-09-28
 
@@ -148,7 +163,9 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/tshemsedinov/reslop/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/tshemsedinov/reslop/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/tshemsedinov/reslop/compare/v0.2.0...v0.2.1
