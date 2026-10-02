@@ -575,7 +575,7 @@ test('AC9 hotkeys dispatch add revert next prev quit', () => {
   assert.equal(session.layout, 'unified');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
-  session.pushInput('q');
+  session.handleEvent({ type: 'key', key: 'ctrl-c' });
   assert.equal(session.done, true);
 });
 
@@ -957,8 +957,8 @@ test('files pane disables mode and feedback', () => {
   assert.equal(session.mode, 'review');
   assert.equal(session.pane, 'files');
   session.dispatch('code');
-  assert.equal(session.mode, 'review');
-  assert.equal(session.notes.code.size, 0);
+  assert.equal(session.pane, 'unit');
+  assert.equal(session.composeKind, 'file');
 });
 
 test('files pane lists paths without a tasks row', () => {
@@ -1061,6 +1061,21 @@ test('files pane unstage on an unstaged file still moves down', () => {
   assert.equal(repo.unstageCalls.length, 0);
   assert.equal(session.fileCursor, 1);
   assert.equal(session.fileList()[1].path, 'b.js');
+});
+
+test('q quotes a diff and insert adds an npm command', () => {
+  const diff = openSession([sampleItem('a.js')]);
+  diff.session.handleEvent({ type: 'key', key: 'q' });
+  assert.equal(diff.session.composeKind, 'feedback');
+  const npm = openSession([sampleItem('a.js')], { startPane: 'files' });
+  fs.writeFileSync(
+    path.join(npm.cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
+  );
+  npm.session.pushInput('n');
+  npm.session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(npm.session.composeKind, 'npm');
+  assert.equal(npm.session.npm.editField, 'name');
 });
 
 test('f maps feedback to the hunk location', () => {
@@ -1391,7 +1406,7 @@ test('todo list scrolls the focused row into view', () => {
   session.draw();
   const paged = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.equal(session.tasksFocus, 33);
-  assert.match(paged, /item 29(?!\d)/);
+  assert.match(paged, /Feature Requests/);
   assert.ok(!/item 0(?!\d)/.test(paged));
 });
 
@@ -2002,7 +2017,7 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(session.pane, 'files');
   assert.equal(repo.commits.length, 0);
   session.pushInput('c');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'commit');
@@ -2017,6 +2032,19 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(repo.commits.length, 1);
   assert.equal(repo.commits[0].kind, 'commit');
   assert.equal(repo.commits[0].message, 'land the change');
+});
+
+test('dashboard p pulls and s pushes', () => {
+  const { session, repo } = openSession([sampleItem('a.js')], {
+    startPane: 'dashboard',
+  });
+  session.pushInput('p');
+  assert.equal(repo.pulls.length, 1);
+  assert.equal(session.status, 'pulled');
+  assert.equal(session.pane, 'dashboard');
+  session.pushInput('s');
+  assert.equal(repo.pushes.length, 1);
+  assert.equal(session.status, 'pushed');
 });
 
 test('escape from a commit diff returns to the dashboard', () => {
@@ -2067,46 +2095,45 @@ test('enter on uncommitted changes opens the commit editor', () => {
   assert.equal(session.commitCursor, 0);
 });
 
-test('amend is active on uncommitted and while unstaged is current', () => {
+test('c commits, amends the latest commit, or fixups an older one', () => {
   const { session } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
-  const amendHit = () => {
-    session.draw();
-    return session.lastFrame.buttons.find((hit) => hit.id === 'amend');
-  };
   session.pushInput('c');
-  assert.ok(amendHit());
+  assert.equal(session.commitCursor, 0);
+  session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(session.commitKind, 'commit');
+  session.composer.closeCompose();
   session.dispatch('next');
-  assert.ok(amendHit());
-  session.rev = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  session.revShort = 'aaa1111';
-  assert.equal(amendHit(), undefined);
-  session.pushInput('a');
-  assert.equal(session.mode, 'review');
-  assert.equal(session.commitKind, null);
-  session.handleEvent({ type: 'key', key: 'home' });
-  assert.ok(amendHit());
-  session.pushInput('a');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'a' });
+  assert.equal(session.commitCursor, 1);
   assert.equal(session.commitKind, 'amend');
+  session.composer.closeCompose();
+  session.dispatch('next');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'f' });
+  assert.equal(session.commitCursor, 2);
+  assert.equal(session.commitKind, 'fixup');
 });
 
 test('click commit footer chooses commit amend or fixup', () => {
-  const clickKind = (id, kind) => {
+  const clickKind = (steps, kind) => {
     const { session } = openSession([sampleItem('a.js', 'staged')], {
       startPane: 'files',
     });
     session.pushInput('c');
-    if (id !== 'commit') session.dispatch('next');
-    clickFooter(session, id);
+    for (let i = 0; i < steps; i++) session.dispatch('next');
+    clickFooter(session, 'newCommit');
+    if (steps === 1) session.handleEvent({ type: 'key', key: 'a' });
+    if (steps === 2) session.handleEvent({ type: 'key', key: 'f' });
     assert.equal(session.pane, 'commits');
     assert.equal(session.mode, 'compose');
     assert.equal(session.commitKind, kind);
   };
-  clickKind('commit', 'commit');
-  clickKind('amend', 'amend');
-  clickKind('reword', 'reword');
-  clickKind('fixup', 'fixup');
+  clickKind(0, 'commit');
+  clickKind(1, 'amend');
+  clickKind(2, 'fixup');
 });
 
 test('commits pane v toggles brief on and off', () => {
@@ -2129,7 +2156,7 @@ test('full mode commit enter inserts a newline', () => {
   });
   session.pushInput('c');
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('two');
@@ -2147,7 +2174,7 @@ test('full mode ctrl-s saves the message', () => {
   });
   session.pushInput('c');
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.pushInput('two');
@@ -2163,7 +2190,7 @@ test('full mode enter keeps the blank line after the subject', () => {
   });
   session.pushInput('c');
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('ship it');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
@@ -2186,7 +2213,7 @@ test('full mode enter three times saves a one-line message', () => {
   });
   session.pushInput('c');
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('  ship it  ');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2203,7 +2230,7 @@ test('saving a commit trims spaces and surrounding newlines', () => {
   });
   session.pushInput('c');
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.editor.replace('  ship it  \n \n  explain  \n\n');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
@@ -2294,7 +2321,8 @@ test('brief amend edits the first line and keeps the body', () => {
   repo.lastMessage = () => 'land the change\n\nexplain the change';
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('a');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'a' });
   assert.equal(session.editor.text, 'land the change');
   assert.equal(session.editor.cursor, 'land the change'.length);
   session.editor.replace('ship it');
@@ -2338,7 +2366,8 @@ test('commits pane a amends with the previous message', () => {
   });
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('a');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'a' });
   assert.equal(session.commitCursor, 1);
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'amend');
@@ -2437,17 +2466,15 @@ test('click apply footer squashes the selected fixup', () => {
   assert.equal(session.status, 'applied');
 });
 
-test('commits pane x fixups the selected commit', () => {
+test('c on an older commit writes a fixup', () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('x');
-  assert.equal(session.editor.text, 'fixup! land the change');
-  session.handleEvent({ type: 'key', key: 'escape' });
   session.dispatch('next');
-  session.pushInput('x');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'f' });
   assert.equal(session.editor.text, 'fixup! init');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.status, 'fixup');
@@ -2460,7 +2487,7 @@ test('escape from commit message does not run git', () => {
     startPane: 'files',
   });
   session.pushInput('c');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('draft');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
@@ -2490,7 +2517,7 @@ test('commits pane skips commit when nothing is staged', () => {
   });
   session.pushInput('c');
   assert.equal(session.pane, 'commits');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'nothing to commit');
   assert.equal(repo.commits.length, 0);
@@ -3015,12 +3042,12 @@ test('list screens hint 🢐esc and the button goes back', () => {
     session.draw();
     return stripAnsi(session.lastFrame.rows.at(-1));
   };
-  assert.ok(!footer().includes('🢐'));
+  assert.match(footer(), /^ 🢐esc {2}/);
   session.dispatch('scrollDown');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.pane, 'diff');
   assert.notEqual(session.current().origin, 'task');
-  assert.ok(!footer().includes('🢐'));
+  assert.match(footer(), /^ 🢐esc {2}/);
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('b');
   assert.match(footer(), /^ 🢐esc {2}/);
@@ -3088,12 +3115,12 @@ test('branch list p pulls and s pushes', () => {
   assert.equal(session.status, 'pushed');
   session.handleEvent({ type: 'key', key: 'down' });
   session.pushInput('p');
-  assert.equal(repo.pulls.length, 1);
+  assert.equal(repo.pulls.length, 2);
   session.pushInput('s');
-  assert.equal(repo.pushes.length, 1);
+  assert.equal(repo.pushes.length, 2);
   session.handleEvent({ type: 'key', key: 'up' });
   session.pushInput('p');
-  assert.equal(repo.pulls.length, 2);
+  assert.equal(repo.pulls.length, 3);
 });
 
 test('rejected push asks f to force or escape to cancel', () => {
@@ -3322,7 +3349,7 @@ test('commit shows progress until git finishes', async () => {
     repo.commits.push({ top, kind, message });
   };
   session.pushInput('c');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('land the change');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(repo.commits.length, 0);
@@ -3606,12 +3633,70 @@ test('unit view reloads disk text in view and edit', () => {
   assert.equal(session.editor.text, 'later\n');
 });
 
-test('branch list n creates a new branch', () => {
+test('insert creates a branch, or commits, amends, or fixups', () => {
+  const branch = openSession([sampleItem('a.js')], { startPane: 'files' });
+  branch.session.pushInput('b');
+  branch.session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(branch.session.mode, 'compose');
+  assert.equal(branch.session.composeKind, 'branch');
+  const commits = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  commits.session.pushInput('c');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(commits.session.commitKind, 'commit');
+  commits.session.composer.closeCompose();
+  commits.session.dispatch('next');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(commits.session.mode, 'confirmCommit');
+  commits.session.draw();
+  const headLine = stripAnsi(commits.session.lastFrame.rows.at(-2));
+  assert.match(headLine, /what do you want to do\?/);
+  assert.match(headLine, /esc cancel/);
+  assert.match(headLine, /commit {2}amend {2}fixup/);
+  commits.session.handleEvent({ type: 'key', key: 'c' });
+  assert.equal(commits.session.commitKind, 'commit');
+  commits.session.composer.closeCompose();
+  commits.session.dispatch('next');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  commits.session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(commits.session.mode, 'review');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  commits.session.handleEvent({ type: 'key', key: 'a' });
+  assert.equal(commits.session.commitCursor, 1);
+  assert.equal(commits.session.commitKind, 'amend');
+  commits.session.composer.closeCompose();
+  commits.session.dispatch('next');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(commits.session.mode, 'confirmCommit');
+  commits.session.draw();
+  const older = stripAnsi(commits.session.lastFrame.rows.at(-2));
+  assert.match(older, /esc cancel/);
+  assert.match(older, /commit {2}amend {2}fixup/);
+  commits.session.handleEvent({ type: 'key', key: 'c' });
+  assert.equal(commits.session.commitKind, 'commit');
+  assert.equal(commits.session.commitCursor, 0);
+  commits.session.composer.closeCompose();
+  commits.session.dispatch('next');
+  commits.session.dispatch('next');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  commits.session.handleEvent({ type: 'key', key: 'a' });
+  assert.equal(commits.session.commitCursor, 1);
+  assert.equal(commits.session.commitKind, 'amend');
+  commits.session.composer.closeCompose();
+  commits.session.dispatch('next');
+  commits.session.handleEvent({ type: 'key', key: 'insert' });
+  commits.session.handleEvent({ type: 'key', key: 'f' });
+  assert.equal(commits.session.commitCursor, 2);
+  assert.equal(commits.session.commitKind, 'fixup');
+});
+
+test('new branch action asks for a name', () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
-  session.pushInput('n');
+  session.dispatch('newBranch');
   assert.equal(session.pane, 'branches');
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'branch');
@@ -3784,12 +3869,12 @@ test('x and a checkbox click toggle a todo and the file keeps it', () => {
   session.draw();
   let body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] ship it/);
-  session.pushInput('x');
+  session.pushInput(' ');
   assert.equal(session.notes.tasks[0].done, true);
   session.draw();
   body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[x\] ship it/);
-  assert.match(body, /delete {2}x/);
+  assert.match(body, /delete {2}space/);
   assert.ok(!body.includes(' q'));
   session.pushInput(' ');
   assert.equal(session.notes.tasks[0].done, false);
@@ -3806,9 +3891,13 @@ test('x and a checkbox click toggle a todo and the file keeps it', () => {
   );
   assert.equal(loaded.tasks[0].done, true);
   assert.equal(loaded.tasks[0].text, 'ship it');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.notes.tasks[0].text, 'ship it');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.handleEvent({ type: 'key', key: 'x' });
   session.handleEvent({ type: 'key', key: ' ' });
+  session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, 'ship itx ');
   assert.equal(session.notes.tasks[0].done, true);
@@ -3927,7 +4016,7 @@ test('files pane n opens npm scripts and bins', async () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'npm');
   assert.equal(session.view().npmView, false);
-  session.pushInput('q');
+  session.handleEvent({ type: 'key', key: 'ctrl-c' });
   assert.equal(session.done, true);
 });
 
@@ -4015,8 +4104,7 @@ test('esc stops a running npm command and waits to leave', () => {
   session.draw();
   const footer = () => stripAnsi(session.lastFrame.rows.at(-1));
   const hitIds = () => session.lastFrame.buttons.map((hit) => hit.id);
-  assert.match(footer(), /⊗ esc/);
-  assert.ok(!footer().includes('🢐'));
+  assert.match(footer(), /^ 🢐esc {2}/);
   assert.match(footer(), / re-run/);
   assert.ok(!footer().includes('edit'));
   assert.ok(!footer().includes('new'));
@@ -4190,7 +4278,7 @@ test('npm screen refuses edits when read only', () => {
   session.pushInput('e');
   assert.equal(session.status, 'read only');
   assert.equal(session.mode, 'review');
-  session.pushInput('i');
+  session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(session.status, 'read only');
   session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'review');
@@ -4369,14 +4457,14 @@ test('click moves the caret in commit, branch, and npm editors', () => {
     startPane: 'files',
   });
   session.pushInput('c');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.pushInput('hello');
   session.draw();
   clickCaret(session, -4, 0);
   assert.equal(session.editor.cursor, 1);
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('v');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.editor.replace('ab\ncd');
   session.draw();
   clickCaret(session, -1, -1);
@@ -4385,7 +4473,7 @@ test('click moves the caret in commit, branch, and npm editors', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('b');
-  session.pushInput('n');
+  session.dispatch('newBranch');
   session.pushInput('topic');
   session.draw();
   clickCaret(session, -3, 0);
@@ -4443,7 +4531,7 @@ test('table editors scroll long lines horizontally', () => {
     return row;
   };
   session.pushInput('b');
-  session.pushInput('n');
+  session.dispatch('newBranch');
   session.editor.replace(longValue('Q', 'Z'));
   showsTail('Q', 'Z');
   const stuck = session.editor.scrollCol;
@@ -4467,7 +4555,7 @@ test('table editors scroll long lines horizontally', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: 'escape' });
   session.pushInput('c');
-  session.pushInput('c');
+  session.handleEvent({ type: 'key', key: 'insert' });
   session.editor.replace(longValue('Q', 'Z'));
   showsTail('Q', 'Z');
   session.handleEvent({ type: 'key', key: 'escape' });
@@ -4537,7 +4625,7 @@ test('editors select with shift and copy cut paste', () => {
   press(session, 'escape');
   press(session, 'escape');
   press(session, 'b');
-  press(session, 'n');
+  session.dispatch('newBranch');
   session.pushInput('topic');
   press(session, 'shift-home');
   assert.equal(session.composeKind, 'branch');

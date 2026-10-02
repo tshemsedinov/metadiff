@@ -3,6 +3,7 @@
 ## [Unreleased][unreleased]
 
 - Tiling view for multi-repository environment
+- Improve navigation and hotkeys
 
 ## [0.2.6][] - 2026-10-02
 

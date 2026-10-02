@@ -727,7 +727,9 @@ test('the dashboard pads below the header and above the footer', async () => {
     const rows = ui.lastFrame.rows.map((row) => stripAnsi(row));
     assert.equal(rows[1].trim(), '');
     assert.match(rows[2], /files/);
-    const footer = rows.findIndex((row) => /^ files {2}diffs/.test(row));
+    const footer = rows.findIndex((row) =>
+      /🢐esc {2}light.*files {2}diffs/.test(row),
+    );
     assert.ok(footer > 2);
     assert.equal(rows[footer - 2].trim(), '');
   } finally {
