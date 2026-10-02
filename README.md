@@ -17,22 +17,19 @@ Open a change, leave findings and a backlog, and prepare a repair plan for the a
 Review → Plan → Repair → Verify
 ```
 
-- Live dashboard on start: files, diffs, commits, branches, npm, running commands, and tasks, updated real-time
+- Live dashboard: files, diffs, tasks, branches, commits, run, and npm, updated in real time
 - Leave feedback, a project backlog, and in-place code proposals as a repair plan
 - Review uncommitted git diffs, a given commit, a GitHub PR, or a GitLab MR
 - File-scope review mode: not just diffs, with editor mode
 - Stage, unstage, or revert each contiguous block of diff lines
 - Auto-reload local diffs when files change, keeping the current screen
 - Import GitHub PR and GitLab MR review comments into the local plan for AI
-- Commits list: brief and full, view a commit's diff, commit, amend, fixup, reword, drop, pull, and push
-- Branches: checkout, create, rebase, drop, pull, and push
+- Commits list: brief and full, view a commit's diff, commit, amend, apply, edit, fixup, and delete
+- Branches: checkout, create, rebase, delete, pull, and push
 - npm scripts and bins: run, edit, and reorder; double-click to run; clean logs older than 5 days
-- Long lines wrap in the diff view; the editor scrolls horizontally
 - Reduced test and lint output for agents: failures and a short summary, not passing noise
-- Review each npm dependency once across `package.json` and the lockfile
-- Propose unused removals, npm audit fixes, and outdated updates as diffs
-- Code highlighting and intra-line diffs: unified, mixed, and side-by-side
-- Auto-update patch and minor releases; confirm a new major
+- Review, renew, audit and update npm dependencies in `package.json` and the lockfile
+- Auto-update reslop patch and minor releases; confirm a new major
 - Work with git, npm and fetch in background
 
 ## Install
@@ -66,18 +63,6 @@ The report is Markdown: failures, diagnostics, and a short summary. Passing resu
 
 Run the full check with `npm t`. Run one or more test files with `reslop t -- node --test <files>`. New reviews include those two commands in the agent instructions.
 
-The dashboard has one tile per topic. Press its key or click the tile to open the screen, and `Esc` to come back (`Esc` on the dashboard quits):
-
-- `f` files: size, count, and lines per folder, then extension, with the tree total on the last line
-- `d` diffs: added and removed lines, staged blocks, and age, per folder and extension
-- `c` commits: the latest commits, with the count in the header
-- `b` branches: current branch, ahead and behind, and recently changed branches, with the local count in the header
-- `n` npm: dependencies, `node_modules` size, wanted/latest, audit, and outdated
-- `r` run: script names started with `reslop t`, with done, ok, fail, total tests, and duration in the header (opens the npm screen)
-- `t` tasks: done/total in the header, feedback, and proposed code blocks
-
-Tiles are updated from file system events, not timers. On a small terminal the least important tiles are dropped. `reslop` with a path or a commit starts on the file list instead.
-
 `reslop t` records each run in `.log/.runs/` so that the dashboard can show commands started by an agent in another terminal.
 
 Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
@@ -102,5 +87,5 @@ Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
 
 ## License
 
-Copyright (c) 2026 Timur Shemsedinov.
+Copyright (c) 2026 Timur Shemsedinov and other contributors (see github).
 This is [MIT](./LICENSE) licensed software.
