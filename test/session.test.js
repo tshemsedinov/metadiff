@@ -25,7 +25,7 @@ const { setTheme, themeName } = ansi;
 const files = require('../lib/files.js');
 const { REVIEW_DIR } = files;
 
-const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] '];
+const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] ', '[ ] '];
 const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
@@ -1406,21 +1406,23 @@ test('todo list scrolls the focused row into view', () => {
   session.draw();
   const paged = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.equal(session.tasksFocus, 33);
-  assert.match(paged, /Feature Requests/);
+  assert.match(paged, /Research/);
   assert.ok(!/item 0(?!\d)/.test(paged));
 });
 
 test('todo edits in the list not the note line', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+  const { session, stdout } = openSession([sampleItem('a.js')]);
+  stdout.rows = 24;
   session.dispatch('tasks');
   session.pushInput('in the list');
   session.draw();
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] in the list/);
-  assert.match(body, /Backlog/);
-  assert.match(body, /Issues/);
-  assert.match(body, /Bug Reports/);
-  assert.match(body, /Feature Requests/);
+  assert.match(body, /Feature requests/);
+  assert.match(body, /Bug reports/);
+  assert.match(body, /Technical debt/);
+  assert.match(body, /Research/);
+  assert.match(body, /Security/);
   assert.equal(body.split('in the list').length - 1, 1);
   assert.equal(session.view().compose, null);
   assert.ok(session.view().taskEdit);
@@ -1747,10 +1749,10 @@ test('home end and page keys jump the todo list', () => {
   session.handleEvent({ type: 'key', key: 'home' });
   assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'end' });
-  assert.equal(session.tasksFocus, 6);
+  assert.equal(session.tasksFocus, 7);
   session.handleEvent({ type: 'key', key: 'home' });
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 6);
+  assert.equal(session.tasksFocus, 7);
   session.handleEvent({ type: 'key', key: 'pageUp' });
   assert.equal(session.tasksFocus, 0);
 });
@@ -1869,7 +1871,7 @@ test('todo edit page keys jump across todos', () => {
   assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 6);
+  assert.equal(session.tasksFocus, 7);
   assert.equal(session.editor.text, '');
 });
 

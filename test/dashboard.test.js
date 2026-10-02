@@ -1261,10 +1261,11 @@ test('the tasks header shows done against the total', () => {
       done: 3,
       total: 8,
       kinds: [
-        { id: 'backlog', title: 'Backlog', done: 1, total: 4 },
-        { id: 'issues', title: 'Issues', done: 1, total: 2 },
-        { id: 'bugs', title: 'Bug Reports', done: 1, total: 1 },
-        { id: 'features', title: 'Feature Requests', done: 0, total: 1 },
+        { id: 'features', title: 'Feature requests', done: 1, total: 4 },
+        { id: 'bugs', title: 'Bug reports', done: 1, total: 2 },
+        { id: 'debt', title: 'Technical debt', done: 1, total: 1 },
+        { id: 'research', title: 'Research', done: 0, total: 1 },
+        { id: 'security', title: 'Security', done: 0, total: 0 },
       ],
     },
   };
@@ -1273,17 +1274,18 @@ test('the tasks header shows done against the total', () => {
   const header = text(block.titleLine);
   const lines = block.lines.map(text);
   const body = lines.join('\n');
-  const backlog = lines.find((line) => line.includes('Backlog'));
+  const backlog = lines.find((line) => line.includes('Feature requests'));
   const barAt = (line) => line.search(/[█░]/);
   assert.equal(header.startsWith('tasks'), true);
   assert.equal(header.trimEnd().endsWith('3/8'), true);
   assert.ok(barAt(header) < header.lastIndexOf('3/8'));
-  assert.match(body, /Issues/);
+  assert.match(body, /Bug reports/);
   assert.match(body, /1\/2/);
-  assert.match(body, /Bug Reports/);
-  assert.match(body, /Feature Requests/);
+  assert.match(body, /Technical debt/);
+  assert.match(body, /Research/);
+  assert.match(body, /Security/);
   assert.equal(backlog.trimEnd().endsWith('1/4'), true);
-  assert.ok(backlog.indexOf('Backlog') < barAt(backlog));
+  assert.ok(backlog.indexOf('Feature requests') < barAt(backlog));
   assert.ok(barAt(backlog) < backlog.lastIndexOf('1/4'));
   assert.match(body, /0\/1/);
 });
