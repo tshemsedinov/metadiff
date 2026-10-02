@@ -3094,7 +3094,8 @@ test('files pane b lists branches and enter checks out', () => {
   assert.equal(session.branchCursor, session.branches.length - 1);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.deepEqual(repo.checkouts, ['feat']);
-  assert.equal(session.pane, 'files');
+  assert.equal(session.pane, 'branches');
+  assert.equal(session.branchCursor, session.branches.length - 1);
   assert.match(session.status, /checked out feat/);
 });
 
@@ -3332,6 +3333,7 @@ test('checkout shows progress until git finishes', async () => {
   await Promise.resolve();
   assert.deepEqual(repo.checkouts, ['feat']);
   assert.match(session.status, /checked out feat/);
+  assert.equal(session.pane, 'branches');
   assert.equal(session.busy, '');
 });
 
