@@ -2,6 +2,8 @@
 
 ## [Unreleased][unreleased]
 
+- Tiling view for multi-repository environment
+
 ## [0.2.6][] - 2026-10-02
 
 - Add a live dashboard as the start screen

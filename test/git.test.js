@@ -97,6 +97,31 @@ test('AC7 untracked add and revert', () => {
   }
 });
 
+test('a nested git repository stays out of the worktree load', () => {
+  const repo = makeRepo();
+  try {
+    repo.write('keep.txt', 'k\n');
+    repo.git(['add', 'keep.txt']);
+    repo.git(['commit', '-m', 'init']);
+    const nested = path.join(repo.dir, 'nested');
+    fs.mkdirSync(nested);
+    const init = spawnSync('git', ['init', '-b', 'main'], {
+      cwd: nested,
+      encoding: 'utf8',
+    });
+    assert.equal(init.status, 0);
+    repo.write('note.txt', 'hello\n');
+    const loaded = load(repo.dir);
+    const paths = loaded.items.map((item) => item.file.newPath);
+    assert.deepEqual(paths, ['note.txt']);
+    const names = createGitRepo().listFiles(repo.dir);
+    assert.equal(names.includes('note.txt'), true);
+    assert.equal(names.includes('nested/'), false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('AC8 revert staged restores HEAD', () => {
   const repo = makeRepo();
   try {
