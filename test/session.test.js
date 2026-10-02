@@ -4644,3 +4644,47 @@ test('editors select with shift and copy cut paste', () => {
   assert.equal(session.editor.hasSelect(), true);
   assert.equal(session.composeKind, 'tasks');
 });
+
+test('slash searches paths on the files and diff screens', () => {
+  const items = [
+    sampleItem('src/app.js'),
+    sampleItem('lib/find.js'),
+    sampleItem('lib/files.js'),
+  ];
+  const { session } = openSession(items);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.pane, 'files');
+  session.handleEvent({ type: 'key', key: '/' });
+  assert.equal(session.mode, 'find');
+  session.pushInput('lib/f');
+  assert.equal(session.view().find.query, 'lib/f');
+  assert.equal(session.reviewPath, 'lib/files.js');
+  session.handleEvent({ type: 'key', key: 'down' });
+  assert.equal(session.reviewPath, 'lib/find.js');
+  session.handleEvent({ type: 'key', key: 'down' });
+  assert.equal(session.reviewPath, 'lib/files.js');
+  session.handleEvent({ type: 'key', key: 'up' });
+  assert.equal(session.reviewPath, 'lib/find.js');
+  session.pushInput('j');
+  assert.equal(session.view().find.query, 'lib/fj');
+  assert.equal(session.reviewPath, 'lib/find.js');
+  session.handleEvent({ type: 'key', key: 'backspace' });
+  assert.equal(session.view().find.query, 'lib/f');
+  assert.equal(session.reviewPath, 'lib/files.js');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.view().find, null);
+  assert.equal(session.reviewPath, 'lib/files.js');
+  session.pane = 'diff';
+  session.scroll = 4;
+  session.handleEvent({ type: 'key', key: '/' });
+  session.pushInput('app');
+  assert.equal(session.pane, 'diff');
+  assert.equal(session.reviewPath, 'src/app.js');
+  assert.equal(session.scroll, 0);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.pane = 'branches';
+  session.handleEvent({ type: 'key', key: '/' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.view().find, null);
+});
