@@ -261,7 +261,7 @@ test('committing the last staged change does not end the review', () => {
     assert.equal(session.items[0].origin, 'staged');
     session.showFiles();
     session.pushInput('c');
-    session.pushInput('c');
+    session.handleEvent({ type: 'key', key: 'insert' });
     session.pushInput('land the change');
     session.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(session.done, false);
