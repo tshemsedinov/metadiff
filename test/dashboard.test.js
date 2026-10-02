@@ -1227,18 +1227,21 @@ test('the tasks header shows done against the total', () => {
   const block = tasksBlock(model, 48, 6, { now: 1, frame: 0 }, tile);
   const text = (line) => line.map((part) => part.text).join('');
   const header = text(block.titleLine);
-  const body = block.lines.map(text).join('\n');
+  const lines = block.lines.map(text);
+  const body = lines.join('\n');
+  const backlog = lines.find((line) => line.includes('Backlog'));
+  const barAt = (line) => line.search(/[█░]/);
   assert.equal(header.startsWith('tasks'), true);
-  assert.ok(header.includes('3/8'));
-  assert.match(body, /Backlog/);
-  assert.match(body, /1\/4/);
+  assert.equal(header.trimEnd().endsWith('3/8'), true);
+  assert.ok(barAt(header) < header.lastIndexOf('3/8'));
   assert.match(body, /Issues/);
   assert.match(body, /1\/2/);
   assert.match(body, /Bug Reports/);
   assert.match(body, /Feature Requests/);
+  assert.equal(backlog.trimEnd().endsWith('1/4'), true);
+  assert.ok(backlog.indexOf('Backlog') < barAt(backlog));
+  assert.ok(barAt(backlog) < backlog.lastIndexOf('1/4'));
   assert.match(body, /0\/1/);
-  assert.ok(header.includes('█') || header.includes('░'));
-  assert.ok(body.includes('█') || body.includes('░'));
 });
 
 test('a title aside sits on the right of the header', () => {
