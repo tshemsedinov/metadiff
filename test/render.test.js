@@ -639,17 +639,14 @@ test('commit pane brief mode lists subject hash branch and age', () => {
   assert.match(text, /land the change/);
   assert.match(render.headerText(view), /demo: commits brief$/);
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /commit/);
-  assert.match(footer, /apply/);
-  assert.match(footer, /amend/);
-  assert.match(footer, /reword/);
-  assert.match(footer, /fixup/);
-  assert.match(footer, /drop/);
-  assert.match(footer, /pull/);
-  assert.match(footer, /push/);
+  const commitIds = frame.buttons.map((hit) => hit.id);
+  for (const id of ['commit', 'amend', 'reword', 'fixup', 'view']) {
+    assert.ok(commitIds.includes(id), id);
+  }
+  assert.ok(!commitIds.includes('pull'));
+  assert.ok(!commitIds.includes('push'));
   assert.ok(!footer.includes('add'));
   assert.ok(!footer.includes('←'));
-  assert.match(footer, /view/);
   assert.ok(frame.buttons.find((hit) => hit.id === 'view'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'commit'));
   assert.ok(!frame.buttons.find((hit) => hit.id === 'apply'));
@@ -671,8 +668,14 @@ test('commit pane brief mode lists subject hash branch and age', () => {
     subject: 'land the change',
   };
   assert.ok(frame.buttons.find((hit) => hit.id === 'drop'));
-  assert.ok(frame.buttons.find((hit) => hit.id === 'pull'));
-  assert.ok(frame.buttons.find((hit) => hit.id === 'push'));
+  assert.equal(
+    frame.buttons.find((hit) => hit.id === 'pull'),
+    undefined,
+  );
+  assert.equal(
+    frame.buttons.find((hit) => hit.id === 'push'),
+    undefined,
+  );
   const colored = render.renderFrame(view, {
     width: 80,
     height: 12,
@@ -1860,15 +1863,16 @@ test('AC10 footer words highlight the bound letter', () => {
   const plain = stripAnsi(row);
   assert.match(
     plain,
-    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
+    /^ files {2}tasks {2}branches {2}commits {2}run {2}npm {2}add {2}unstage/,
   );
-  assert.match(plain, /commit {2}pull {2}push/);
-  assert.match(plain, /^ add {2}/);
+  assert.match(plain, /drop {2}ignore/);
+  assert.match(plain, /^ files {2}/);
   assert.ok(!plain.includes('q'));
   assert.ok(!plain.includes('prev'));
   assert.ok(!plain.includes('next'));
   assert.ok(!plain.includes('quit'));
-  assert.ok(!plain.includes('files'));
+  assert.ok(!plain.includes('pull'));
+  assert.ok(!plain.includes('push'));
   assert.ok(!plain.includes('mode'));
   assert.ok(!plain.includes('feedback'));
   assert.ok(!plain.includes('code'));
@@ -1886,9 +1890,9 @@ test('AC10 footer words highlight the bound letter', () => {
   const dimRow = dim.rows[dim.rows.length - 1];
   assert.match(
     dimRow,
-    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
+    /files {2}tasks {2}branches {2}commits {2}run {2}npm {2}add {2}unstage/,
   );
-  assert.match(dimRow, /commit {2}pull {2}push/);
+  assert.match(dimRow, /drop {2}ignore/);
   assert.ok(!dimRow.includes('q'));
   assert.ok(!dimRow.includes('['));
   const mode = frame.buttons.find((hit) => hit.id === 'layout');
@@ -1899,9 +1903,9 @@ test('AC10 footer words highlight the bound letter', () => {
   assert.equal(code, undefined);
   assert.ok(frame.buttons.find((hit) => hit.id === 'add'));
   assert.ok(frame.buttons.find((hit) => hit.id === 'unstage'));
-  assert.ok(frame.buttons.find((hit) => hit.id === 'file'));
+  assert.ok(frame.buttons.find((hit) => hit.id === 'dashFiles'));
   assert.equal(
-    frame.buttons.find((hit) => hit.id === 'diff'),
+    frame.buttons.find((hit) => hit.id === 'dashDiffs'),
     undefined,
   );
   assert.equal(
@@ -1912,8 +1916,14 @@ test('AC10 footer words highlight the bound letter', () => {
     frame.buttons.find((hit) => hit.id === 'files'),
     undefined,
   );
-  assert.ok(frame.buttons.find((hit) => hit.id === 'pull'));
-  assert.ok(frame.buttons.find((hit) => hit.id === 'push'));
+  assert.equal(
+    frame.buttons.find((hit) => hit.id === 'pull'),
+    undefined,
+  );
+  assert.equal(
+    frame.buttons.find((hit) => hit.id === 'push'),
+    undefined,
+  );
   view.fileScope = 'file';
   const fileScope = render.renderFrame(view, {
     width: 80,
@@ -1923,11 +1933,11 @@ test('AC10 footer words highlight the bound letter', () => {
   const fileScopeRow = fileScope.rows[fileScope.rows.length - 1];
   assert.match(
     fileScopeRow,
-    /tasks {2}branch {2}npm {2}diff {2}commit {2}pull/,
+    /files {2}tasks {2}branches {2}commits {2}run {2}npm/,
   );
-  assert.ok(fileScope.buttons.find((hit) => hit.id === 'diff'));
+  assert.ok(fileScope.buttons.find((hit) => hit.id === 'revert'));
   assert.equal(
-    fileScope.buttons.find((hit) => hit.id === 'file'),
+    fileScope.buttons.find((hit) => hit.id === 'dashDiffs'),
     undefined,
   );
 });
@@ -1960,9 +1970,9 @@ test('files pane todos row dims add unstage drop', () => {
   const footer = frame.rows[frame.rows.length - 1];
   assert.match(
     footer,
-    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file /,
+    /files {2}tasks {2}branches {2}commits {2}run {2}npm {2}add {2}unstage/,
   );
-  assert.match(footer, /commit {2}pull {2}push/);
+  assert.match(footer, /drop {2}ignore/);
   assert.ok(!footer.includes('q'));
   assert.ok(!footer.includes('←'));
   assert.ok(!footer.includes('→'));
@@ -1978,7 +1988,7 @@ test('files pane todos row dims add unstage drop', () => {
     frame.buttons.find((hit) => hit.id === 'revert'),
     undefined,
   );
-  assert.ok(frame.buttons.find((hit) => hit.id === 'commit'));
+  assert.ok(frame.buttons.find((hit) => hit.id === 'dashCommits'));
   const colored = render.renderFrame(view, {
     width: 80,
     height: 8,
@@ -1999,7 +2009,7 @@ test('files pane todos row dims add unstage drop', () => {
   const fileFooter = file.rows[file.rows.length - 1];
   assert.match(
     fileFooter,
-    /add {2}unstage {2}drop {2}ignore {2}tasks {2}branch {2}npm {2}file/,
+    /files {2}tasks {2}branches {2}commits {2}run {2}npm {2}add {2}unstage/,
   );
   assert.ok(file.buttons.find((hit) => hit.id === 'add'));
 });
@@ -2025,15 +2035,14 @@ test('diff pane dims add on staged and unstage on unstaged', () => {
     repoName: 'demo',
   };
   const staged = render.renderFrame(view, {
-    width: 80,
+    width: 140,
     height: 8,
     color: true,
   });
   const stagedRow = staged.rows[staged.rows.length - 1];
   const rest = seq(THEME.buttonFg, THEME.buttonBg);
   const hot = seq(THEME.buttonHotFg, THEME.buttonBg);
-  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop/);
-  assert.ok(!stripAnsi(stagedRow).includes('ignore'));
+  assert.match(stripAnsi(stagedRow), /add {2}unstage {2}drop {2}ignore/);
   assert.equal(
     staged.buttons.find((hit) => hit.id === 'add'),
     undefined,
@@ -2045,7 +2054,7 @@ test('diff pane dims add on staged and unstage on unstaged', () => {
   view.item = { ...item, origin: 'unstaged' };
   view.counts = { staged: 0, unstaged: 1, untracked: 0 };
   const unstaged = render.renderFrame(view, {
-    width: 80,
+    width: 140,
     height: 8,
     color: true,
   });
@@ -2057,7 +2066,6 @@ test('diff pane dims add on staged and unstage on unstaged', () => {
   );
   assert.ok(unstagedRow.includes(`${BOLD}${hot}a`));
   assert.ok(unstagedRow.includes(`${rest}unstage`));
-  assert.ok(!stripAnsi(unstagedRow).includes('commit'));
   assert.equal(
     unstaged.buttons.find((hit) => hit.id === 'commit'),
     undefined,
@@ -2124,11 +2132,18 @@ test('branch pane lists names and marks the default branch', () => {
   assert.match(text, /wip/);
   assert.match(render.headerText(view), /demo: branches$/);
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /new/);
-  assert.match(footer, /rebase/);
-  assert.match(footer, /drop/);
-  assert.match(footer, /pull/);
-  assert.match(footer, /push/);
+  const branchIds = frame.buttons.map((hit) => hit.id);
+  for (const id of ['newBranch', 'pull', 'push']) {
+    assert.ok(branchIds.includes(id), id);
+  }
+  const wide = render.renderFrame(view, {
+    width: 160,
+    height: 12,
+    color: false,
+  });
+  const wideFooter = stripAnsi(wide.rows.at(-1));
+  assert.match(wideFooter, /rebase/);
+  assert.match(wideFooter, /delete/);
   assert.ok(!footer.includes('add'));
   assert.ok(!footer.includes('←'));
   assert.ok(!footer.includes('→'));
@@ -2186,11 +2201,14 @@ test('branch pane lists names and marks the default branch', () => {
   assert.ok(!featPainted.includes(bg(THEME.buttonHotFg)));
   const rest = seq(THEME.buttonFg, THEME.buttonBg);
   const hot = seq(THEME.buttonHotFg, THEME.buttonBg);
-  const currentFooter = colored.rows[colored.rows.length - 1];
+  const wideColored = render.renderFrame(view, {
+    width: 160,
+    height: 12,
+    color: true,
+  });
+  const currentFooter = wideColored.rows[wideColored.rows.length - 1];
   assert.ok(currentFooter.includes(`${rest}rebase`));
-  assert.ok(currentFooter.includes(`${rest}drop`));
-  assert.ok(!currentFooter.includes(`${BOLD}${hot}r`));
-  assert.ok(!currentFooter.includes(`${BOLD}${hot}d`));
+  assert.ok(currentFooter.includes(`${rest}delete`));
   assert.ok(currentFooter.includes(`${BOLD}${hot}p`));
   assert.ok(currentFooter.includes(`${BOLD}${hot}s`));
   view.branchCursor = 0;
@@ -2199,7 +2217,6 @@ test('branch pane lists names and marks the default branch', () => {
     height: 12,
     color: true,
   });
-  const ontoFooter = onto.rows[onto.rows.length - 1];
   const ontoFeat = onto.rows.find((row) => row.includes('bbb2222'));
   const ontoMain = onto.rows.find((row) => row.includes('aaa1111'));
   assert.ok(ontoFeat.includes(currentBg));
@@ -2220,12 +2237,19 @@ test('branch pane lists names and marks the default branch', () => {
     onto.buttons.find((hit) => hit.id === 'push'),
     undefined,
   );
-  assert.ok(ontoFooter.includes(`${BOLD}${hot}r`));
-  assert.ok(ontoFooter.includes(`${BOLD}${hot}d`));
-  assert.ok(ontoFooter.includes(`${rest}pull`));
-  assert.ok(ontoFooter.includes(`${rest}push`));
-  assert.ok(!ontoFooter.includes(`${BOLD}${hot}p`));
-  assert.ok(!ontoFooter.includes(`${BOLD}${hot}s`));
+  const ontoWide = render.renderFrame(view, {
+    width: 160,
+    height: 12,
+    color: true,
+  });
+  const ontoHint = ontoWide.rows[ontoWide.rows.length - 1];
+  assert.ok(ontoHint.includes(`${BOLD}${hot}e`));
+  assert.ok(ontoHint.includes(`${BOLD}${hot}del`));
+  assert.ok(ontoHint.includes(`${rest}pull`));
+  assert.ok(ontoHint.includes(`${rest}push`));
+  const ontoCompact = onto.rows[onto.rows.length - 1];
+  assert.ok(!ontoCompact.includes(`${BOLD}${hot}p`));
+  assert.ok(!ontoCompact.includes(`${BOLD}${hot}s`));
 });
 
 test('branch pane types a new name on a row under the list', () => {
@@ -2718,7 +2742,7 @@ test('compose panel sits above status and buttons', () => {
     },
   );
   const frame = render.renderFrame(view, {
-    width: 80,
+    width: 140,
     height: 16,
     color: false,
   });
@@ -2726,11 +2750,10 @@ test('compose panel sits above status and buttons', () => {
   const statusRow = frame.rows[frame.rows.length - 2];
   const buttonRow = frame.rows[frame.rows.length - 1];
   assert.match(statusRow, /0\/1/);
-  assert.match(buttonRow, /feedback/);
+  assert.match(buttonRow, /files/);
   assert.match(buttonRow, /edit/);
   assert.ok(!buttonRow.includes('code'));
   assert.ok(!buttonRow.includes('reload'));
-  assert.ok(!buttonRow.includes('files'));
   const joined = frame.rows.join('\n');
   const noteAt = joined.indexOf('extract helper');
   const statusAt = joined.indexOf(statusRow);
@@ -2784,7 +2807,7 @@ test('feedback compose paints templates above the input', () => {
 
 test('todo compose does not paint feedback templates', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -2911,7 +2934,7 @@ test('note panel is lighter than the status line', () => {
 
 test('todo view paints file todo text not a diff hunk', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -2925,7 +2948,9 @@ test('todo view paints file todo text not a diff hunk', () => {
     status: '',
     counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 1 },
     repoName: 'demo',
-    tasks: ['[ ] rewrite this', '[x] already done'],
+    taskSections: [
+      { title: 'Backlog', texts: ['[ ] rewrite this', '[x] already done'] },
+    ],
     tasksFocus: 0,
   };
   const frame = render.renderFrame(view, {
@@ -2934,23 +2959,26 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: false,
   });
   const body = stripAnsi(frame.rows.join('\n'));
-  const captionAt = body.indexOf(REPO_TASKS_LABEL);
+  const captionAt = body.indexOf('Backlog');
   const firstAt = body.indexOf('[ ] rewrite this');
   assert.ok(captionAt >= 0 && captionAt < firstAt);
   assert.match(body, /\[ \] rewrite this/);
   assert.match(body, /\[x\] already done/);
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('+'));
   assert.ok(!stripAnsi(frame.rows[2]).startsWith('-'));
-  assert.ok(body.includes(`demo: ${REPO_TASKS_LABEL}`));
+  assert.ok(body.includes('demo: tasks'));
   assert.ok(!body.includes('todo 1/1'));
-  assert.ok(!body.includes(`demo/${REPO_TASKS_LABEL}`));
+  assert.ok(!body.includes('demo/tasks'));
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /← {2}→ {2}x/);
+  assert.match(footer, /files {2}diffs {2}tasks {2}branches/);
+  assert.match(footer, /delete {2}x/);
+  assert.ok(!footer.includes('←'));
+  assert.ok(!footer.includes('→'));
   assert.ok(!footer.includes('q'));
   assert.ok(!footer.includes('prev'));
   assert.ok(!footer.includes('next'));
   assert.ok(!footer.includes('quit'));
-  assert.ok(!footer.includes('files'));
+  assert.ok(footer.includes('files'));
   assert.ok(!footer.includes('reload'));
   assert.ok(!footer.includes('add'));
   assert.ok(!footer.includes('drop'));
@@ -2958,8 +2986,8 @@ test('todo view paints file todo text not a diff hunk', () => {
   assert.ok(!footer.includes('feedback'));
   assert.ok(!footer.includes('code'));
   assert.ok(!footer.includes('todo'));
-  assert.ok(!footer.includes('commit'));
-  assert.ok(!footer.includes('del'));
+  assert.ok(!footer.includes('pull'));
+  assert.ok(!footer.includes('push'));
   assert.ok(!footer.includes('edit'));
   assert.ok(!footer.includes('⏎'));
   const colored = render.renderFrame(view, {
@@ -2968,7 +2996,7 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: true,
   });
   const caption = colored.rows[2];
-  assert.ok(stripAnsi(caption).includes(REPO_TASKS_LABEL));
+  assert.ok(stripAnsi(caption).includes('Backlog'));
   assert.ok(!stripAnsi(caption).includes('demo'));
   assert.ok(!caption.includes(BOLD));
   assert.ok(!caption.includes(fg(THEME.buttonHotFg)));
@@ -2977,7 +3005,7 @@ test('todo view paints file todo text not a diff hunk', () => {
 
 test('todo list stays visible while composing', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -3015,7 +3043,7 @@ test('todo list stays visible while composing', () => {
 
 test('todo list paints the focused row on the selection bar', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -3054,7 +3082,7 @@ test('checkbox marks use a contrast chip on todo and note rows', () => {
     { type: 'add', text: 'x', noNl: false, blockId: 0 },
   ]);
   const todoView = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -3100,7 +3128,7 @@ test('checkbox marks use a contrast chip on todo and note rows', () => {
 
 test('todo list exposes a click hit for each todo row', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -3137,7 +3165,7 @@ test('todo list exposes a click hit for each todo row', () => {
 
 test('todo wrap hangs under the checkbox text', () => {
   const view = {
-    pane: 'diff',
+    pane: 'tasks',
     item: {
       origin: 'task',
       todoId: 1,
@@ -3291,6 +3319,7 @@ test('compose and idle notes wrap on word boundaries', () => {
   const todo = render.renderFrame(
     {
       ...base,
+      pane: 'tasks',
       item: {
         origin: 'task',
         todoId: 1,
@@ -3738,7 +3767,7 @@ test('secondary screens lead the hint line with 🢐esc', () => {
   assert.match(plain({ pane: 'branches' }), /^ 🢐esc {2}/);
   assert.match(plain({ pane: 'commits' }), /^ 🢐esc {2}/);
   assert.match(plain({ pane: 'npm' }), /^ 🢐esc {2}/);
-  assert.match(plain({ pane: 'diff', item: { origin: 'task' } }), /^ 🢐esc {2}/);
+  assert.match(plain({ pane: 'tasks' }), /^ 🢐esc {2}/);
   assert.ok(!plain({ pane: 'files' }).includes('🢐'));
   assert.ok(!plain({ pane: 'diff' }).includes('🢐'));
   const output = footerOf({ pane: 'npm', npmView: true });
@@ -3770,7 +3799,7 @@ test('npm status line shows the old log size', () => {
     files: [],
   };
   const frame = render.renderFrame(view, {
-    width: 60,
+    width: 160,
     height: 10,
     color: false,
   });
@@ -3790,7 +3819,7 @@ test('npm status line shows the old log size', () => {
   assert.ok(!row.includes(`${blue}0/0`));
   view.npmLogs = '';
   const empty = render.renderFrame(view, {
-    width: 60,
+    width: 160,
     height: 10,
     color: false,
   });

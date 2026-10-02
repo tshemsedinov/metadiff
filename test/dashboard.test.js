@@ -458,15 +458,15 @@ test('the dashboard tiles keep the canonical order and hotkeys', () => {
   assert.deepEqual(ids, [
     'files',
     'diffs',
-    'commits',
-    'branches',
-    'npm',
-    'run',
     'tasks',
+    'branches',
+    'commits',
+    'run',
+    'npm',
   ]);
   assert.deepEqual(
     TILES.map((tile) => tile.key),
-    ['f', 'd', 'c', 'b', 'n', 'r', 't'],
+    ['f', 'd', 't', 'b', 'c', 'r', 'n'],
   );
 });
 
@@ -1211,14 +1211,32 @@ test('npm packages take wanted and latest from the outdated report', () => {
 test('the tasks header shows done against the total', () => {
   const tile = { key: 't', title: 'tasks' };
   const model = {
-    tasks: { total: 8, done: 3, feedback: 1, code: 0, open: ['write tests'] },
+    tasks: {
+      done: 3,
+      total: 8,
+      kinds: [
+        { id: 'backlog', title: 'Backlog', done: 1, total: 4 },
+        { id: 'issues', title: 'Issues', done: 1, total: 2 },
+        { id: 'bugs', title: 'Bug Reports', done: 1, total: 1 },
+        { id: 'features', title: 'Feature Requests', done: 0, total: 1 },
+      ],
+    },
   };
-  const block = tasksBlock(model, 32, 6, { now: 1, frame: 0 }, tile);
-  const header = block.titleLine.map((part) => part.text).join('');
+  const block = tasksBlock(model, 48, 6, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const body = block.lines.map(text).join('\n');
   assert.equal(header.startsWith('tasks'), true);
-  assert.equal(header.endsWith('3/8'), true);
-  const count = block.titleLine.find((part) => part.text === '3/8');
-  assert.equal(count.tone, 'muted');
+  assert.ok(header.includes('3/8'));
+  assert.match(body, /Backlog/);
+  assert.match(body, /1\/4/);
+  assert.match(body, /Issues/);
+  assert.match(body, /1\/2/);
+  assert.match(body, /Bug Reports/);
+  assert.match(body, /Feature Requests/);
+  assert.match(body, /0\/1/);
+  assert.ok(header.includes('█') || header.includes('░'));
+  assert.ok(body.includes('█') || body.includes('░'));
 });
 
 test('a title aside sits on the right of the header', () => {
@@ -1303,6 +1321,35 @@ test('run captions sit in the header with total and duration', () => {
   assert.equal(end(header, 'fail'), end(row, '2'));
   assert.equal(end(header, 'total'), end(row, '10', row.indexOf('10') + 2));
   assert.equal(end(header, 'duration'), end(row, '3.0s'));
+});
+
+test('a running command spins on its row and not in the caption', () => {
+  const now = 1_000_000;
+  const model = {
+    busy: 'npm test',
+    runs: [
+      {
+        name: 'test',
+        status: 'running',
+        source: 'node --test',
+        startedAt: now - 1000,
+        endedAt: 0,
+        done: 1,
+        failed: 0,
+        expected: 4,
+        result: null,
+      },
+    ],
+  };
+  const tile = { key: 'r', title: 'run' };
+  const block = runsBlock(model, 48, 6, { now, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const header = text(block.titleLine);
+  const body = block.lines.map(text).join('\n');
+  assert.equal(header.includes('⠋'), false);
+  assert.ok(body.includes('⠋'));
+  assert.ok(body.includes('npm test'));
+  assert.ok(body.includes('test'));
 });
 
 test('a long run command keeps the columns and shows an ellipsis', () => {

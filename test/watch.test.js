@@ -354,6 +354,7 @@ test('disk watch keeps the files pane on the same path', () => {
   const { session, repo } = openWatched([a, b], { startPane: 'files' });
   session.uiOpen = true;
   session.dispatch('next');
+  session.dispatch('prev');
   assert.equal(session.fileList()[session.fileCursor].path, 'a.js');
   repo.setItems([extra, a, b]);
   session.lifecycle.onDiskChange();
