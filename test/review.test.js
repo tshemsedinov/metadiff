@@ -150,7 +150,7 @@ test('serializeReview groups todos then feedback with position', () => {
   assert.match(md, /status: editing/);
   assert.match(md, /# reslop review 2026-09-07-00/);
   assert.match(md, /## Agent instructions/);
-  assert.match(md, /^## Backlog$/m);
+  assert.match(md, /^## Feature requests$/m);
   assert.match(md, /^## lib\/session\.js$/m);
   assert.ok(!md.includes('> lib/session.js'));
   assert.ok(!md.includes('### Todo'));
@@ -461,12 +461,39 @@ test('flushReview skips write when there are no notes', () => {
   }
 });
 
-test('parseReview reads a legacy TODOs heading as the backlog', () => {
+test('parseReview keeps tasks from the previous section names', () => {
+  const md = [
+    '## Backlog',
+    '',
+    '- [ ] old',
+    '',
+    '## Issues',
+    '',
+    '- [ ] follow up',
+    '',
+    '## Feature Requests',
+    '',
+    '- [ ] shiny',
+    '',
+    '## Bug Reports',
+    '',
+    '- [ ] crash',
+  ].join('\n');
+  const loaded = parseReview(md, '/repo/.review/x.md');
+  const kindOf = (text) => loaded.tasks.find((item) => item.text === text).kind;
+  assert.equal(kindOf('old'), 'debt');
+  assert.equal(kindOf('follow up'), 'debt');
+  assert.equal(kindOf('shiny'), 'features');
+  assert.equal(kindOf('crash'), 'bugs');
+});
+
+test('parseReview reads a legacy TODOs heading as technical debt', () => {
   const md = '---\nstatus: editing\n---\n\n## TODOs\n\n- [ ] keep\n';
   const loaded = parseReview(md, '/repo/.review/x.md');
   assert.equal(loaded.tasks[0].file, 'TODOs');
   assert.equal(loaded.tasks[0].text, 'keep');
-  assert.match(serializeReview(loaded), /^## Backlog$/m);
+  assert.equal(loaded.tasks[0].kind, 'debt');
+  assert.match(serializeReview(loaded), /^## Technical debt$/m);
 });
 
 test('serializeReview collects todos under Backlog not file headings', () => {
@@ -481,19 +508,19 @@ test('serializeReview collects todos under Backlog not file headings', () => {
     text: 'nit',
   });
   const md = serializeReview(store);
-  assert.match(md, /^## Backlog$/m);
+  assert.match(md, /^## Feature requests$/m);
   assert.match(md, /- \[ \] todo a/);
   assert.match(md, /- \[ \] todo b/);
   const fileAt = md.indexOf('## a.js');
-  const todosAt = md.indexOf('## Backlog');
+  const todosAt = md.indexOf('## Feature requests');
   assert.ok(todosAt >= 0 && todosAt < fileAt);
   assert.ok(!md.slice(fileAt).includes('todo a'));
   const loaded = parseReview(md, store.reviewPath);
   assert.equal(loaded.tasks.length, 2);
   assert.equal(loaded.tasks[0].file, 'TODOs');
   assert.equal(loaded.tasks[1].file, 'TODOs');
-  assert.equal(loaded.tasks[0].kind, 'backlog');
-  assert.equal(loaded.tasks[1].kind, 'backlog');
+  assert.equal(loaded.tasks[0].kind, 'features');
+  assert.equal(loaded.tasks[1].kind, 'features');
 });
 
 test('serializeReview keeps each task list under its heading', () => {
@@ -503,12 +530,11 @@ test('serializeReview keeps each task list under its heading', () => {
   addTask(store, 'TODOs', 'dark mode', true, 'features');
   addTask(store, 'TODOs', 'login', false, 'issues');
   const md = serializeReview(store);
-  const backlog = md.indexOf('## Backlog');
-  const issues = md.indexOf('## Issues');
-  const bugs = md.indexOf('## Bug Reports');
-  const features = md.indexOf('## Feature Requests');
-  assert.ok(backlog >= 0 && backlog < issues);
-  assert.ok(issues < bugs && bugs < features);
+  const features = md.indexOf('## Feature requests');
+  const bugs = md.indexOf('## Bug reports');
+  const debt = md.indexOf('## Technical debt');
+  assert.ok(features >= 0 && features < bugs);
+  assert.ok(bugs < debt);
   assert.match(md, /- \[ \] later/);
   assert.match(md, /- \[ \] login/);
   assert.match(md, /- \[ \] crash/);
@@ -518,8 +544,8 @@ test('serializeReview keeps each task list under its heading', () => {
     const task = loaded.tasks.find((item) => item.text === text);
     return task.kind;
   };
-  assert.equal(kindOf('later'), 'backlog');
-  assert.equal(kindOf('login'), 'issues');
+  assert.equal(kindOf('later'), 'debt');
+  assert.equal(kindOf('login'), 'debt');
   assert.equal(kindOf('crash'), 'bugs');
   assert.equal(kindOf('dark mode'), 'features');
   assert.equal(loaded.tasks[0].file, 'TODOs');

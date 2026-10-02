@@ -3032,8 +3032,11 @@ test('todo view paints file todo text not a diff hunk', () => {
     counts: { staged: 0, unstaged: 0, untracked: 0, tasks: 1 },
     repoName: 'demo',
     taskSections: [
-      { title: 'Backlog', texts: ['[ ] rewrite this', '[x] already done'] },
-      { title: 'Issues', texts: ['[ ] later'] },
+      {
+        title: 'Feature requests',
+        texts: ['[ ] rewrite this', '[x] already done'],
+      },
+      { title: 'Bug reports', texts: ['[ ] later'] },
     ],
     tasksFocus: 0,
   };
@@ -3043,7 +3046,7 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: false,
   });
   const body = stripAnsi(frame.rows.join('\n'));
-  const captionAt = body.indexOf('Backlog');
+  const captionAt = body.indexOf('Feature requests');
   const firstAt = body.indexOf('[ ] rewrite this');
   assert.ok(captionAt >= 0 && captionAt < firstAt);
   assert.match(body, /\[ \] rewrite this/);
@@ -3057,7 +3060,7 @@ test('todo view paints file todo text not a diff hunk', () => {
   assert.match(footer, /^ 🢐esc {2}delete {2}space.*files {2}diffs {2}tasks/);
   const rows = frame.rows.map((row) => stripAnsi(row));
   const doneAt = rows.findIndex((row) => row.includes('already done'));
-  const issuesAt = rows.findIndex((row) => row.includes('Issues'));
+  const issuesAt = rows.findIndex((row) => row.includes('Bug reports'));
   assert.equal(issuesAt, doneAt + 2);
   assert.equal(rows[doneAt + 1].trim(), '');
   assert.ok(!footer.includes('←'));
@@ -3084,9 +3087,9 @@ test('todo view paints file todo text not a diff hunk', () => {
     color: true,
   });
   const caption = colored.rows.find((row) =>
-    stripAnsi(row).includes('Backlog'),
+    stripAnsi(row).includes('Feature requests'),
   );
-  assert.ok(stripAnsi(caption).includes('Backlog'));
+  assert.ok(stripAnsi(caption).includes('Feature requests'));
   assert.ok(!stripAnsi(caption).includes('demo'));
   assert.ok(!caption.includes(BOLD));
   assert.ok(caption.includes(fg(THEME.taskHeadFg)));
