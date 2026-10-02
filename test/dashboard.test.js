@@ -29,7 +29,7 @@ const { filesBlock, diffsBlock, npmBlock, tasksBlock } = dashBlocks;
 const dashboardRender = require('../lib/render/dashboard.js');
 const { TILES, paintBodyDashboard } = dashboardRender;
 const dashboardSession = require('../lib/session/dashboard.js');
-const { classify, ageDelay } = dashboardSession;
+const { Dashboard, classify, ageDelay } = dashboardSession;
 const watch = require('../lib/session/watch.js');
 const { DiskWatcher, UNKNOWN_PATH } = watch;
 const actions = require('../lib/session/actions.js');
@@ -384,6 +384,62 @@ test('the age label refreshes slower as commits get older', () => {
   assert.equal(ageDelay(1000), 1000);
   assert.equal(ageDelay(10 * 60000), 30000);
   assert.equal(ageDelay(5 * 3600000), 600000);
+});
+
+const quietDashboard = () => {
+  const started = [];
+  const stopped = [];
+  const timers = [];
+  const ui = {
+    uiOpen: true,
+    nav: { pane: 'dashboard' },
+    npm: { lastRun: null },
+    progress: {
+      start: (id) => started.push(id),
+      stop: (id) => stopped.push(id),
+    },
+    term: {
+      later: (name, fn, ms) => timers.push({ name, fn, ms }),
+      cancel: () => {},
+    },
+  };
+  const dash = new Dashboard(ui);
+  dash.active = true;
+  return { dash, started, stopped, timers };
+};
+
+test('the current minute blinks for three seconds after activity', () => {
+  const { dash } = quietDashboard();
+  const now = 5_000_000;
+  dash.heat(now, 4);
+  assert.equal(dash.liveActivity(now + 2999), true);
+  assert.equal(dash.liveActivity(now + 3000), false);
+  dash.heat(now + 1000, 1);
+  assert.equal(dash.liveActivity(now + 3999), true);
+  assert.equal(dash.liveActivity(now + 4000), false);
+  dash.mark(now + 2000, 'commit');
+  dash.mark(now + 8000, 'commit');
+  assert.equal(dash.liveActivity(now + 5000), false);
+  dash.heat(now, 2, 9);
+  const minute = dash.activityView(now).minutes[0];
+  assert.equal(minute.removed > minute.added, true);
+  dash.runs = [{ status: 'running', pid: process.pid }];
+  assert.equal(dash.liveActivity(now + 20_000), true);
+});
+
+test('the blink timer stops the current cell after three seconds', () => {
+  const { dash, started, stopped, timers } = quietDashboard();
+  const now = Date.now();
+  dash.activityAt = now - 1000;
+  dash.afterDraw();
+  const blink = timers.find((row) => row.name === 'dashboard-blink');
+  assert.ok(started.includes('dashboard'));
+  assert.ok(blink.ms > 1500 && blink.ms <= 2020);
+  dash.activityAt = Date.now() - 4000;
+  started.length = 0;
+  dash.afterDraw();
+  assert.ok(stopped.includes('dashboard'));
+  assert.equal(started.includes('dashboard'), false);
 });
 
 test('the disk watcher reports changed paths and run records', async () => {
@@ -900,7 +956,7 @@ test('diff columns keep one space after the mark and fill the row', () => {
   assert.equal(visibleWidth(folder), 40);
   const trend = text(block.footer);
   assert.equal(trend.startsWith('activity '), true);
-  assert.equal(visibleWidth(trend), 40);
+  assert.equal(visibleWidth(trend), 39);
   assert.equal(block.footer[0].tone, 'muted');
 });
 
@@ -937,15 +993,117 @@ test('diff activity scrolls minutes left and blinks the current one', () => {
   const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
   const footer = text(block.footer);
   assert.equal(footer.startsWith('activity '), true);
-  assert.equal(visibleWidth(footer), 40);
-  assert.ok(footer.indexOf('●') < footer.indexOf('·'));
-  assert.ok(footer.indexOf('·') < footer.indexOf('✖'));
-  assert.equal(footer.endsWith('✖'), true);
+  assert.equal(visibleWidth(footer), 39);
+  for (const part of block.footer.slice(1)) {
+    assert.equal(visibleWidth(part.text), 1);
+  }
+  assert.ok(footer.indexOf('◉') < footer.indexOf('+'));
+  assert.equal(footer.endsWith('∙'), true);
+  assert.equal(block.footer.at(-4).bg, null);
   assert.deepEqual(block.footer.at(-1).bg, THEME.heat4);
   const flash = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
   assert.deepEqual(flash.footer.at(-1).bg, THEME.heatBlink);
-  const painted = paintTile(tile, flash, 42, 4, true);
-  assert.ok(painted.at(-1).includes(bg(THEME.heatBlink)));
+  const painted = paintTile(tile, flash, 40, 6, true);
+  const row = painted.at(-1);
+  const plain = stripAnsi(row);
+  assert.equal(flash.footer.at(-1).text, '◎');
+  assert.equal(visibleWidth(plain), 40);
+  assert.equal(plain.endsWith('◎'), true);
+  assert.equal(/\s/.test(row.slice(row.lastIndexOf('◎'))), false);
+  assert.ok(row.includes(bg(THEME.heatBlink)));
+  model.diffs.activity.live = false;
+  const done = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
+  assert.equal(done.footer.at(-1).text, 'x');
+});
+
+test('diff activity background runs from the first minute to now', () => {
+  const minute = 60_000;
+  const now = 5 * minute;
+  const totals = {
+    added: 1,
+    removed: 0,
+    stagedAdded: 0,
+    stagedRemoved: 0,
+    staged: 0,
+    remaining: 1,
+  };
+  const model = {
+    diffs: {
+      files: 1,
+      dirs: [],
+      exts: [],
+      totals,
+      activity: {
+        minutes: [
+          { at: 2, level: 4, marks: ['commit'] },
+          { at: 4, level: 0, marks: ['pass'] },
+        ],
+        live: false,
+      },
+      delta: null,
+    },
+  };
+  const tile = { key: 'd', title: 'diffs' };
+  const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
+  const before = block.footer.at(-5);
+  const open = block.footer.at(-4);
+  const gap = block.footer.at(-3);
+  const mark = block.footer.at(-2);
+  const end = block.footer.at(-1);
+  assert.equal(before.bg, null);
+  assert.equal(open.text, '◉');
+  assert.deepEqual(open.bg, THEME.heat1);
+  assert.equal(gap.text, ' ');
+  assert.deepEqual(gap.bg, THEME.heatTrack);
+  assert.equal(mark.text, '*');
+  assert.deepEqual(mark.bg, THEME.heatTrack);
+  assert.equal(end.text, ' ');
+  assert.deepEqual(end.bg, THEME.heatTrack);
+});
+
+test('diff activity marks removals and pulses the current minute', () => {
+  const minute = 60_000;
+  const now = 3 * minute;
+  const totals = {
+    added: 1,
+    removed: 4,
+    stagedAdded: 0,
+    stagedRemoved: 0,
+    staged: 0,
+    remaining: 1,
+  };
+  const model = {
+    diffs: {
+      files: 1,
+      dirs: [],
+      exts: [],
+      totals,
+      activity: {
+        minutes: [
+          { at: 1, level: 0, added: 0, removed: 0, marks: ['abort'] },
+          { at: 2, level: 5, added: 1, removed: 4, marks: [] },
+          { at: 3, level: 3, added: 3, removed: 0, marks: ['fail'] },
+        ],
+        live: true,
+      },
+      delta: null,
+    },
+  };
+  const tile = { key: 'd', title: 'diffs' };
+  const text = (line) => line.map((part) => part.text).join('');
+  const quiet = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
+  const footer = text(quiet.footer);
+  assert.ok(footer.includes('!'));
+  assert.ok(footer.indexOf('!') < footer.indexOf('-'));
+  assert.equal(quiet.footer.at(-1).text, '∙');
+  const low = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
+  assert.equal(low.footer.at(-1).text, '◦');
+  model.diffs.activity.minutes[2].level = 90;
+  const high = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
+  assert.equal(high.footer.at(-1).text, '•');
+  model.diffs.activity.minutes[2].level = 400;
+  const top = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
+  assert.equal(top.footer.at(-1).text, '◎');
 });
 
 test('diff rows keep removals when the tile is narrow', () => {
