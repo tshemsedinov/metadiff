@@ -2606,6 +2606,63 @@ test('AC25 header path roles use distinct greys', () => {
   assert.match(plain, /metasql\/lib\/database\.js/);
 });
 
+test('find marks path matches and the active one is stronger', () => {
+  const files = [
+    {
+      path: 'lib/files.js',
+      status: 'unstaged',
+      remaining: 1,
+      staged: 0,
+      added: 1,
+      removed: 0,
+    },
+    {
+      path: 'lib/find.js',
+      status: 'unstaged',
+      remaining: 1,
+      staged: 0,
+      added: 1,
+      removed: 0,
+    },
+    {
+      path: 'src/app.js',
+      status: 'unstaged',
+      remaining: 1,
+      staged: 0,
+      added: 1,
+      removed: 0,
+    },
+  ];
+  const view = {
+    pane: 'files',
+    files,
+    fileCursor: 1,
+    repoName: 'demo',
+    branch: 'main',
+    counts: { staged: 0, unstaged: 3, untracked: 0 },
+    status: '',
+    scroll: 0,
+    find: { query: 'lib', at: 1 },
+  };
+  const frame = render.renderFrame(view, {
+    width: 80,
+    height: 12,
+    color: true,
+  });
+  const rows = frame.rows.map((row) => ({ raw: row, text: stripAnsi(row) }));
+  const filesRow = rows.find((row) => row.text.includes('lib/files.js'));
+  const findRow = rows.find((row) => row.text.includes('lib/find.js'));
+  assert.ok(filesRow.raw.includes(bg(THEME.searchBg)));
+  assert.ok(!filesRow.raw.includes(bg(THEME.searchOnBg)));
+  assert.ok(findRow.raw.includes(bg(THEME.searchOnBg)));
+  const status = rows[rows.length - 2];
+  assert.match(status.text, /^ \/lib /);
+  assert.ok(status.raw.includes(bg(THEME.searchOnBg)));
+  const header = rows[0];
+  assert.ok(header.raw.includes(bg(THEME.searchOnBg)));
+  assert.match(header.text, /lib\/find\.js/);
+});
+
 test('presentRows overwrites in place without a leading wipe', () => {
   const out = render.presentRows(['aa', 'bb'], { clear: false });
   assert.ok(out.startsWith(`${ESC}[?25l`));
