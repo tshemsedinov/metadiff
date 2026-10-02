@@ -127,21 +127,24 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('p'), 'prev');
   assert.equal(actionFromKey('u'), 'unstage');
   assert.equal(actionFromKey('b'), null);
-  assert.equal(actionFromKey('b', 'files'), 'branch');
-  assert.equal(actionFromKey('p', 'files'), 'pull');
+  assert.equal(actionFromKey('b', 'files'), 'dashBranches');
+  assert.equal(actionFromKey('p', 'files'), 'prev');
   assert.equal(actionFromKey('u', 'files'), 'unstage');
   assert.equal(actionFromKey('u', 'unit'), 'unstage');
-  assert.equal(actionFromKey('f', 'files'), 'file');
-  assert.equal(actionFromKey('f', 'files', 'file'), 'feedback');
+  assert.equal(actionFromKey('f', 'files'), 'dashFiles');
+  assert.equal(actionFromKey('f', 'diff'), 'dashFiles');
   assert.equal(actionFromKey('d', 'files'), 'revert');
-  assert.equal(actionFromKey('d', 'files', 'file'), 'diff');
+  assert.equal(actionFromKey('d', 'diff'), 'revert');
+  assert.equal(actionFromKey('d', 'unit'), 'revert');
   assert.equal(actionFromKey('left', 'unit'), 'prev');
   assert.equal(actionFromKey('right', 'unit'), 'next');
-  assert.equal(actionFromKey('s', 'files'), 'push');
+  assert.equal(actionFromKey('s', 'files'), null);
   assert.equal(actionFromKey('n'), 'next');
   assert.equal(actionFromKey('n', 'branches'), 'newBranch');
-  assert.equal(actionFromKey('r', 'branches'), 'rebase');
-  assert.equal(actionFromKey('d', 'branches'), 'drop');
+  assert.equal(actionFromKey('e', 'branches'), 'rebase');
+  assert.equal(actionFromKey('r', 'branches'), 'dashRun');
+  assert.equal(actionFromKey('d', 'branches'), 'dashDiffs');
+  assert.equal(actionFromKey('delete', 'branches'), 'drop');
   assert.equal(actionFromKey('p', 'branches'), 'pull');
   assert.equal(actionFromKey('s', 'branches'), 'push');
   assert.equal(actionFromKey('left', 'branches'), null);
@@ -150,13 +153,16 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('k', 'branches'), 'prev');
   assert.equal(actionFromKey('up', 'branches'), 'scrollUp');
   assert.equal(actionFromKey('down', 'branches'), 'scrollDown');
-  assert.equal(actionFromKey('a', 'commits'), 'apply');
-  assert.equal(actionFromKey('r', 'commits'), 'reword');
-  assert.equal(actionFromKey('f', 'commits'), 'fixup');
-  assert.equal(actionFromKey('d', 'commits'), 'drop');
+  assert.equal(actionFromKey('a', 'commits'), 'amend');
+  assert.equal(actionFromKey('p', 'commits'), 'apply');
+  assert.equal(actionFromKey('e', 'commits'), 'reword');
+  assert.equal(actionFromKey('x', 'commits'), 'fixup');
+  assert.equal(actionFromKey('r', 'commits'), 'dashRun');
+  assert.equal(actionFromKey('f', 'commits'), 'dashFiles');
+  assert.equal(actionFromKey('d', 'commits'), 'dashDiffs');
+  assert.equal(actionFromKey('delete', 'commits'), 'drop');
   assert.equal(actionFromKey('c', 'commits'), 'commit');
-  assert.equal(actionFromKey('p', 'commits'), 'pull');
-  assert.equal(actionFromKey('s', 'commits'), 'push');
+  assert.equal(actionFromKey('s', 'commits'), null);
   assert.equal(actionFromKey('v', 'commits'), 'view');
   assert.equal(actionFromKey('m', 'commits'), 'layout');
   assert.equal(actionFromKey('m'), 'layout');
@@ -164,18 +170,23 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('right', 'commits'), null);
   assert.equal(actionFromKey('left', 'files'), null);
   assert.equal(actionFromKey('right', 'files'), null);
-  assert.equal(actionFromKey('n', 'files'), 'npm');
+  assert.equal(actionFromKey('n', 'files'), 'dashNpm');
+  assert.equal(actionFromKey('t', 'files'), 'dashTasks');
+  assert.equal(actionFromKey('c', 'files'), 'dashCommits');
   assert.equal(actionFromKey('e', 'npm'), 'npmEdit');
-  assert.equal(actionFromKey('n', 'npm'), 'npmNew');
-  assert.equal(actionFromKey('d', 'npm'), 'npmDrop');
-  assert.equal(actionFromKey('c', 'npm'), 'npmLogs');
+  assert.equal(actionFromKey('i', 'npm'), 'npmNew');
+  assert.equal(actionFromKey('n', 'npm'), 'dashNpm');
+  assert.equal(actionFromKey('d', 'npm'), 'dashDiffs');
+  assert.equal(actionFromKey('delete', 'npm'), 'npmDrop');
+  assert.equal(actionFromKey('l', 'npm'), 'npmLogs');
+  assert.equal(actionFromKey('c', 'npm'), 'dashCommits');
+  assert.equal(actionFromKey('delete', 'tasks'), 'drop');
   assert.equal(actionFromKey('j', 'files'), 'next');
   assert.equal(actionFromKey('k', 'files'), 'prev');
   assert.equal(actionFromKey('a', 'files'), 'add');
-  assert.equal(actionFromKey('f', 'files'), 'file');
-  assert.equal(actionFromKey('d', 'files'), 'revert');
+  assert.equal(actionFromKey('i', 'files'), 'ignore');
   assert.equal(actionFromKey('d'), 'revert');
-  assert.equal(actionFromKey('r', 'files'), null);
+  assert.equal(actionFromKey('r', 'files'), 'dashRun');
   assert.equal(actionFromKey('escape'), null);
 });
 
@@ -224,29 +235,31 @@ test('layoutButtons hitboxes cover labels', () => {
   assert.equal(ids.includes('tasks'), true);
   const filesHint = layoutButtons(160, {
     hidden: FILES_HIDDEN,
-    extra: ['file', 'commit', 'pull', 'push'],
+    extra: [
+      'dashFiles',
+      'dashTasks',
+      'dashBranches',
+      'dashNpm',
+      'dashRun',
+      'dashCommits',
+    ],
   });
   const filesIds = filesHint.parts.map((part) => part.id);
   assert.deepEqual(filesIds, [
+    'dashFiles',
+    'dashTasks',
+    'dashBranches',
+    'dashNpm',
+    'dashRun',
+    'dashCommits',
     'add',
     'unstage',
     'revert',
     'ignore',
-    'tasks',
-    'branch',
-    'file',
-    'commit',
-    'pull',
-    'push',
   ]);
   assert.ok(!filesIds.includes('diff'));
-  const diffHint = layoutButtons(160, {
-    hidden: FILES_HIDDEN,
-    extra: ['diff', 'commit', 'pull', 'push'],
-  });
-  const diffIds = diffHint.parts.map((part) => part.id);
-  assert.ok(diffIds.includes('diff'));
-  assert.ok(!diffIds.includes('file'));
+  assert.ok(!filesIds.includes('pull'));
+  assert.ok(!filesIds.includes('push'));
   assert.ok(!filesIds.includes('prev'));
   assert.ok(!filesIds.includes('next'));
   const todo = layoutButtons(160, { hidden: TASKS_DISABLED });
@@ -346,16 +359,7 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
   );
   assert.ok(ontoLayout.hits.some((hit) => hit.id === 'rebase'));
   assert.ok(ontoLayout.hits.some((hit) => hit.id === 'drop'));
-  const commitIds = [
-    'amend',
-    'apply',
-    'reword',
-    'fixup',
-    'drop',
-    'view',
-    'pull',
-    'push',
-  ];
+  const commitIds = ['amend', 'apply', 'reword', 'fixup', 'drop', 'view'];
   const head = { sha: 'aaa', canCommit: true, unstagedCurrent: true };
   const commitOff = disabledActions('commits', head);
   assert.equal(commitOff.includes('amend'), false);
@@ -397,9 +401,14 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
   assert.ok(commitLayout.parts.some((part) => part.id === 'drop'));
   const view = commitLayout.parts.find((part) => part.id === 'view');
   assert.equal(view.label, 'view');
+  const edited = commitLayout.parts.find((part) => part.id === 'reword');
+  assert.equal(edited.label, 'edit');
+  const removed = commitLayout.parts.find((part) => part.id === 'drop');
+  assert.equal(removed.label, 'delete');
+  assert.equal(removed.letter, 'del');
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'view'));
-  assert.ok(commitLayout.parts.some((part) => part.id === 'pull'));
-  assert.ok(commitLayout.parts.some((part) => part.id === 'push'));
+  assert.ok(!commitLayout.parts.some((part) => part.id === 'pull'));
+  assert.ok(!commitLayout.parts.some((part) => part.id === 'push'));
   assert.ok(!commitLayout.parts.some((part) => part.id === 'prev'));
   assert.ok(!commitLayout.parts.some((part) => part.id === 'layout'));
   assert.equal(
@@ -411,6 +420,4 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
     undefined,
   );
   assert.ok(commitLayout.hits.some((hit) => hit.id === 'amend'));
-  assert.ok(commitLayout.hits.some((hit) => hit.id === 'pull'));
-  assert.ok(commitLayout.hits.some((hit) => hit.id === 'push'));
 });

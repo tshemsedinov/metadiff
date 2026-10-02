@@ -23,7 +23,9 @@ const npm = require('../lib/render/npm.js');
 const { logViewRows } = npm;
 const { setTheme, themeName } = ansi;
 const files = require('../lib/files.js');
-const { REVIEW_DIR, REPO_TASKS_LABEL } = files;
+const { REVIEW_DIR } = files;
+
+const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] '];
 const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
@@ -336,14 +338,12 @@ const clickAt = (session, x, y) => {
   });
 };
 
-test('prev at first block opens todos and next reaches last', () => {
+test('prev at first block stays put and next reaches last', () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
   const { session } = openSession([a, b, c]);
   session.dispatch('prev');
-  assert.equal(session.current().origin, 'task');
-  session.dispatch('next');
   assert.equal(session.current().file.newPath, 'a.js');
   session.dispatch('next');
   assert.equal(session.current().file.newPath, 'b.js');
@@ -366,6 +366,7 @@ test('AC8 add on staged is a no-op', () => {
 test('diff screen dims a on staged and u on unstaged', () => {
   const stagedItem = sampleItem('s.js', 'staged');
   const staged = openSession([stagedItem], { color: true });
+  staged.stdout.columns = 160;
   staged.session.draw();
   const stagedRow = staged.session.lastFrame.rows.at(-1);
   const rest = seq(THEME.buttonFg, THEME.buttonBg);
@@ -384,6 +385,7 @@ test('diff screen dims a on staged and u on unstaged', () => {
   assert.equal(staged.session.status, '');
 
   const unstaged = openSession([sampleItem('u.js')], { color: true });
+  unstaged.stdout.columns = 160;
   unstaged.session.draw();
   const unstagedRow = unstaged.session.lastFrame.rows.at(-1);
   assert.ok(unstaged.session.lastFrame.buttons.find((hit) => hit.id === 'add'));
@@ -472,8 +474,7 @@ test('AC21 commit add and revert are read only', () => {
   assert.equal(session.status, 'read only');
   assert.equal(repo.commits.length, 0);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'tasks');
-  assert.equal(files[1].status, '7ac260c');
+  assert.equal(files[0].status, '7ac260c');
   session.dispatch('next');
   assert.equal(session.status, 'read only');
   assert.equal(repo.added.length, 0);
@@ -504,8 +505,7 @@ test('PR add and revert are read only and feedback attaches', () => {
   assert.equal(session.status, 'read only');
   assert.equal(repo.commits.length, 0);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'tasks');
-  assert.equal(files[1].status, '#12');
+  assert.equal(files[0].status, '#12');
   session.dispatch('feedback');
   session.pushInput('prefer const');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -516,8 +516,6 @@ test('PR add and revert are read only and feedback attaches', () => {
   session.dispatch('next');
   assert.equal(session.status, 'saved');
   session.dispatch('prev');
-  assert.equal(session.current().origin, 'task');
-  session.dispatch('next');
   assert.equal(session.current().file.newPath, 'lib/a.js');
   const view = session.view();
   assert.equal(view.sourceKind, 'pr');
@@ -558,9 +556,9 @@ test('AC9 hotkeys dispatch add revert next prev quit', () => {
   const c = sampleItem('c.js');
   const { session, repo } = openSession([a, b, c]);
   assert.equal(session.layout, 'unified');
-  session.pushInput('n');
+  session.pushInput('j');
   assert.equal(session.current().file.newPath, 'b.js');
-  session.pushInput('p');
+  session.pushInput('k');
   assert.equal(session.current().file.newPath, 'a.js');
   session.pushInput('a');
   assert.equal(repo.added.length, 1);
@@ -590,8 +588,6 @@ test('j and k move next and prev on the diff', () => {
   session.pushInput('k');
   assert.equal(session.current().file.newPath, 'a.js');
   session.pushInput('k');
-  assert.equal(session.current().origin, 'task');
-  session.pushInput('j');
   assert.equal(session.current().file.newPath, 'a.js');
 });
 
@@ -825,10 +821,10 @@ test('starts on the file list', () => {
   const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
   assert.equal(session.pane, 'files');
   assert.equal(session.fileCursor, 0);
-  assert.equal(session.fileList()[0].kind, 'tasks');
+  assert.equal(session.fileList()[0].path, 'a.js');
   session.dispatch('open');
   assert.equal(session.pane, 'diff');
-  assert.equal(session.current().origin, 'task');
+  assert.equal(session.current().file.newPath, 'a.js');
 });
 
 test('AC14 files pane lists paths and enter opens', () => {
@@ -840,17 +836,15 @@ test('AC14 files pane lists paths and enter opens', () => {
   const text = stdout.dump();
   assert.ok(!text.includes('todo 1/3'));
   assert.ok(!text.includes('@@'));
-  assert.ok(text.includes('Project Tasks'));
+  assert.ok(!text.includes('Project Tasks'));
   assert.match(text, /a\.js/);
   assert.match(text, /b\.js/);
-  session.dispatch('scrollDown');
-  assert.equal(session.fileCursor, 1);
   session.dispatch('open');
   assert.equal(session.pane, 'diff');
   assert.equal(session.current().file.newPath, 'a.js');
   session.dispatch('files');
   assert.equal(session.pane, 'files');
-  assert.equal(session.fileCursor, 1);
+  assert.equal(session.fileCursor, 0);
 });
 
 test('enter on a partial file opens the first unstaged hunk', () => {
@@ -870,14 +864,13 @@ test('files pane add moves to the next file', () => {
     [sampleItem('a.js'), sampleItem('b.js'), sampleItem('c.js')],
     { startPane: 'files' },
   );
-  session.dispatch('next');
   session.dispatch('add');
-  assert.equal(session.fileCursor, 2);
-  assert.equal(session.fileList()[2].path, 'b.js');
+  assert.equal(session.fileCursor, 1);
+  assert.equal(session.fileList()[1].path, 'b.js');
   assert.equal(session.items[0].origin, 'staged');
   session.dispatch('prev');
   session.dispatch('unstage');
-  assert.equal(session.fileCursor, 2);
+  assert.equal(session.fileCursor, 1);
   assert.equal(session.items[0].origin, 'unstaged');
 });
 
@@ -888,15 +881,14 @@ test('files pane add on last file keeps the cursor', () => {
   );
   session.dispatch('next');
   session.dispatch('next');
-  session.dispatch('next');
-  assert.equal(session.fileCursor, 3);
+  assert.equal(session.fileCursor, 2);
   session.reviewPath = 'a.js';
   session.dispatch('add');
-  assert.equal(session.fileCursor, 3);
-  assert.equal(session.fileList()[3].path, 'c.js');
+  assert.equal(session.fileCursor, 2);
+  assert.equal(session.fileList()[2].path, 'c.js');
   assert.equal(session.items[2].origin, 'staged');
   session.dispatch('unstage');
-  assert.equal(session.fileCursor, 3);
+  assert.equal(session.fileCursor, 2);
   assert.equal(session.items[2].origin, 'unstaged');
 });
 
@@ -915,7 +907,6 @@ test('files pane add unstage revert apply to the whole file', () => {
   const { session, repo } = openSession([first, second, other], {
     startPane: 'files',
   });
-  session.dispatch('next');
   session.dispatch('add');
   assert.equal(repo.added.length, 2);
   assert.equal(repo.added[0].file.newPath, 'a.js');
@@ -923,20 +914,20 @@ test('files pane add unstage revert apply to the whole file', () => {
   assert.equal(session.items[0].origin, 'staged');
   assert.equal(session.items[1].origin, 'staged');
   assert.equal(session.items[2].origin, 'unstaged');
-  assert.equal(session.fileCursor, 2);
+  assert.equal(session.fileCursor, 1);
   session.dispatch('prev');
   session.dispatch('unstage');
   assert.equal(repo.unstageCalls.length, 2);
   assert.equal(session.items[0].origin, 'unstaged');
   assert.equal(session.items[1].origin, 'unstaged');
-  assert.equal(session.fileCursor, 2);
+  assert.equal(session.fileCursor, 1);
   session.dispatch('prev');
   session.dispatch('revert');
   assert.equal(repo.reverted.length, 2);
   assert.equal(repo.reverted[0].file.newPath, 'a.js');
   assert.equal(repo.reverted[1].file.newPath, 'a.js');
-  assert.equal(session.fileCursor, 1);
-  assert.equal(session.fileList()[1].path, 'b.js');
+  assert.equal(session.fileCursor, 0);
+  assert.equal(session.fileList()[0].path, 'b.js');
 });
 
 test('files pane i appends the path to gitignore and npmignore', () => {
@@ -970,19 +961,16 @@ test('files pane disables mode and feedback', () => {
   assert.equal(session.notes.code.size, 0);
 });
 
-test('files pane todos row ignores add unstage drop', () => {
+test('files pane lists paths without a tasks row', () => {
   const { session } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   assert.equal(session.fileCursor, 0);
-  assert.equal(session.fileList()[0].kind, 'tasks');
-  session.dispatch('add');
-  session.dispatch('unstage');
-  session.dispatch('revert');
-  assert.equal(session.status, '');
-  assert.equal(session.pane, 'files');
-  assert.equal(session.fileCursor, 0);
-  session.dispatch('next');
+  assert.equal(session.fileList()[0].path, 'a.js');
+  assert.equal(
+    session.fileList().some((entry) => entry.kind === 'tasks'),
+    false,
+  );
   session.dispatch('add');
   assert.equal(session.status, 'staged');
 });
@@ -1056,12 +1044,11 @@ test('files pane add on a staged file still moves down', () => {
   const item = sampleItem('a.js', 'staged');
   const next = sampleItem('b.js');
   const { session, repo } = openSession([item, next], { startPane: 'files' });
-  session.dispatch('next');
   session.dispatch('add');
   assert.equal(session.status, 'already staged');
   assert.equal(repo.added.length, 0);
-  assert.equal(session.fileCursor, 2);
-  assert.equal(session.fileList()[2].path, 'b.js');
+  assert.equal(session.fileCursor, 1);
+  assert.equal(session.fileList()[1].path, 'b.js');
 });
 
 test('files pane unstage on an unstaged file still moves down', () => {
@@ -1069,12 +1056,11 @@ test('files pane unstage on an unstaged file still moves down', () => {
     [sampleItem('a.js'), sampleItem('b.js')],
     { startPane: 'files' },
   );
-  session.dispatch('next');
   session.dispatch('unstage');
   assert.equal(session.status, 'not staged');
   assert.equal(repo.unstageCalls.length, 0);
-  assert.equal(session.fileCursor, 2);
-  assert.equal(session.fileList()[2].path, 'b.js');
+  assert.equal(session.fileCursor, 1);
+  assert.equal(session.fileList()[1].path, 'b.js');
 });
 
 test('f maps feedback to the hunk location', () => {
@@ -1404,7 +1390,7 @@ test('todo list scrolls the focused row into view', () => {
   session.dispatch('pageDown');
   session.draw();
   const paged = stripAnsi(session.lastFrame.rows.join('\n'));
-  assert.equal(session.tasksFocus, 30);
+  assert.equal(session.tasksFocus, 33);
   assert.match(paged, /item 29(?!\d)/);
   assert.ok(!/item 0(?!\d)/.test(paged));
 });
@@ -1416,6 +1402,10 @@ test('todo edits in the list not the note line', () => {
   session.draw();
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] in the list/);
+  assert.match(body, /Backlog/);
+  assert.match(body, /Issues/);
+  assert.match(body, /Bug Reports/);
+  assert.match(body, /Feature Requests/);
   assert.equal(body.split('in the list').length - 1, 1);
   assert.equal(session.view().compose, null);
   assert.ok(session.view().taskEdit);
@@ -1431,13 +1421,13 @@ test('t from any file adds a repo todo and starts editing', () => {
   session.dispatch('scrollDown');
   assert.equal(session.fileCursor, 1);
   session.dispatch('tasks');
-  assert.equal(session.pane, 'diff');
+  assert.equal(session.pane, 'tasks');
   assert.equal(session.current().origin, 'task');
   assert.equal(session.current().file.newPath, 'TODOs');
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'tasks');
   assert.equal(session.tasksFocus, 0);
-  assert.deepEqual(session.view().tasks, ['[ ] ']);
+  assert.deepEqual(session.view().tasks, taskRows(['[ ] ']));
   session.handleEvent({ type: 'key', key: 'escape' });
   session.dispatch('files');
   session.fileCursor = 0;
@@ -1452,11 +1442,13 @@ test('t opens the repo todo page and lets you edit it', () => {
   const b = sampleItem('b.js');
   const { session } = openSession([a, b]);
   const files = session.fileList();
-  assert.equal(files[0].kind, 'tasks');
-  assert.equal(files[0].path, REPO_TASKS_LABEL);
-  assert.equal(files[0].remaining, 0);
-  assert.equal(files[0].staged, 0);
+  assert.equal(files[0].path, 'a.js');
+  assert.equal(
+    files.some((entry) => entry.kind === 'tasks'),
+    false,
+  );
   session.dispatch('tasks');
+  assert.equal(session.pane, 'tasks');
   assert.equal(session.current().origin, 'task');
   assert.equal(session.current().file.newPath, 'TODOs');
   assert.equal(session.mode, 'compose');
@@ -1466,12 +1458,13 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.items[0].file.newPath, 'a.js');
   assert.equal(session.items[1].file.newPath, 'b.js');
   assert.equal(session.current().origin, 'task');
-  assert.deepEqual(session.view().tasks, ['[ ] rewrite loop', '[ ] ']);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] rewrite loop', '[ ] ']),
+  );
   assert.equal(session.view().total, 2);
   assert.equal(session.view().counts.tasks, 1);
   assert.equal(session.view().counts.feedback, 0);
-  assert.equal(session.fileList()[0].remaining, 1);
-  assert.equal(session.fileList()[0].staged, 0);
   assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
@@ -1480,33 +1473,27 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.mode, 'review');
   assert.equal(session.tasksFocus, 0);
   session.dispatch('next');
-  assert.equal(session.current().origin, 'unstaged');
-  assert.equal(session.current().file.newPath, 'a.js');
+  assert.equal(session.pane, 'tasks');
+  assert.equal(session.tasksFocus, 1);
   assert.equal(session.composer.idleNoteText(), '');
-  session.dispatch('tasks');
-  assert.equal(session.current().origin, 'task');
+  session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
-  assert.deepEqual(session.view().tasks, ['[ ] rewrite loop', '[ ] ']);
-  assert.equal(session.tasksFocus, 1);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] rewrite loop', '[ ] ']),
+  );
   session.pushInput('add tests');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.tasksOpen, true);
-  assert.deepEqual(session.view().tasks, [
-    '[ ] rewrite loop',
-    '[ ] add tests',
-    '[ ] ',
-  ]);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] rewrite loop', '[ ] add tests', '[ ] ']),
+  );
   assert.equal(session.tasksFocus, 1);
-  session.dispatch('next');
-  assert.equal(session.current().origin, 'unstaged');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(session.pane, 'files');
   assert.equal(session.current().file.newPath, 'a.js');
-  session.dispatch('next');
-  assert.equal(session.current().file.newPath, 'b.js');
-  assert.equal(session.composer.idleNoteText(), '');
-  session.dispatch('prev');
-  session.dispatch('prev');
-  assert.equal(session.current().origin, 'task');
 });
 
 test('todo list keeps a blank row to start a new item', () => {
@@ -1515,7 +1502,7 @@ test('todo list keeps a blank row to start a new item', () => {
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
   assert.equal(session.mode, 'review');
-  assert.deepEqual(session.view().tasks, ['[ ] first note', '[ ] ']);
+  assert.deepEqual(session.view().tasks, taskRows(['[ ] first note', '[ ] ']));
   session.dispatch('scrollDown');
   assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -1549,11 +1536,10 @@ test('todo list keeps a blank row to start a new item', () => {
   assert.equal(session.composeTaskId, null);
   session.pushInput('second note');
   session.handleEvent({ type: 'key', key: 'enter' });
-  assert.deepEqual(session.view().tasks, [
-    '[ ] first note',
-    '[ ] second note',
-    '[ ] ',
-  ]);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] first note', '[ ] second note', '[ ] ']),
+  );
   assert.equal(session.mode, 'compose');
   assert.equal(session.tasksFocus, 2);
   assert.equal(session.editor.text, '');
@@ -1674,11 +1660,11 @@ test('delete and backspace remove the selected todo', () => {
   assert.equal(session.mode, 'review');
   assert.equal(session.tasksFocus, 1);
   session.handleEvent({ type: 'key', key: 'delete' });
-  assert.deepEqual(session.view().tasks, ['[ ] first note', '[ ] ']);
+  assert.deepEqual(session.view().tasks, taskRows(['[ ] first note', '[ ] ']));
   assert.equal(session.tasksFocus, 0);
   assert.equal(session.current().origin, 'task');
   session.handleEvent({ type: 'key', key: 'backspace' });
-  assert.deepEqual(session.view().tasks, ['[ ] ']);
+  assert.deepEqual(session.view().tasks, taskRows(['[ ] ']));
   assert.equal(session.current().origin, 'task');
 });
 
@@ -1714,7 +1700,10 @@ test('todo autosave updates one draft instead of duplicating', () => {
   assert.equal(session.mode, 'compose');
   assert.equal(session.editor.text, '');
   assert.equal(session.tasksFocus, 1);
-  assert.deepEqual(session.view().tasks, ['[ ] keep this more', '[ ] ']);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] keep this more', '[ ] ']),
+  );
 });
 
 test('typing a todo starts editing at the end of the line', () => {
@@ -1743,10 +1732,10 @@ test('home end and page keys jump the todo list', () => {
   session.handleEvent({ type: 'key', key: 'home' });
   assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'end' });
-  assert.equal(session.tasksFocus, 3);
+  assert.equal(session.tasksFocus, 6);
   session.handleEvent({ type: 'key', key: 'home' });
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 3);
+  assert.equal(session.tasksFocus, 6);
   session.handleEvent({ type: 'key', key: 'pageUp' });
   assert.equal(session.tasksFocus, 0);
 });
@@ -1775,8 +1764,12 @@ test('todo edit arrows move across todos without leaving edit', () => {
   assert.equal(session.editor.text, '');
   session.handleEvent({ type: 'key', key: 'down' });
   assert.equal(session.mode, 'compose');
-  assert.equal(session.tasksFocus, 2);
-  assert.deepEqual(session.view().tasks, ['[ ] first', '[ ] second', '[ ] ']);
+  assert.equal(session.tasksFocus, 3);
+  assert.equal(session.editor.text, '');
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] first', '[ ] second', '[ ] ']),
+  );
 });
 
 test('todo edit arrows move inside a multiline todo', () => {
@@ -1861,7 +1854,7 @@ test('todo edit page keys jump across todos', () => {
   assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 3);
+  assert.equal(session.tasksFocus, 6);
   assert.equal(session.editor.text, '');
 });
 
@@ -1877,7 +1870,10 @@ test('enter edits the next todo and escape stays on it', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
   assert.equal(session.tasksFocus, 1);
-  assert.deepEqual(session.view().tasks, ['[ ] first', '[ ] second', '[ ] ']);
+  assert.deepEqual(
+    session.view().tasks,
+    taskRows(['[ ] first', '[ ] second', '[ ] ']),
+  );
 });
 
 test('todo save recovers if the stub was dropped', () => {
@@ -1952,7 +1948,7 @@ test('initReview resumes latest editing file', () => {
   assert.equal(session.notes.tasks[0].text, 'rewrite loop');
   assert.equal(
     session.fileList().some((entry) => entry.kind === 'tasks'),
-    true,
+    false,
   );
 });
 
@@ -2223,7 +2219,7 @@ test('editing a commit ignores clicks and scrolls on other commits', () => {
   session.pushInput('v');
   session.dispatch('next');
   session.dispatch('next');
-  session.pushInput('r');
+  session.pushInput('e');
   session.pushInput('x');
   assert.equal(session.mode, 'compose');
   assert.equal(session.commitCursor, 2);
@@ -2277,7 +2273,7 @@ test('brief reword edits the first line and keeps the body', () => {
   ]);
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('r');
+  session.pushInput('e');
   assert.equal(session.editor.text, 'land the change');
   assert.equal(session.editor.cursor, 'land the change'.length);
   session.editor.replace('ship it');
@@ -2324,7 +2320,7 @@ test('full mode reword edits the whole message', () => {
   session.pushInput('c');
   session.pushInput('v');
   session.dispatch('next');
-  session.pushInput('r');
+  session.pushInput('e');
   assert.equal(session.editor.text, 'land the change\n\nexplain the change');
   session.editor.replace('ship it\n\nnew body');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2360,7 +2356,7 @@ test('commits pane r rewords the selected commit', () => {
   session.pushInput('c');
   session.dispatch('next');
   session.dispatch('next');
-  session.pushInput('r');
+  session.pushInput('e');
   assert.equal(session.commitCursor, 2);
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'reword');
@@ -2402,7 +2398,7 @@ test('commits pane a applies a selected fixup', () => {
   session.dispatch('next');
   session.draw();
   assert.ok(session.lastFrame.buttons.find((hit) => hit.id === 'apply'));
-  session.pushInput('a');
+  session.pushInput('p');
   assert.deepEqual(repo.applyFixups, [
     'fff0000fffffffffffffffffffffffffffffff',
   ]);
@@ -2441,17 +2437,17 @@ test('click apply footer squashes the selected fixup', () => {
   assert.equal(session.status, 'applied');
 });
 
-test('commits pane f fixups the selected commit', () => {
+test('commits pane x fixups the selected commit', () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('f');
+  session.pushInput('x');
   assert.equal(session.editor.text, 'fixup! land the change');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.dispatch('next');
-  session.pushInput('f');
+  session.pushInput('x');
   assert.equal(session.editor.text, 'fixup! init');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.status, 'fixup');
@@ -2481,11 +2477,11 @@ test('compose c inserts a letter and does not open commit', () => {
   assert.equal(repo.commits.length, 0);
 });
 
-test('diff pane c does not open commits', () => {
+test('diff pane c opens commits', () => {
   const { session } = openSession([sampleItem('a.js', 'staged')]);
   session.pushInput('c');
   assert.equal(session.mode, 'review');
-  assert.equal(session.pane, 'diff');
+  assert.equal(session.pane, 'commits');
 });
 
 test('commits pane skips commit when nothing is staged', () => {
@@ -2498,7 +2494,7 @@ test('commits pane skips commit when nothing is staged', () => {
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'nothing to commit');
   assert.equal(repo.commits.length, 0);
-  session.pushInput('f');
+  session.handleEvent({ type: 'key', key: 'x' });
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'nothing to commit');
   assert.equal(repo.commits.length, 0);
@@ -2547,23 +2543,23 @@ test('commits pane lists newest first', () => {
   assert.equal(session.rev, 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
 });
 
-test('commits pane d asks to drop the selected commit', () => {
+test('commits pane delete asks to delete the selected commit', () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
   session.dispatch('next');
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'confirmDrop');
   assert.equal(session.view().dropName, 'aaa1111');
   session.pushInput('n');
   assert.equal(session.mode, 'review');
   assert.equal(repo.commitDrops.length, 0);
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
   assert.equal(repo.commitDrops.length, 0);
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   session.pushInput('y');
   assert.deepEqual(repo.commitDrops, [
     'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -2609,36 +2605,28 @@ test('files pane a and d stay add and revert', () => {
   assert.equal(reverted.repo.reverted.length, 1);
 });
 
-test('files pane p pulls and s pushes', () => {
+test('files pane p and s do not pull or push', () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('p');
-  assert.equal(repo.pulls.length, 1);
-  assert.equal(session.status, 'pulled');
   session.pushInput('s');
-  assert.equal(repo.pushes.length, 1);
-  assert.equal(session.status, 'pushed');
+  assert.equal(repo.pulls.length, 0);
+  assert.equal(repo.pushes.length, 0);
+  assert.equal(session.pane, 'files');
 });
 
-test('commits pane p pulls and s pushes', () => {
+test('commits pane p applies and s does not push', () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
   assert.equal(session.pane, 'commits');
   session.pushInput('p');
-  assert.equal(repo.pulls.length, 1);
-  assert.equal(session.status, 'pulled');
-  assert.equal(session.pane, 'commits');
   session.pushInput('s');
-  assert.equal(repo.pushes.length, 1);
-  assert.equal(session.status, 'pushed');
+  assert.equal(repo.pulls.length, 0);
+  assert.equal(repo.pushes.length, 0);
   assert.equal(session.pane, 'commits');
-  clickFooter(session, 'pull');
-  assert.equal(repo.pulls.length, 2);
-  clickFooter(session, 'push');
-  assert.equal(repo.pushes.length, 2);
 });
 
 test('quit without notes does not write a review file', () => {
@@ -2692,7 +2680,7 @@ test('load applies imported GitHub notes on a new review', () => {
   assert.equal(session.notes.tasks[0].file, 'pull request');
   assert.equal(
     session.fileList().some((entry) => entry.kind === 'tasks'),
-    true,
+    false,
   );
   session.load();
   assert.equal(session.notes.tasks.length, 1);
@@ -3358,19 +3346,17 @@ test('files pane u unstages', () => {
   assert.equal(session.status, 'unstaged');
 });
 
-test('files pane f and d switch file and diff scope', () => {
+test('files pane f opens file scope and d drops', () => {
   const item = sampleItem('a.js', 'staged');
   const { session, repo } = openSession([item], { startPane: 'files' });
   session.dispatch('next');
   session.pushInput('f');
   assert.equal(session.fileScope, 'file');
-  assert.equal(session.status, 'file scope');
+  assert.equal(session.pane, 'files');
   assert.equal(repo.unstageCalls.length, 0);
   session.pushInput('d');
-  assert.equal(session.fileScope, 'diff');
-  assert.equal(session.status, 'diff mode');
-  assert.equal(repo.unstageCalls.length, 0);
-  assert.equal(repo.reverted.length, 0);
+  assert.equal(session.fileScope, 'file');
+  assert.equal(repo.reverted.length, 1);
 });
 
 test('unit scope lists every file sorted by path', () => {
@@ -3380,7 +3366,7 @@ test('unit scope lists every file sorted by path', () => {
   repo.extraFiles.push('a.js', 'z.js');
   session.dispatch('file');
   const names = session.fileList().map((entry) => entry.path);
-  assert.deepEqual(names, [REPO_TASKS_LABEL, 'a.js', 'b.js', 'z.js']);
+  assert.deepEqual(names, ['a.js', 'b.js', 'z.js']);
 });
 
 test('unit view shows the file with current block marks', () => {
@@ -3643,36 +3629,36 @@ test('branch list r rebases current onto selected', () => {
     startPane: 'files',
   });
   session.pushInput('b');
-  session.pushInput('r');
+  session.pushInput('e');
   assert.equal(repo.rebases.length, 0);
   session.dispatch('next');
-  session.pushInput('r');
+  session.pushInput('e');
   assert.deepEqual(repo.rebases, ['feat']);
   assert.equal(repo.listed.length, 2);
   assert.match(session.status, /rebased onto feat/);
   assert.equal(session.pane, 'branches');
 });
 
-test('branch list d asks to drop the selected branch', () => {
+test('branch list delete asks to delete the selected branch', () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
   session.dispatch('next');
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'confirmDrop');
   assert.equal(session.dropName, 'feat');
   session.pushInput('n');
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   session.pushInput('y');
   assert.deepEqual(repo.drops, ['feat']);
   assert.match(session.status, /dropped feat/);
@@ -3685,11 +3671,11 @@ test('click drop prompt y and n', () => {
   });
   session.pushInput('b');
   session.dispatch('next');
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   clickStatusChoice(session, 'n');
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
-  session.pushInput('d');
+  session.handleEvent({ type: 'key', key: 'delete' });
   clickStatusChoice(session, 'y');
   assert.deepEqual(repo.drops, ['feat']);
 });
@@ -3781,7 +3767,6 @@ test('partial file add reloads after a later hunk fails', () => {
     repo,
   });
   const before = loads;
-  session.dispatch('next');
   session.dispatch('add');
   assert.equal(session.status, 'patch failed');
   assert.ok(loads > before);
@@ -3804,7 +3789,7 @@ test('x and a checkbox click toggle a todo and the file keeps it', () => {
   session.draw();
   body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[x\] ship it/);
-  assert.match(body, /→ {2}x/);
+  assert.match(body, /delete {2}x/);
   assert.ok(!body.includes(' q'));
   session.pushInput(' ');
   assert.equal(session.notes.tasks[0].done, false);
@@ -4205,14 +4190,11 @@ test('npm screen refuses edits when read only', () => {
   session.pushInput('e');
   assert.equal(session.status, 'read only');
   assert.equal(session.mode, 'review');
-  session.pushInput('n');
+  session.pushInput('i');
   assert.equal(session.status, 'read only');
   session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'review');
-  session.handleEvent({ type: 'key', key: 'd' });
-  assert.equal(session.status, 'read only');
-  assert.equal(session.mode, 'review');
-  session.handleEvent({ type: 'key', key: 'c' });
+  session.handleEvent({ type: 'key', key: 'l' });
   assert.equal(session.status, 'read only');
   assert.equal(session.mode, 'review');
 });
@@ -4245,10 +4227,11 @@ test('double click runs the selected npm command', () => {
   assert.equal(session.view().npmView, true);
 });
 
-test('d deletes the selected npm script after confirmation', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('delete removes the selected npm script after confirmation', () => {
+  const { session, cwd, stdout } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
+  stdout.columns = 160;
   const file = path.join(cwd, 'package.json');
   fs.writeFileSync(
     file,
@@ -4259,8 +4242,12 @@ test('d deletes the selected npm script after confirmation', () => {
   session.pushInput('n');
   session.draw();
   const footer = stripAnsi(session.lastFrame.rows.at(-1));
-  assert.match(footer, /^ 🢐esc {2}edit {2}new {2}delete {2}cleanup/);
-  session.handleEvent({ type: 'key', key: 'd' });
+  assert.match(footer, /edit {2}insert {2}delete {2}cleanup/);
+  const ids = session.lastFrame.buttons.map((hit) => hit.id);
+  assert.ok(ids.includes('npmEdit'));
+  assert.ok(ids.includes('npmNew'));
+  assert.ok(ids.includes('npmDrop'));
+  session.handleEvent({ type: 'key', key: 'delete' });
   assert.equal(session.mode, 'confirmDrop');
   session.pushInput('y');
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -4296,13 +4283,13 @@ test('npm screen deletes logs older than 5 days', () => {
   session.draw();
   const status = () => stripAnsi(session.lastFrame.rows.at(-2));
   assert.match(status(), /old logs 6/);
-  session.handleEvent({ type: 'key', key: 'c' });
+  session.handleEvent({ type: 'key', key: 'l' });
   assert.equal(session.mode, 'confirmDrop');
   session.draw();
   assert.match(status(), /drop logs older than 5 days \(6\)\? y\/n/);
   session.pushInput('n');
   assert.equal(fs.existsSync(stale), true);
-  session.handleEvent({ type: 'key', key: 'c' });
+  session.handleEvent({ type: 'key', key: 'l' });
   session.pushInput('y');
   assert.equal(fs.existsSync(stale), false);
   assert.equal(fs.existsSync(kept), true);
@@ -4311,8 +4298,7 @@ test('npm screen deletes logs older than 5 days', () => {
   assert.equal(session.status, 'dropped logs');
   const hits = session.lastFrame.buttons.map((hit) => hit.id);
   assert.ok(!hits.includes('npmLogs'));
-  assert.match(stripAnsi(session.lastFrame.rows.at(-1)), /cleanup/);
-  session.handleEvent({ type: 'key', key: 'c' });
+  session.handleEvent({ type: 'key', key: 'l' });
   assert.equal(session.status, 'dropped logs');
   assert.equal(session.mode, 'review');
 });

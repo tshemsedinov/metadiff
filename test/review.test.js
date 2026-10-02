@@ -492,6 +492,37 @@ test('serializeReview collects todos under Backlog not file headings', () => {
   assert.equal(loaded.tasks.length, 2);
   assert.equal(loaded.tasks[0].file, 'TODOs');
   assert.equal(loaded.tasks[1].file, 'TODOs');
+  assert.equal(loaded.tasks[0].kind, 'backlog');
+  assert.equal(loaded.tasks[1].kind, 'backlog');
+});
+
+test('serializeReview keeps each task list under its heading', () => {
+  const store = createStore('/tmp/x.md');
+  addTask(store, 'TODOs', 'later', false, 'backlog');
+  addTask(store, 'TODOs', 'crash', false, 'bugs');
+  addTask(store, 'TODOs', 'dark mode', true, 'features');
+  addTask(store, 'TODOs', 'login', false, 'issues');
+  const md = serializeReview(store);
+  const backlog = md.indexOf('## Backlog');
+  const issues = md.indexOf('## Issues');
+  const bugs = md.indexOf('## Bug Reports');
+  const features = md.indexOf('## Feature Requests');
+  assert.ok(backlog >= 0 && backlog < issues);
+  assert.ok(issues < bugs && bugs < features);
+  assert.match(md, /- \[ \] later/);
+  assert.match(md, /- \[ \] login/);
+  assert.match(md, /- \[ \] crash/);
+  assert.match(md, /- \[x\] dark mode/);
+  const loaded = parseReview(md, store.reviewPath);
+  const kindOf = (text) => {
+    const task = loaded.tasks.find((item) => item.text === text);
+    return task.kind;
+  };
+  assert.equal(kindOf('later'), 'backlog');
+  assert.equal(kindOf('login'), 'issues');
+  assert.equal(kindOf('crash'), 'bugs');
+  assert.equal(kindOf('dark mode'), 'features');
+  assert.equal(loaded.tasks[0].file, 'TODOs');
 });
 
 test('applyImportedNotes maps comments onto feedback and todos', () => {

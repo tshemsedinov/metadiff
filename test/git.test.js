@@ -409,10 +409,9 @@ test('AC15 file argv loads only that file', () => {
     session.load();
     assert.equal(session.pane, 'diff');
     const files = session.fileList();
-    assert.equal(files.length, 2);
-    assert.equal(files[0].kind, 'tasks');
-    assert.equal(files[1].path, 'keep.txt');
-    assert.match(files[1].date, /^\d+(mo|[smhdwy]) ago$/);
+    assert.equal(files.length, 1);
+    assert.equal(files[0].path, 'keep.txt');
+    assert.match(files[0].date, /^\d+(mo|[smhdwy]) ago$/);
   } finally {
     repo.cleanup();
   }
