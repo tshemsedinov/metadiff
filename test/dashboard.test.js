@@ -1664,6 +1664,8 @@ test('a transitive package is grey and shows its parent chain', () => {
   assert.equal(tone('one'), 'dep');
   assert.equal(tone('eslint'), 'dev');
   assert.equal(tone('three'), 'pkg');
+  const via = nested.find((part) => part.text.includes('🢒'));
+  assert.equal(via.tone, 'chain');
   assert.match(text(nested), /three 🢒 two 🢒 one/);
   const chain = 'js-yaml 🢒 @eslint/eslintrc 🢒 eslint';
   const long = {

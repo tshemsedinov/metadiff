@@ -3966,7 +3966,8 @@ test('packages screen manages dependencies', async () => {
   const rows = session.lastFrame.rows.map((row) => stripAnsi(row));
   const table = rows.slice(1, -2).join('\n');
   const status = rows.at(-2);
-  assert.match(status, /deps: 1 {2}dev: 1 {2}all: 2 \(20\) {2}⚠️ 1/);
+  assert.match(status, /deps: 1 {2}dev: 1 {2}all: 2 \(20\) {2}⚠️ 1\s*$/);
+  assert.match(status, /^ \S+\s{2,}deps: 1/);
   assert.equal(table.includes('deps:'), false);
   assert.match(table, /^ {3}/m);
   assert.match(table, /current/);

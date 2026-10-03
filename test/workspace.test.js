@@ -210,6 +210,15 @@ test('a repo tile shows size, extensions, tasks, and diffs', () => {
     diffReady: true,
     tasksReady: true,
     runsReady: true,
+    npmReady: true,
+    npm: {
+      hasManifest: true,
+      deps: 0,
+      dev: 5,
+      modules: { count: 98, bytes: 20 },
+      audit: 2,
+      outdated: 5,
+    },
     running: false,
   };
   const model = { now, frame: 0, cursor: 0, cols: 1, tiles: [row] };
@@ -233,6 +242,8 @@ test('a repo tile shows size, extensions, tasks, and diffs', () => {
   assert.match(text, /commits: 12/);
   assert.match(text, /diff: \+1\/4/);
   assert.match(text, /-2\/7/);
+  const summary = `deps: 0  dev: 5  all: 98 (${size(20)})  🚨 2  ⚠️ 5`;
+  assert.ok(text.includes(summary));
   assert.equal(text.includes('▶'), false);
   assert.match(text, /test/);
   assert.match(text, /passed/);
@@ -245,6 +256,7 @@ test('a repo tile shows size, extensions, tasks, and diffs', () => {
     diffReady: false,
     tasksReady: false,
     runsReady: false,
+    npmReady: false,
     running: true,
   };
   const first = paintBodyRepos(
@@ -322,7 +334,8 @@ test('opening a folder of repositories starts on repo tiles', async () => {
           row.commitsReady &&
           row.diffReady &&
           row.tasksReady &&
-          row.runsReady,
+          row.runsReady &&
+          row.npmReady,
       ),
     );
     assert.equal(ready, true);
