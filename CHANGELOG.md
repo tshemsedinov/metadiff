@@ -2,8 +2,14 @@
 
 ## [Unreleased][unreleased]
 
-- Tiling view for multi-repository environment
+## [0.2.7][] - 2026-10-03
+
+- Add tiling view for multi-repository environment
 - Improve navigation and hotkeys
+- Add npm and dependencies screen
+- Rework tasks: regroup into feature, bug, debt, research, and security
+- Show tasks progress
+- Search file paths in the files and diff screens
 
 ## [0.2.6][] - 2026-10-02
 
@@ -166,7 +172,8 @@
 - Feedback and todos that produce a repair plan for an agent
 - Intra-line highlighting in unified, mixed, and side-by-side layouts
 
-[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.6...HEAD
+[unreleased]: https://github.com/tshemsedinov/reslop/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/tshemsedinov/reslop/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/tshemsedinov/reslop/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/tshemsedinov/reslop/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/tshemsedinov/reslop/compare/v0.2.3...v0.2.4
