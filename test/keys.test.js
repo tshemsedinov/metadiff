@@ -207,6 +207,12 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('d', 'npm'), 'dashDiffs');
   assert.equal(actionFromKey('delete', 'npm'), 'npmDrop');
   assert.equal(actionFromKey('l', 'npm'), 'npmLogs');
+  assert.equal(actionFromKey('insert', 'packages'), 'packageNew');
+  assert.equal(actionFromKey('delete', 'packages'), 'packageDrop');
+  assert.equal(actionFromKey('w', 'packages'), 'packageWanted');
+  assert.equal(actionFromKey('l', 'packages'), 'packageLatest');
+  assert.equal(keys.buttonWord('packageWanted'), 'wanted');
+  assert.equal(keys.buttonWord('packageLatest'), 'latest');
   assert.equal(actionFromKey('c', 'npm'), 'dashCommits');
   assert.equal(actionFromKey('delete', 'tasks'), 'drop');
   assert.equal(actionFromKey('j', 'files'), 'next');

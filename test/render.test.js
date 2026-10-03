@@ -358,7 +358,7 @@ test('footer keeps info status on the counts line', () => {
   assert.equal(savedRow.endsWith(' '), true);
 });
 
-test('status line includes feedback todo and code counts', () => {
+test('status line shows tasks done against the total', () => {
   const hunk = sampleHunk([
     { type: 'add', text: 'x', noNl: false, blockId: 0 },
   ]);
@@ -377,9 +377,8 @@ test('status line includes feedback todo and code counts', () => {
       staged: 6,
       unstaged: 11,
       untracked: 0,
-      feedback: 3,
       tasks: 2,
-      code: 1,
+      tasksDone: 1,
     },
     repoName: 'demo',
     branch: 'main',
@@ -390,11 +389,13 @@ test('status line includes feedback todo and code counts', () => {
     color: false,
   });
   const statusRow = frame.rows[frame.rows.length - 2];
-  assert.match(statusRow, /main {2}feedback 3 {2}tasks 2 {2}code 1/);
+  assert.match(statusRow, /main {2}tasks 1\/2/);
+  assert.equal(statusRow.includes('feedback'), false);
+  assert.equal(statusRow.includes('code'), false);
   assert.ok(!statusRow.includes('['));
   assert.match(statusRow, /6\/17\s*$/);
   assert.ok(!statusRow.includes('untracked'));
-  const notesAt = statusRow.indexOf('feedback 3');
+  const notesAt = statusRow.indexOf('tasks 1/2');
   const ratioAt = statusRow.indexOf('6/17');
   assert.ok(notesAt < ratioAt);
   const colored = render.renderFrame(view, {
@@ -457,11 +458,11 @@ test('status line includes repo +/- totals', () => {
     color: false,
   });
   const statusRow = stripAnsi(frame.rows[frame.rows.length - 2]);
-  assert.match(statusRow, /main {2}feedback 0 {2}tasks 0 {2}code 0/);
+  assert.match(statusRow, /main {2}tasks 0\/0/);
   assert.ok(!statusRow.includes('['));
   assert.match(statusRow, /\+3\/35 {2}-1\/6 {2}1\/17\s*$/);
   assert.ok(!statusRow.includes('untracked'));
-  const notesAt = statusRow.indexOf('feedback 0');
+  const notesAt = statusRow.indexOf('tasks 0/0');
   const plusAt = statusRow.indexOf('+3/35');
   assert.ok(notesAt < plusAt);
   const colored = render.renderFrame(view, {
@@ -472,6 +473,46 @@ test('status line includes repo +/- totals', () => {
   const painted = colored.rows[colored.rows.length - 2];
   assert.ok(painted.includes(fg(THEME.addLineFg)));
   assert.ok(painted.includes(fg(THEME.delLineFg)));
+});
+
+test('npm run tasks and branches omit diff totals', () => {
+  const files = [
+    {
+      path: 'a.js',
+      status: 'unstaged',
+      remaining: 4,
+      staged: 0,
+      added: 12,
+      removed: 5,
+    },
+  ];
+  const base = {
+    files,
+    fileCursor: 0,
+    repoName: 'demo',
+    branch: 'main',
+    counts: { staged: 0, unstaged: 1 },
+    status: '',
+    scroll: 0,
+  };
+  const quiet = new Set(['npm', 'packages', 'branches']);
+  for (const pane of ['npm', 'packages', 'tasks', 'branches']) {
+    const frame = render.renderFrame(
+      { ...base, pane },
+      { width: 80, height: 10, color: false },
+    );
+    const statusRow = stripAnsi(frame.rows[frame.rows.length - 2]);
+    assert.equal(statusRow.includes('+'), false, pane);
+    assert.equal(statusRow.includes('-'), false, pane);
+    if (!quiet.has(pane)) {
+      assert.match(statusRow, /0\/4/);
+      assert.match(statusRow, /tasks 0\/0/);
+      continue;
+    }
+    assert.equal(statusRow.includes('0/4'), false, pane);
+    assert.equal(statusRow.includes('tasks'), false, pane);
+    assert.match(statusRow, /^ main\s*$/);
+  }
 });
 
 test('long operations paint an infinite progress bar', () => {
@@ -522,7 +563,7 @@ test('long operations paint an infinite progress bar', () => {
   const row = stripAnsi(frame.rows[frame.rows.length - 2]);
   const shown = render.formatBusyStatus('pulling', 0);
   const msgAt = row.indexOf(shown);
-  const leftEnd = row.indexOf('code 0') + 'code 0'.length;
+  const leftEnd = row.indexOf('tasks 0/0') + 'tasks 0/0'.length;
   const rightAt = row.lastIndexOf('0/0');
   assert.ok(msgAt > leftEnd);
   assert.ok(msgAt + visibleWidth(shown) <= rightAt);
@@ -2744,10 +2785,7 @@ test('commit review header and counts use short sha', () => {
     height: 16,
     color: false,
   });
-  assert.match(
-    frame.text,
-    /commit 7ac260c {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/,
-  );
+  assert.match(frame.text, /commit 7ac260c {2}1 {2}tasks 0\/0/);
 });
 
 test('PR review header and counts use pull request label', () => {
@@ -2776,7 +2814,7 @@ test('PR review header and counts use pull request label', () => {
     height: 16,
     color: false,
   });
-  assert.match(frame.text, /pr #123 {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/);
+  assert.match(frame.text, /pr #123 {2}1 {2}tasks 0\/0/);
 });
 
 test('MR review header and counts use merge request label', () => {
@@ -2805,7 +2843,7 @@ test('MR review header and counts use merge request label', () => {
     height: 16,
     color: false,
   });
-  assert.match(frame.text, /mr !123 {2}1 {2}feedback 0 {2}tasks 0 {2}code 0/);
+  assert.match(frame.text, /mr !123 {2}1 {2}tasks 0\/0/);
 });
 
 test('compose panel sits above status and buttons', () => {
