@@ -25,7 +25,9 @@ const { labelOf, pickGroups, titleAside } = dashTable;
 const activity = require('../lib/render/dash-activity.js');
 const { runMetrics, branchesBlock, runsBlock } = activity;
 const dashBlocks = require('../lib/render/dash-blocks.js');
-const { filesBlock, diffsBlock, npmBlock, tasksBlock } = dashBlocks;
+const { filesBlock, diffsBlock, npmBlock, npmContent, tasksBlock } = dashBlocks;
+const packagesRender = require('../lib/render/packages.js');
+const { paintBodyPackages } = packagesRender;
 const dashboardRender = require('../lib/render/dashboard.js');
 const { TILES, paintBodyDashboard } = dashboardRender;
 const dashboardSession = require('../lib/session/dashboard.js');
@@ -344,10 +346,65 @@ test('readNpmSummary counts dependencies, scripts and modules', async () => {
     assert.equal(summary.modules.bytes, 20 + lockBytes);
     assert.equal(summary.modules.count, 3);
     assert.deepEqual(summary.modules.packages, [
-      { name: 'a', bytes: 5, dev: false, version: '1.2.3' },
-      { name: 'big', bytes: 9, dev: true, version: '' },
-      { name: '@scope/pkg', bytes: 6, dev: true, version: '' },
+      {
+        name: 'a',
+        bytes: 5,
+        dev: false,
+        transitive: false,
+        chain: '',
+        version: '1.2.3',
+      },
+      {
+        name: 'big',
+        bytes: 9,
+        dev: true,
+        transitive: false,
+        chain: '',
+        version: '',
+      },
+      {
+        name: '@scope/pkg',
+        bytes: 6,
+        dev: false,
+        transitive: true,
+        chain: '',
+        version: '',
+      },
     ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readNpmSummary chains transitive packages', async () => {
+  const dir = tempDir('reslop-npm-');
+  try {
+    const manifest = { dependencies: { one: '1' } };
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
+    const modules = path.join(dir, 'node_modules');
+    for (const name of ['one', 'two', 'three']) {
+      fs.mkdirSync(path.join(modules, name), { recursive: true });
+      fs.writeFileSync(path.join(modules, name, 'i.js'), name);
+    }
+    const lock = {
+      packages: {
+        '': { dependencies: { one: '1' } },
+        'node_modules/one': { version: '1.0.0', dependencies: { two: '1' } },
+        'node_modules/two': { version: '1.0.0', dependencies: { three: '1' } },
+        'node_modules/three': { version: '1.0.0' },
+      },
+    };
+    const stamp = path.join(modules, '.package-lock.json');
+    fs.writeFileSync(stamp, JSON.stringify(lock));
+    const summary = await readNpmSummary(dir, null);
+    const byName = new Map(
+      summary.modules.packages.map((row) => [row.name, row]),
+    );
+    assert.equal(byName.get('one').transitive, false);
+    assert.equal(byName.get('one').dev, false);
+    assert.equal(byName.get('two').transitive, true);
+    assert.equal(byName.get('two').chain, 'one');
+    assert.equal(byName.get('three').chain, 'two 🢒 one');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -651,6 +708,10 @@ test('hotkeys open screens and Esc returns to the dashboard', async () => {
     press(ui, 'escape');
     assert.equal(ui.pane, 'dashboard');
     press(ui, 'n');
+    assert.equal(ui.pane, 'packages');
+    press(ui, 'escape');
+    assert.equal(ui.pane, 'dashboard');
+    press(ui, 'r');
     assert.equal(ui.pane, 'npm');
     press(ui, 'escape');
     assert.equal(ui.pane, 'dashboard');
@@ -725,6 +786,14 @@ test('a click on a tile opens its screen', async () => {
     ui.handleEvent({ type: 'mouse', kind: 'press', press: true, ...at });
     ui.handleEvent({ type: 'mouse', kind: 'release', press: false, ...at });
     assert.equal(ui.pane, 'branches');
+    ui.nav.pane = 'dashboard';
+    ui.draw();
+    const npm = ui.lastFrame.fileHits.find((h) => h.cursor === 'npm');
+    assert.ok(npm);
+    const npmAt = { x: npm.x0 + 2, y: npm.y, btn: 0, button: 0 };
+    ui.handleEvent({ type: 'mouse', kind: 'press', press: true, ...npmAt });
+    ui.handleEvent({ type: 'mouse', kind: 'release', press: false, ...npmAt });
+    assert.equal(ui.pane, 'packages');
   } finally {
     await close();
   }
@@ -1250,8 +1319,57 @@ test('the npm tile lists packages under the header counts', () => {
   };
   assert.equal(tone('name'), '');
   assert.equal(tone('size'), 'muted');
-  assert.equal(tone('big'), 'add');
-  assert.equal(tone('small'), 'sha');
+  assert.equal(tone('big'), 'dep');
+  assert.equal(tone('small'), 'dev');
+});
+
+test('the npm screen lists every package the tile cuts off', () => {
+  const packages = [];
+  for (let i = 0; i < 12; i++) {
+    packages.push({
+      name: `pkg${i}`,
+      bytes: i + 1,
+      dev: false,
+      current: '1.0.0',
+      wanted: '1.0.0',
+      latest: '1.0.0',
+    });
+  }
+  const data = {
+    ready: true,
+    hasManifest: true,
+    deps: 12,
+    dev: 0,
+    modules: { bytes: 78, count: 12, packages },
+    audit: 0,
+    outdated: 0,
+    running: '',
+  };
+  const tile = { key: 'n', title: 'npm' };
+  const ctx = { frame: 0 };
+  const block = npmBlock({ npm: data }, 48, 6, ctx, tile);
+  const full = npmContent(data, 48, null, ctx, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const short = block.lines.map(text).join('\n');
+  const complete = full.lines.map(text).join('\n');
+  assert.ok(short.includes('pkg0'));
+  assert.equal(short.includes('pkg11'), false);
+  assert.ok(complete.includes('pkg11'));
+  assert.ok(text(block.lines[0]).includes('current'));
+  assert.ok(text(full.lines[0]).includes('current'));
+  const view = {
+    packages: data,
+    packagesCursor: full.lines.length,
+    listScroll: 0,
+    progressFrame: 0,
+  };
+  const painted = paintBodyPackages(view, 48, false, 8, 1);
+  const body = painted.body.join('\n');
+  assert.match(painted.body[1], /^ {3}/);
+  assert.ok(painted.body[1].includes('current'));
+  assert.ok(body.includes('▶'));
+  assert.ok(body.includes('pkg11'));
+  assert.equal(body.includes('deps:'), false);
 });
 
 test('the npm tile shows current, wanted, and latest', () => {
@@ -1329,14 +1447,27 @@ test('the npm tile shows current, wanted, and latest', () => {
   assert.ok(labels.includes('size'));
   assert.equal(tone(heading, 'current'), 'muted');
   assert.equal(tone(heading, 'size'), 'muted');
-  assert.equal(tone(behind, 'big'), 'add');
+  assert.equal(tone(behind, 'big'), 'dep');
   assert.equal(tone(behind, '1.0.0'), 'warn');
-  assert.equal(tone(behind, '1.2.0'), 'warn');
-  assert.equal(tone(behind, '2.0.0'), 'warn');
+  assert.equal(tone(behind, '1.2.0'), 'add');
+  assert.equal(tone(behind, '2.0.0'), 'add');
   assert.equal(tone(ready, '3.1.0'), 'error');
-  assert.equal(tone(ahead, '5.0.0'), 'warn');
-  assert.equal(tone(ahead, '4.0.0'), 'muted');
-  const narrow = npmBlock(model, 36, 10, { now: 1, frame: 0 }, tile);
+  assert.equal(tone(ahead, '5.0.0'), 'add');
+  assert.equal(tone(ahead, '4.0.0'), 'warn');
+  assert.equal(body.join('\n').includes('⚠️'), false);
+  assert.equal(body.join('\n').includes('🛑'), false);
+  const screen = npmContent(model.npm, 96, null, { now: 1, frame: 0 }, tile);
+  const screenTone = (name, value) => {
+    const line = screen.lines.find((row) =>
+      row.some((part) => part.text === name),
+    );
+    const part = line.find((item) => item.text === value);
+    return part ? part.tone : '';
+  };
+  assert.equal(screenTone('big', '⚠️ outdated'), 'warn');
+  assert.equal(screenTone('small', '🛑 vulnerability detected'), 'error');
+  assert.equal(screenTone('next', '⚠️ outdated'), 'warn');
+  const narrow = npmBlock(model, 52, 10, { now: 1, frame: 0 }, tile);
   const narrowText = narrow.lines.map(text).join('\n');
   assert.match(narrowText, /big/);
   assert.match(narrowText, /2\.0\.0/);
@@ -1396,7 +1527,13 @@ test('npm packages take wanted and latest from the outdated report', () => {
     name: 'big',
     bytes: 14,
     dev: false,
+    transitive: false,
+    chain: '',
     audit: false,
+    fix: '',
+    range: '',
+    severity: '',
+    title: '',
     current: '1.0.0',
     wanted: '1.2.0',
     latest: '2.0.0',
@@ -1405,11 +1542,153 @@ test('npm packages take wanted and latest from the outdated report', () => {
     name: 'small',
     bytes: 6,
     dev: false,
+    transitive: false,
+    chain: '',
     audit: true,
+    fix: '',
+    range: '',
+    severity: 'high',
+    title: '',
     current: '3.1.0',
     wanted: '3.1.0',
     latest: '3.1.0',
   });
+});
+
+test('a fixed version is green and a still vulnerable one stays red', () => {
+  const tile = { key: 'n', title: 'npm' };
+  const model = {
+    npm: {
+      ready: true,
+      hasManifest: true,
+      deps: 1,
+      dev: 0,
+      modules: {
+        bytes: 10,
+        count: 1,
+        packages: [
+          {
+            name: 'lodash',
+            bytes: 10,
+            current: '4.17.15',
+            wanted: '4.17.20',
+            latest: '4.17.21',
+            audit: true,
+            fix: '4.17.21',
+            range: '<4.17.21',
+            severity: 'high',
+          },
+        ],
+      },
+      audit: 1,
+      outdated: 1,
+      running: '',
+    },
+  };
+  const block = npmContent(model.npm, 96, null, { now: 1, frame: 0 }, tile);
+  const row = block.lines.find((line) =>
+    line.some((part) => part.text === 'lodash'),
+  );
+  const tone = (value) => {
+    const part = row.find((item) => item.text === value);
+    return part ? part.tone : '';
+  };
+  assert.equal(tone('🛑 vulnerability detected'), 'error');
+  assert.equal(tone('⚠️ outdated'), 'warn');
+  assert.equal(tone('4.17.15'), 'error');
+  assert.equal(tone('4.17.20'), 'error');
+  assert.equal(tone('4.17.21'), 'add');
+});
+
+test('a transitive package is grey and shows its parent chain', () => {
+  const tile = { key: 'n', title: 'npm' };
+  const model = {
+    npm: {
+      ready: true,
+      hasManifest: true,
+      deps: 1,
+      dev: 1,
+      modules: {
+        bytes: 9,
+        count: 3,
+        packages: [
+          {
+            name: 'one',
+            bytes: 3,
+            dev: false,
+            transitive: false,
+            chain: '',
+            current: '1.0.0',
+            wanted: '1.0.0',
+            latest: '1.0.0',
+          },
+          {
+            name: 'eslint',
+            bytes: 3,
+            dev: true,
+            transitive: false,
+            chain: '',
+            current: '8.0.0',
+            wanted: '8.0.0',
+            latest: '8.0.0',
+          },
+          {
+            name: 'three',
+            bytes: 3,
+            dev: false,
+            transitive: true,
+            chain: 'two 🢒 one',
+            current: '1.0.0',
+            wanted: '1.0.0',
+            latest: '1.0.0',
+          },
+        ],
+      },
+      audit: 0,
+      outdated: 0,
+      running: '',
+    },
+  };
+  const block = npmBlock(model, 80, 8, { now: 1, frame: 0 }, tile);
+  const tone = (name) => {
+    const row = block.lines.find((line) =>
+      line.some((part) => part.text === name),
+    );
+    const part = row.find((item) => item.text === name);
+    return part ? part.tone : '';
+  };
+  const text = (line) => line.map((part) => part.text).join('');
+  const nested = block.lines.find((line) =>
+    line.some((part) => part.text === 'three'),
+  );
+  assert.equal(tone('one'), 'dep');
+  assert.equal(tone('eslint'), 'dev');
+  assert.equal(tone('three'), 'pkg');
+  assert.match(text(nested), /three 🢒 two 🢒 one/);
+  const chain = 'js-yaml 🢒 @eslint/eslintrc 🢒 eslint';
+  const long = {
+    ...model,
+    npm: {
+      ...model.npm,
+      modules: {
+        ...model.npm.modules,
+        packages: [
+          {
+            ...model.npm.modules.packages[2],
+            name: 'argparse',
+            chain,
+          },
+        ],
+      },
+    },
+  };
+  const tight = npmBlock(long, 72, 6, { now: 1, frame: 0 }, tile);
+  const tightRow = tight.lines
+    .find((line) => line.some((part) => part.text.startsWith('argparse')))
+    .map((part) => part.text)
+    .join('');
+  assert.match(tightRow, /argparse 🢒 js-yaml 🢒 @eslint\/eslintrc/);
+  assert.match(tightRow, /1\.0\.0/);
 });
 
 test('the tasks header shows done against the total', () => {

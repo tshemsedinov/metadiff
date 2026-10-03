@@ -474,6 +474,46 @@ test('status line includes repo +/- totals', () => {
   assert.ok(painted.includes(fg(THEME.delLineFg)));
 });
 
+test('npm run tasks and branches omit diff totals', () => {
+  const files = [
+    {
+      path: 'a.js',
+      status: 'unstaged',
+      remaining: 4,
+      staged: 0,
+      added: 12,
+      removed: 5,
+    },
+  ];
+  const base = {
+    files,
+    fileCursor: 0,
+    repoName: 'demo',
+    branch: 'main',
+    counts: { staged: 0, unstaged: 1 },
+    status: '',
+    scroll: 0,
+  };
+  const quiet = new Set(['npm', 'packages', 'branches']);
+  for (const pane of ['npm', 'packages', 'tasks', 'branches']) {
+    const frame = render.renderFrame(
+      { ...base, pane },
+      { width: 80, height: 10, color: false },
+    );
+    const statusRow = stripAnsi(frame.rows[frame.rows.length - 2]);
+    assert.equal(statusRow.includes('+'), false, pane);
+    assert.equal(statusRow.includes('-'), false, pane);
+    if (!quiet.has(pane)) {
+      assert.match(statusRow, /0\/4/);
+      assert.match(statusRow, /feedback 0 {2}tasks 0 {2}code 0/);
+      continue;
+    }
+    assert.equal(statusRow.includes('0/4'), false, pane);
+    assert.equal(statusRow.includes('feedback'), false, pane);
+    assert.match(statusRow, /^ main\s*$/);
+  }
+});
+
 test('long operations paint an infinite progress bar', () => {
   assert.equal(render.formatBusyStatus('pulled', 0), 'pulled');
   const first = render.formatBusyStatus('pulling', 0);

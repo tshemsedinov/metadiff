@@ -1072,7 +1072,7 @@ test('q quotes a diff and insert adds an npm command', () => {
     path.join(npm.cwd, 'package.json'),
     `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
   );
-  npm.session.pushInput('n');
+  npm.session.pushInput('r');
   npm.session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(npm.session.composeKind, 'npm');
   assert.equal(npm.session.npm.editField, 'name');
@@ -3926,7 +3926,155 @@ test('l toggles the theme and is typed as text while composing', () => {
   }
 });
 
-test('files pane n opens npm scripts and bins', async () => {
+test('packages screen manages dependencies', async () => {
+  const stdout = uiSink();
+  stdout.columns = 160;
+  stdout.rows = 24;
+  const { session, repo } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+    stdout,
+    outdatedMap: new Map([
+      ['leftpad', { current: '1.0.0', wanted: '1.2.0', latest: '2.0.0' }],
+    ]),
+  });
+  session.dashboard.npm = {
+    ready: true,
+    hasManifest: true,
+    deps: 1,
+    dev: 1,
+    modules: {
+      bytes: 20,
+      count: 2,
+      packages: [
+        { name: 'leftpad', bytes: 14, version: '1.0.0', dev: false },
+        { name: 'eslint', bytes: 6, version: '8.0.0', dev: true },
+      ],
+    },
+  };
+  session.dashboard.tasks.npm.request = () => {};
+  const calls = [];
+  let gate = null;
+  repo.runPackage = (cwd, args) => {
+    calls.push(args);
+    if (!gate) return Promise.resolve({ status: 0, stdout: '', stderr: '' });
+    const pending = gate;
+    gate = null;
+    return pending;
+  };
+  session.dashboard.openPackages();
+  session.draw();
+  const rows = session.lastFrame.rows.map((row) => stripAnsi(row));
+  const table = rows.slice(1, -2).join('\n');
+  const status = rows.at(-2);
+  assert.match(status, /deps: 1 {2}dev: 1 {2}all: 2 \(20\) {2}⚠️ 1/);
+  assert.equal(table.includes('deps:'), false);
+  assert.match(table, /^ {3}/m);
+  assert.match(table, /current/);
+  assert.match(table, /^ ▶ leftpad/m);
+  assert.match(rows.at(-1), /insert/);
+  assert.match(rows.at(-1), /delete/);
+  assert.match(rows.at(-1), /wanted/);
+  assert.match(rows.at(-1), /latest/);
+  let release;
+  gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  session.handleEvent({ type: 'key', key: 'w' });
+  assert.equal(session.busy, 'npm i');
+  release({ status: 0, stdout: '', stderr: '' });
+  await session.packages.job;
+  assert.deepEqual(calls[0], ['update', 'leftpad']);
+  session.handleEvent({ type: 'key', key: 'l' });
+  await session.packages.job;
+  assert.deepEqual(calls.at(-1), ['install', 'leftpad@latest']);
+  session.handleEvent({ type: 'key', key: 'j' });
+  session.handleEvent({ type: 'key', key: 'l' });
+  await session.packages.job;
+  assert.deepEqual(calls.at(-1), ['install', 'eslint@latest', '--save-dev']);
+  session.handleEvent({ type: 'key', key: 'k' });
+  session.handleEvent({ type: 'key', key: 'delete' });
+  assert.equal(session.mode, 'confirmDrop');
+  session.draw();
+  const prompt = stripAnsi(session.lastFrame.rows.at(-2));
+  assert.match(prompt, /drop leftpad\? y\/n/);
+  session.pushInput('n');
+  assert.equal(session.mode, 'review');
+  assert.equal(calls.length, 3);
+  session.handleEvent({ type: 'key', key: 'delete' });
+  session.pushInput('y');
+  await session.packages.job;
+  assert.deepEqual(calls.at(-1), ['uninstall', 'leftpad']);
+  session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(session.composeKind, 'package');
+  session.draw();
+  const editing = session.lastFrame.rows.map((row) => stripAnsi(row));
+  const editY = session.lastFrame.editHits[0].y - 1;
+  const leftY = editing.findIndex((line) => line.includes('leftpad'));
+  const eslintY = editing.findIndex((line) => line.includes('eslint'));
+  assert.equal(editY, leftY - 1);
+  assert.ok(leftY < eslintY);
+  session.pushInput('ms');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.packages.job;
+  assert.deepEqual(calls.at(-1), ['install', 'ms']);
+  session.handleEvent({ type: 'key', key: 'j' });
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.draw();
+  const devEdit = session.lastFrame.rows.map((row) => stripAnsi(row));
+  const devY = session.lastFrame.editHits[0].y - 1;
+  const leftDev = devEdit.findIndex((line) => line.includes('leftpad'));
+  const eslintDev = devEdit.findIndex((line) => line.includes('eslint'));
+  assert.ok(leftDev < devY);
+  assert.equal(devY, eslintDev - 1);
+  session.pushInput('chalk');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.packages.job;
+  assert.deepEqual(calls.at(-1), ['install', 'chalk', '--save-dev']);
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.status, 'name');
+  assert.equal(calls.length, 6);
+});
+
+test('delete refuses a transitive package', async () => {
+  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+  session.dashboard.npm = {
+    ready: true,
+    hasManifest: true,
+    deps: 1,
+    dev: 0,
+    modules: {
+      bytes: 4,
+      count: 1,
+      packages: [
+        {
+          name: 'three',
+          bytes: 4,
+          version: '1.0.0',
+          dev: false,
+          transitive: true,
+          chain: 'one 🢒 two 🢒 three',
+        },
+      ],
+    },
+  };
+  session.dashboard.tasks.npm.request = () => {};
+  session.dashboard.openPackages();
+  session.handleEvent({ type: 'key', key: 'delete' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.status, 'transitive');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.composeKind, null);
+  assert.equal(session.status, 'transitive');
+  session.draw();
+  const insert = session.lastFrame.buttons.find(
+    (hit) => hit.id === 'packageNew',
+  );
+  assert.equal(insert, undefined);
+});
+
+test('files pane r opens npm scripts and bins', async () => {
   const { session, cwd, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
@@ -3943,7 +4091,7 @@ test('files pane n opens npm scripts and bins', async () => {
     path.join(dep, 'package.json'),
     `${JSON.stringify({ name: 'leftpad', bin: { leftpad: 'bin.js' } })}\n`,
   );
-  session.pushInput('n');
+  session.pushInput('r');
   assert.equal(session.pane, 'npm');
   session.draw();
   let body = stripAnsi(session.lastFrame.rows.join('\n'));
@@ -4039,7 +4187,7 @@ test('npm output v toggles raw text until the screen closes', () => {
     onClose({ status: 1, text: raw });
     return { kill() {} };
   };
-  session.pushInput('n');
+  session.pushInput('r');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.draw();
   let body = stripAnsi(session.lastFrame.rows.join('\n'));
@@ -4102,7 +4250,7 @@ test('esc stops a running npm command and waits to leave', () => {
       },
     };
   };
-  session.pushInput('n');
+  session.pushInput('r');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.view().npmRunning, true);
   session.draw();
@@ -4186,7 +4334,7 @@ test('npm output scrolls with the editor hotkeys', () => {
     onClose({ status: 0, text: lines.join('\n') });
     return { kill() {} };
   };
-  session.pushInput('n');
+  session.pushInput('r');
   session.handleEvent({ type: 'key', key: 'enter' });
   session.draw();
   const page = logViewRows(session.lastFrame.bodyH);
@@ -4249,7 +4397,7 @@ test('npm output animates progress until the command exits', () => {
       },
     };
   };
-  session.pushInput('n');
+  session.pushInput('r');
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.view().npmRunning, true);
   assert.equal(session.progress.size(), 1);
@@ -4278,7 +4426,7 @@ test('npm screen refuses edits when read only', () => {
     path.join(cwd, 'package.json'),
     `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
   );
-  session.pushInput('n');
+  session.pushInput('r');
   session.pushInput('e');
   assert.equal(session.status, 'read only');
   assert.equal(session.mode, 'review');
@@ -4307,7 +4455,7 @@ test('double click runs the selected npm command', () => {
     onClose({ status: 0, text: '' });
     return { kill() {} };
   };
-  session.pushInput('n');
+  session.pushInput('r');
   session.draw();
   const hits = session.lastFrame.fileHits;
   assert.ok(hits.length >= 2);
@@ -4331,7 +4479,7 @@ test('delete removes the selected npm script after confirmation', () => {
       scripts: { test: 'node --test', lint: 'eslint .' },
     })}\n`,
   );
-  session.pushInput('n');
+  session.pushInput('r');
   session.draw();
   const footer = stripAnsi(session.lastFrame.rows.at(-1));
   assert.match(footer, /edit {2}insert {2}delete {2}cleanup/);
@@ -4371,7 +4519,7 @@ test('npm screen deletes logs older than 5 days', () => {
   const kept = path.join(dir, `${daysAgoStamp(5)}-test-01.log`);
   fs.writeFileSync(stale, 'abcdef');
   fs.writeFileSync(kept, 'keep');
-  session.pushInput('n');
+  session.pushInput('r');
   session.draw();
   const status = () => stripAnsi(session.lastFrame.rows.at(-2));
   assert.match(status(), /old logs 6/);
@@ -4489,7 +4637,7 @@ test('click moves the caret in commit, branch, and npm editors', () => {
     path.join(cwd, 'package.json'),
     `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
   );
-  session.pushInput('n');
+  session.pushInput('r');
   session.pushInput('e');
   assert.equal(session.editor.text, 'test');
   session.draw();
@@ -4564,7 +4712,7 @@ test('table editors scroll long lines horizontally', () => {
   showsTail('Q', 'Z');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: 'escape' });
-  session.pushInput('n');
+  session.pushInput('r');
   session.pushInput('e');
   session.editor.replace(longValue('Q', 'Z'));
   showsTail('Q', 'Z');
