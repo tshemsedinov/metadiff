@@ -31,6 +31,7 @@ Review → Plan → Repair → Verify
 - Review, renew, audit and update npm dependencies in `package.json` and the lockfile
 - Auto-update reslop patch and minor releases; confirm a new major
 - Work with git, npm and fetch in background
+- Execute review results and plan in cli agents, detect local agent, choose effort, and model
 
 ## Install
 

@@ -14,7 +14,7 @@ const { renderDocument } = reportRender;
 const reportView = require('../lib/render/report.js');
 const { renderReport } = reportView;
 const renderNpm = require('../lib/render/npm.js');
-const { paintBodyNpm, logViewRows } = renderNpm;
+const { paintBodyNpm, logViewRows, expandLogLines } = renderNpm;
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, visibleWidth, fg, THEME, CODE_FG } = ansi;
 const commands = require('../lib/npm-commands.js');
@@ -131,6 +131,17 @@ test('npm log wraps long lines instead of clipping them', () => {
   assert.ok(plain.includes('actual'));
   assert.ok(plain.includes('epsilon'));
   for (const row of pane.body) assert.equal(visibleWidth(row), 24);
+});
+
+test('wrapped log urls keep the full href for clicks', () => {
+  const href = `https://cursor.com/loginDeepControl?${'a'.repeat(60)}`;
+  const lines = expandLogLines(href, 24);
+  assert.ok(lines.length > 1);
+  assert.equal(lines.map((row) => stripAnsi(row)).join(''), href);
+  for (const row of lines) {
+    assert.ok(row.includes(`]8;;${href}`));
+    assert.ok(visibleWidth(row) <= 20);
+  }
 });
 
 const prettyView =

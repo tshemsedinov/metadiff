@@ -218,6 +218,16 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('j', 'files'), 'next');
   assert.equal(actionFromKey('k', 'files'), 'prev');
   assert.equal(actionFromKey('a', 'files'), 'add');
+  assert.equal(actionFromKey('a', 'diff'), 'add');
+  assert.equal(actionFromKey('a', 'unit'), 'add');
+  assert.equal(actionFromKey('a', 'dashboard'), 'dashAgents');
+  assert.equal(actionFromKey('a', 'npm'), 'add');
+  assert.equal(actionFromKey('m', 'agents'), 'agentModel');
+  assert.equal(actionFromKey('f', 'agents'), 'agentEffort');
+  assert.equal(actionFromKey('e', 'agents'), 'agentParams');
+  assert.equal(actionFromKey('l', 'agents'), 'agentLogin');
+  assert.equal(actionFromKey('s', 'agents'), 'agentStop');
+  assert.equal(actionFromKey('enter', 'agents'), 'open');
   assert.equal(actionFromKey('i', 'files'), 'ignore');
   assert.equal(actionFromKey('d'), 'revert');
   assert.equal(actionFromKey('r', 'files'), 'dashRun');

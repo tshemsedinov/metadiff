@@ -2,6 +2,9 @@
 
 ## [Unreleased][unreleased]
 
+- Execute review results and plan in cli agents
+- Detect local agent, choose effort, and model
+
 ## [0.2.7][] - 2026-10-03
 
 - Add tiling view for multi-repository environment

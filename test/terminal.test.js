@@ -27,6 +27,9 @@ const fakeStdin = () => {
   stdin.resume = () => {
     stdin.paused = false;
   };
+  stdin.pause = () => {
+    stdin.paused = true;
+  };
   return stdin;
 };
 
@@ -92,6 +95,35 @@ test('enter and leave restore raw mode and write term sequences', () => {
   term.leave();
   assert.equal(stdin.raw, false);
   assert.ok(stdout.dump().endsWith(LEAVE_TERM));
+});
+
+test('pause and resume restore listening after an external command', () => {
+  const { term, stdin, stdout } = openTerm();
+  let n = 0;
+  term.enter();
+  term.startListening({
+    onData: () => {
+      n += 1;
+    },
+    onResize: () => {},
+  });
+  assert.equal(stdin.listenerCount('data'), 1);
+  term.pause();
+  assert.equal(term.open, false);
+  assert.equal(stdin.raw, false);
+  assert.equal(stdin.paused, true);
+  assert.equal(stdin.listenerCount('data'), 0);
+  stdin.emit('data', 'x');
+  assert.equal(n, 0);
+  term.resume();
+  assert.equal(term.open, true);
+  assert.equal(stdin.raw, true);
+  assert.equal(stdin.paused, false);
+  assert.equal(stdin.listenerCount('data'), 1);
+  stdin.emit('data', 'x');
+  assert.equal(n, 1);
+  assert.ok(stdout.dump().includes(LEAVE_TERM));
+  assert.ok(stdout.dump().endsWith(ENTER_TERM));
 });
 
 test('repeated listen and close restore listener and timer counts', () => {

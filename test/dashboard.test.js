@@ -566,6 +566,29 @@ test('layoutTiles stacks tiles in one column on a narrow terminal', () => {
   for (const band of bands) assert.equal(band.tiles.length, 1);
 });
 
+test('wide tiles take half a row instead of a third', () => {
+  const bands = layoutTiles(120, 40, TILES);
+  const byId = new Map(TILES.map((tile) => [tile.id, tile]));
+  for (const band of bands) {
+    if (band.tiles.length < 3) continue;
+    for (const place of band.tiles) {
+      assert.equal(byId.get(place.id).size, 'normal');
+    }
+  }
+  const mid = bands.find((band) =>
+    band.tiles.some((place) => place.id === 'branches'),
+  );
+  assert.equal(mid.tiles.length, 2);
+  assert.deepEqual(
+    mid.tiles.map((place) => place.id),
+    ['branches', 'commits'],
+  );
+  const [left, right] = mid.tiles;
+  assert.equal(right.x - (left.x + left.w), GAP_X);
+  assert.ok(left.w >= 50);
+  assert.ok(right.w >= 50);
+});
+
 test('the dashboard tiles keep the canonical order and hotkeys', () => {
   const ids = TILES.map((tile) => tile.id);
   assert.deepEqual(ids, [
@@ -576,10 +599,11 @@ test('the dashboard tiles keep the canonical order and hotkeys', () => {
     'commits',
     'run',
     'npm',
+    'agents',
   ]);
   assert.deepEqual(
     TILES.map((tile) => tile.key),
-    ['f', 'd', 't', 'b', 'c', 'r', 'n'],
+    ['f', 'd', 't', 'b', 'c', 'r', 'n', 'a'],
   );
 });
 
@@ -597,6 +621,7 @@ test('dashboard hotkeys map to their blocks', () => {
   assert.equal(DASH_BLOCKS[actionFromKey('n', 'dashboard')], 'npm');
   assert.equal(DASH_BLOCKS[actionFromKey('r', 'dashboard')], 'run');
   assert.equal(DASH_BLOCKS[actionFromKey('t', 'dashboard')], 'tasks');
+  assert.equal(DASH_BLOCKS[actionFromKey('a', 'dashboard')], 'agents');
 });
 
 const openDashboard = async (rows = 40, columns = 120) => {
@@ -643,7 +668,14 @@ test('a dashboard session shows every block with live data', async () => {
     assert.equal(ui.pane, 'dashboard');
     assert.ok(await waitUntil(() => /first commit/.test(frameText(ui))));
     const text = frameText(ui);
-    for (const title of ['files', 'diffs', 'commits', 'branches', 'npm']) {
+    for (const title of [
+      'files',
+      'diffs',
+      'commits',
+      'branches',
+      'npm',
+      'agents',
+    ]) {
       assert.match(text, new RegExp(`${title}`));
     }
     assert.match(text, /run/);
@@ -728,6 +760,11 @@ test('hotkeys open screens and Esc returns to the dashboard', async () => {
     press(ui, 'escape');
     assert.equal(ui.pane, 'dashboard');
     assert.equal(ui.nav.tasksOpen, false);
+    ui.agents.listModels = async () => [];
+    press(ui, 'a');
+    assert.equal(ui.pane, 'agents');
+    press(ui, 'escape');
+    assert.equal(ui.pane, 'dashboard');
   } finally {
     await close();
   }
