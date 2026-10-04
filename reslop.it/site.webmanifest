@@ -1,7 +1,7 @@
 {
   "name": "reslop",
   "short_name": "reslop",
-  "description": "Review diff and plan changes",
+  "description": "Interactive code review and repair planning for AI-assisted changes",
   "start_url": "/",
   "display": "browser",
   "background_color": "#0c0c12",
