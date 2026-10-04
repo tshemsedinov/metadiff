@@ -357,28 +357,29 @@ test('parseNameList and parseJsonModels keep model ids', () => {
 });
 
 test('listModels tries the next command after an empty list', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-models-'));
-  const file = path.join(dir, 'agent');
-  const script = [
-    '#!/bin/sh',
-    'if [ "$1" = "--list-models" ]; then',
-    '  echo "No models available for this account."',
-    '  exit 1',
-    'fi',
-    'echo "Loading models..."',
-    'echo "auto - Auto"',
-    'echo "grok-4.6 - Grok 4.6"',
-    '',
-  ].join('\n');
-  try {
-    fs.writeFileSync(file, script);
-    fs.chmodSync(file, 0o755);
-    const spec = AGENTS.find((row) => row.id === 'cursor');
-    const names = await listModels(file, spec, { env: { PATH: dir } });
-    assert.deepEqual(names, ['auto', 'grok-4.6']);
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  const spec = AGENTS.find((row) => row.id === 'cursor');
+  const calls = [];
+  const run = async (bin, args) => {
+    calls.push([bin, ...args]);
+    if (args[0] === '--list-models') {
+      return {
+        status: 1,
+        stdout: 'No models available for this account.\n',
+        stderr: '',
+      };
+    }
+    return {
+      status: 0,
+      stdout: 'Loading models...\nauto - Auto\ngrok-4.6 - Grok 4.6\n',
+      stderr: '',
+    };
+  };
+  const names = await listModels('agent', spec, { run });
+  assert.deepEqual(names, ['auto', 'grok-4.6']);
+  assert.deepEqual(calls, [
+    ['agent', '--list-models'],
+    ['agent', 'models'],
+  ]);
 });
 
 test('agents screen cycles models from the cli catalog', async () => {
