@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>reslop — Review diff and plan changes</title>
+  <meta name="description" content="reslop: review diff and plan changes. Prepare specs for the agent. Leave feedback, add todos. Generate a plan the agent executes.">
+  <link rel="canonical" href="https://reslop.it/">
+  <meta name="theme-color" content="#e6e6ee">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="reslop">
+  <meta property="og:url" content="https://reslop.it/">
+  <meta property="og:title" content="reslop — Review diff and plan changes">
+  <meta property="og:description" content="Prepare specs for the agent. Leave feedback, add todos. Generate a plan the agent executes.">
+  <meta property="og:image" content="https://reslop.it/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="reslop — Review diff and plan changes">
+  <meta name="twitter:description" content="Prepare specs for the agent. Leave feedback, add todos. Generate a plan the agent executes.">
+  <meta name="twitter:image" content="https://reslop.it/img/og.png">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="css/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "reslop",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux, macOS, Windows",
+    "url": "https://reslop.it/",
+    "downloadUrl": "https://www.npmjs.com/package/reslop",
+    "softwareVersion": "0.0.1",
+    "license": "https://opensource.org/licenses/MIT",
+    "description": "Review diff and plan changes. Prepare specs for the agent. Leave feedback, add todos. Generate a plan the agent executes.",
+    "author": {
+      "@type": "Person",
+      "name": "Timur Shemsedinov",
+      "url": "https://github.com/tshemsedinov"
+    },
+    "codeRepository": "https://github.com/tshemsedinov/reslop"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./">
+        <span class="logo" aria-hidden="true">👁️</span>
+        <span class="name">reslop</span>
+      </a>
+      <nav class="topnav" aria-label="Primary">
+        <a href="#install"><span class="hot">i</span>nstall</a>
+        <a href="#keys"><span class="hot">k</span>eys</a>
+        <a href="https://github.com/tshemsedinov/reslop" rel="noopener noreferrer">github</a>
+        <a href="https://www.npmjs.com/package/reslop" rel="noopener noreferrer">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap-wide hero-grid">
+        <div>
+          <p class="kicker">Review diff and plan changes</p>
+          <h1>reslop</h1>
+          <p class="lede">
+            Prepare specs for the agent. Leave feedback, add todos.
+            Generate a plan the agent executes.
+          </p>
+          <p class="pair">
+            <b>AI code review</b>
+            <span class="dot" aria-hidden="true">·</span>
+            <span>review for AI-generated code</span>
+          </p>
+          <div class="cta">
+            <div class="install-chip">
+              <code>npm i -g reslop</code>
+              <button class="copy" type="button" data-copy="npm i -g reslop" aria-label="Copy install command">copy</button>
+            </div>
+            <a class="btn" href="https://github.com/tshemsedinov/reslop" rel="noopener noreferrer">GitHub</a>
+            <a class="btn btn-ghost" href="#install">Usage</a>
+          </div>
+        </div>
+
+        <div>
+          <div
+            class="tui"
+            id="tui"
+            tabindex="0"
+            data-mode="unified"
+            data-files="0"
+            data-note="1"
+            role="application"
+            aria-label="Interactive reslop review demo. Focus, then use the same keys as the terminal."
+          >
+            <div class="tui-head">
+              <span class="logo" aria-hidden="true">👁️</span>
+              <span class="chrome">reslop:</span>
+              <span class="repo">acme</span><span class="chrome">/</span>
+              <span data-path><span class="dir">lib</span><span class="chrome">/</span><span class="file">auth.js</span></span>
+              <span class="meta" data-meta> unstaged 1/3</span>
+            </div>
+            <div class="tui-body">
+              <div class="tui-files" data-files aria-label="Changed files"></div>
+              <div class="tui-diff" data-diff><div class="dl ctx"><span class="g"> </span><span class="src">  <span class="kw">function</span> <span class="fn">verify</span>(token, users) {</span></div><div class="dl ctx"><span class="g"> </span><span class="src">    <span class="kw">if</span> (!token) <span class="kw">return</span> <span class="kw">null</span>;</span></div><div class="dl del"><span class="g">-</span><span class="src">    <span class="kw">const</span> user = users.<span class="fn">find</span>(u =&gt; u.token <span class="ch">==</span> token)</span></div><div class="dl add"><span class="g">+</span><span class="src">    <span class="kw">const</span> user = users.<span class="fn">find</span>((u) =&gt; u.token <span class="ch">===</span> token);</span></div><div class="dl del"><span class="g">-</span><span class="src">    <span class="kw">if</span> (!user) <span class="kw">throw</span> <span class="ch">"unauthorized"</span></span></div><div class="dl add"><span class="g">+</span><span class="src">    <span class="kw">if</span> (!user) {</span></div><div class="dl add"><span class="g">+</span><span class="src">      <span class="kw">throw</span> <span class="ch">new Error('unauthorized')</span>;</span></div><div class="dl add"><span class="g">+</span><span class="src">    }</span></div><div class="dl ctx"><span class="g"> </span><span class="src">    <span class="kw">return</span> user;</span></div><div class="dl ctx"><span class="g"> </span><span class="src">  }</span></div></div>
+            </div>
+            <div class="tui-note" data-note>
+              <div class="cap">FEEDBACK</div>
+              <div><span class="check">[ ]</span>use strict equality - lib/auth.js:12:14:0</div>
+            </div>
+            <div class="tui-foot">
+              <button type="button" data-action="add"><span class="h">a</span>dd</button>
+              <button type="button" data-action="unstage"><span class="h">u</span>nstage</button>
+              <button type="button" data-action="revert"><span class="h">r</span>evert</button>
+              <button type="button" data-action="skip"><span class="h">s</span>kip</button>
+              <button type="button" data-action="prev"><span class="h">←</span>prev</button>
+              <button type="button" data-action="next"><span class="h">→</span>next</button>
+              <button type="button" data-action="mode" data-mode-btn="unified" aria-pressed="true"><span class="h">m</span>ode</button>
+              <button type="button" data-action="files" data-files-btn><span class="h">l</span> files</button>
+              <button type="button" data-action="feedback"><span class="h">f</span>eedback</button>
+              <button type="button" data-action="todo"><span class="h">t</span>odo</button>
+              <button type="button" data-action="quit"><span class="h">q</span>uit</button>
+              <span class="tui-msg" data-msg>click or focus, then type</span>
+            </div>
+          </div>
+          <p class="tui-hint">Same keys as the terminal. <kbd>m</kbd> cycles layout. <kbd>l</kbd> files. <kbd>f</kbd> / <kbd>t</kbd> notes. <kbd>←</kbd> <kbd>→</kbd> walk files.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Two directions. One loop.</h2>
+        <div class="loop">
+          <article class="card human">
+            <p class="who">You</p>
+            <h3>Review AI-generated code</h3>
+            <p>
+              Walk the uncommitted diff or a commit. Intra-line highlighting
+              paints the words that actually differ — even a close edit
+              inside one word. Stage, unstage, revert, or skip each block.
+            </p>
+          </article>
+          <div class="bridge" aria-hidden="true">
+            <code>.review/*.md</code>
+            <span>plan</span>
+          </div>
+          <article class="card agent">
+            <p class="who">Agent</p>
+            <h3>AI reviews, then executes</h3>
+            <p>
+              Feedback and todos land in a dated markdown file. Finish as
+              <code>ready</code>. The agent works through the checkboxes,
+              marks <code>partial</code> until every item is <code>[x]</code>.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>What it does</h2>
+        <div class="features">
+          <article class="feat">
+            <h3><span class="tag">+</span>Intra-line highlighting</h3>
+            <p>Stronger red and green on the tokens that differ. A one-character edit does not paint the whole word.</p>
+          </article>
+          <article class="feat">
+            <h3><span class="tag">+</span>Block actions</h3>
+            <p>Each contiguous hunk can be added, unstaged, reverted to HEAD, skipped, or stepped with next and prev. Commit review is read-only.</p>
+          </article>
+          <article class="feat">
+            <h3><span class="tag">+</span>Three layouts</h3>
+            <p><kbd>m</kbd> cycles unified, mixed, and side-by-side. Syntax colors sit on top of the diff paint.</p>
+          </article>
+          <article class="feat">
+            <h3><span class="tag">+</span>Plan generation</h3>
+            <p>Notes go in <code>.review/YYYY-MM-DD-NN.md</code>. A heading names the file. Todos are checkboxes. Feedback carries <code>path:old:new:block</code>.</p>
+          </article>
+          <article class="feat">
+            <h3><span class="tag">+</span>Agent contract</h3>
+            <p>Resume <code>editing</code>. Finish marks <code>ready</code>. The agent executes <code>ready</code> and <code>partial</code>, never <code>editing</code> or <code>done</code>. <code>.review/</code> is omitted from the diff list.</p>
+          </article>
+          <article class="feat">
+            <h3><span class="tag">+</span>Terminal native</h3>
+            <p>Clickable footer, drag-to-copy (OSC 52, then wl-copy / xclip / xsel). Node.js 18+, git, no runtime dependencies.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>How it works</h2>
+        <div class="steps">
+          <article class="step">
+            <h3>Open the diff</h3>
+            <p>No arguments lists files. A path opens that file. A revision that is not also a path opens that commit’s patch.</p>
+          </article>
+          <article class="step">
+            <h3>Mark the work</h3>
+            <p><kbd>f</kbd> feedback on a block. <kbd>t</kbd> a todo for the file. Autosave while you type. <kbd>⌫</kbd> removes a todo.</p>
+          </article>
+          <article class="step">
+            <h3>Finish as ready</h3>
+            <p><kbd>q</kbd> then <kbd>f</kbd> marks the review ready for the agent. <kbd>c</kbd> keeps it <code>editing</code> for next time. <kbd>-n</kbd> always starts a new file.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap plan">
+        <div>
+          <h2>The plan the agent reads</h2>
+          <p class="lede tight">
+            One file. Frontmatter status. Checkboxes the agent ticks as it goes.
+          </p>
+          <ul class="status-list">
+            <li><span class="pill">editing</span> Still writing the review in reslop</li>
+            <li><span class="pill ready">ready</span> Ready for AI to work through the checkboxes</li>
+            <li><span class="pill partial">partial</span> AI started; some items remain</li>
+            <li><span class="pill done">done</span> All items marked <code>[x]</code></li>
+          </ul>
+        </div>
+        <pre class="md" tabindex="0"><span class="fm">---
+status: ready
+---</span>
+
+<span class="h"># reslop review 2026-09-08-00</span>
+
+<span class="h">## Agent instructions</span>
+Execute reviews with `status: ready` or `status: partial`.
+Do not start `editing` or `done` review files.
+Work through unchecked items. After finishing one, mark it `[x]`.
+
+<span class="h">## lib/auth.js</span>
+
+<span class="item">- [ ] reject missing Bearer tokens</span>
+<span class="item">- [ ] use strict equality - lib/auth.js:12:14:0</span>
+
+<span class="h">## lib/session.js</span>
+
+<span class="item">- [ ] do not keep week-long cookies</span>
+<span class="ok">- [x] session maxAge is 15 minutes - lib/session.js:28:28:0</span></pre>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap">
+        <h2>Install</h2>
+        <div class="install-panel">
+          <pre><span class="c"># Node.js 18+</span>
+<span class="g">npm i -g reslop</span>
+
+<span class="c"># working tree, or a commit, or a path</span>
+<span class="g">reslop</span>
+<span class="g">reslop -n</span>
+<span class="g">reslop path/to/file</span>
+<span class="g">reslop 7ac260c</span>
+<span class="g">reslop HEAD~1 path/to/file</span>
+<span class="g">reslop --help</span></pre>
+        </div>
+        <p class="tui-hint spaced">
+          From a clone: <code>npm run enable</code> links <code>~/.local/bin/reslop</code>.
+          <code>npm run disable</code> removes it.
+        </p>
+      </div>
+    </section>
+
+    <section id="keys">
+      <div class="wrap">
+        <h2>Keys and buttons</h2>
+        <table class="keys">
+          <thead>
+            <tr><th>Key</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>a</kbd></td><td>Stage this block (<code>git add</code>)</td></tr>
+            <tr><td><kbd>u</kbd></td><td>Unstage this block (keep worktree)</td></tr>
+            <tr><td><kbd>r</kbd></td><td>Restore this block to the last commit</td></tr>
+            <tr><td><kbd>s</kbd></td><td>Skip (leave unstaged, drop from review)</td></tr>
+            <tr><td><kbd>←</kbd> <kbd>p</kbd></td><td>Previous remaining block</td></tr>
+            <tr><td><kbd>→</kbd> <kbd>n</kbd></td><td>Next remaining block</td></tr>
+            <tr><td><kbd>l</kbd></td><td>File list (git status of this scope)</td></tr>
+            <tr><td><kbd>m</kbd></td><td>Cycle unified / mixed / side-by-side</td></tr>
+            <tr><td><kbd>f</kbd></td><td>Feedback on this diff block</td></tr>
+            <tr><td><kbd>t</kbd></td><td>New todo for this file</td></tr>
+            <tr><td><kbd>⌫</kbd> <kbd>Del</kbd></td><td>Remove the selected todo</td></tr>
+            <tr><td><kbd>⏎</kbd></td><td>Open the selected file</td></tr>
+            <tr><td><kbd>q</kbd></td><td>Quit — <kbd>f</kbd> finish as ready, <kbd>c</kbd> keep editing</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Help</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <span>© 2026 Timur Shemsedinov</span>
+      <a href="https://github.com/tshemsedinov/reslop/blob/main/LICENSE" rel="noopener noreferrer">MIT</a>
+      <a href="https://github.com/tshemsedinov/reslop" rel="noopener noreferrer">GitHub</a>
+      <a href="https://www.npmjs.com/package/reslop" rel="noopener noreferrer">npm</a>
+      <a href="https://www.patreon.com/tshemsedinov" rel="noopener noreferrer">Patreon</a>
+      <span class="sp">reslop.it</span>
+    </div>
+  </footer>
+  <script src="js/site.js" defer></script>
+</body>
+</html>
