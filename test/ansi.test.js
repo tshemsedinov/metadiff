@@ -80,6 +80,17 @@ test('clipAnsi keeps color codes and cuts on visible width', () => {
   assert.ok(cut.endsWith(RESET));
 });
 
+test('hyperlink is invisible to width and stripAnsi', () => {
+  const href = 'https://cursor.com/loginDeepControl?token=abc';
+  const linked = ansi.hyperlink(href, 'https://cursor.com/login');
+  assert.equal(visibleWidth(linked), visibleWidth('https://cursor.com/login'));
+  assert.equal(stripAnsi(linked), 'https://cursor.com/login');
+  assert.ok(linked.includes(`]8;;${href}`));
+  assert.equal(clipAnsi(linked, 40), linked);
+  const ground = foregroundOn(linked, THEME.ctxBg);
+  assert.ok(ground.includes(`]8;;${href}`));
+});
+
 test('foregroundOn keeps text color and uses the given background', () => {
   const ground = bg(THEME.ctxBg);
   const text = '\x1b[1;31;41mError\x1b[0m plain';

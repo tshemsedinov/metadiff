@@ -3,3 +3,4 @@ node_modules
 .review/
 .log/
 AGENTS.md
+CLAUDE.md
