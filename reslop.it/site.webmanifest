@@ -1,0 +1,21 @@
+{
+  "name": "reslop",
+  "short_name": "reslop",
+  "description": "Review diff and plan changes",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#0c0c12",
+  "theme_color": "#e6e6ee",
+  "icons": [
+    {
+      "src": "img/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "img/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
