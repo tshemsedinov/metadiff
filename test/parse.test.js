@@ -1,10 +1,8 @@
 'use strict';
 
-const helpers = require('./helpers.js');
-const { sampleHunk } = helpers;
+const { sampleHunk } = require('./helpers.js');
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const diff = require('../lib/diff/diff.js');

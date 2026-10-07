@@ -1,14 +1,12 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const gitlab = require('../lib/gitlab.js');
-const diff = require('../lib/diff/diff.js');
+const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 const { parseGitlabMrUrl, gitlabToken, loadMergeRequest } = gitlab;
 const { mrApiUrl, discussionToNotes } = gitlab;
-const { parseDiff, itemsFromFiles } = diff;
 
 const MR = {
   host: 'gitlab.com',

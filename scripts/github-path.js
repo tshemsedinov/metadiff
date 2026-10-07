@@ -4,8 +4,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 
-const paths = require('./install-paths.js');
-const { destDir } = paths;
+const { destDir } = require('./install-paths.js');
 
 const file = process.env.GITHUB_PATH;
 if (!file) {

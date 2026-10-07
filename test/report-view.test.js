@@ -1,24 +1,18 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const helpers = require('./helpers.js');
-const { tempDir } = helpers;
-const reportParse = require('../lib/report-parse.js');
-const { buildDocument } = reportParse;
-const reportRender = require('../lib/report-render.js');
-const { renderDocument } = reportRender;
-const reportView = require('../lib/render/report.js');
-const { renderReport } = reportView;
+const { tempDir } = require('./helpers.js');
+const { buildDocument } = require('../lib/report-parse.js');
+const { renderDocument } = require('../lib/report-render.js');
+const { renderReport } = require('../lib/render/report.js');
 const renderNpm = require('../lib/render/npm.js');
 const { paintBodyNpm, logViewRows, expandLogLines } = renderNpm;
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, visibleWidth, fg, THEME, CODE_FG } = ansi;
-const commands = require('../lib/npm-commands.js');
-const { TABLE_KEY, formatTable } = commands;
+const { TABLE_KEY, formatTable } = require('../lib/npm-commands.js');
 
 const failure = (number) => [
   `not ok ${number} - comparison ${number}`,

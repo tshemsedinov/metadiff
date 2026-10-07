@@ -1,11 +1,9 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const source = require('../lib/source.js');
-const { selectChangeSource, createLoadedSource } = source;
+const { selectChangeSource, createLoadedSource } = require('../lib/source.js');
 
 test('selectChangeSource recognizes a GitHub pull request URL', () => {
   const url = 'https://github.com/acme/app/pull/123';

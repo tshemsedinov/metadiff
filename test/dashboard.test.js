@@ -1,7 +1,6 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,12 +10,10 @@ const { Tracker, RunRecorder, readRuns, settleRecord } = runs;
 const { summarizeDocument, isRunsRel, commandLabel } = runs;
 const tree = require('../lib/dashboard/tree.js');
 const { FileIndex, folderOf, extOf } = tree;
-const gitInfo = require('../lib/dashboard/git.js');
-const { readGitSummary, parseTrack } = gitInfo;
+const { readGitSummary, parseTrack } = require('../lib/dashboard/git.js');
 const dashModel = require('../lib/dashboard/model.js');
 const { scriptName, runName, buildModel, mergeRuns, groupChanges } = dashModel;
-const npmInfo = require('../lib/dashboard/npm.js');
-const { readNpmSummary } = npmInfo;
+const { readNpmSummary } = require('../lib/dashboard/npm.js');
 const tiles = require('../lib/render/tiles.js');
 const { layoutTiles, GAP_X, GAP_Y, seg, paintTile } = tiles;
 const dashTable = require('../lib/render/dash-table.js');
@@ -26,24 +23,17 @@ const activity = require('../lib/render/dash-activity.js');
 const { runMetrics, branchesBlock, runsBlock } = activity;
 const dashBlocks = require('../lib/render/dash-blocks.js');
 const { filesBlock, diffsBlock, npmBlock, npmContent, tasksBlock } = dashBlocks;
-const packagesRender = require('../lib/render/packages.js');
-const { paintBodyPackages } = packagesRender;
-const dashboardRender = require('../lib/render/dashboard.js');
-const { TILES, paintBodyDashboard } = dashboardRender;
+const { paintBodyPackages } = require('../lib/render/packages.js');
+const { TILES, paintBodyDashboard } = require('../lib/render/dashboard.js');
 const dashboardSession = require('../lib/session/dashboard.js');
 const { Dashboard, classify, ageDelay } = dashboardSession;
-const watch = require('../lib/session/watch.js');
-const { DiskWatcher, UNKNOWN_PATH } = watch;
-const actions = require('../lib/session/actions.js');
-const { actionFromKey, DASH_BLOCKS } = actions;
-const session = require('../lib/session.js');
-const { Session } = session;
-const git = require('../lib/git.js');
-const { createGitRepo } = git;
+const { DiskWatcher, UNKNOWN_PATH } = require('../lib/session/watch.js');
+const { actionFromKey, DASH_BLOCKS } = require('../lib/session/actions.js');
+const { Session } = require('../lib/session.js');
+const { createGitRepo } = require('../lib/git.js');
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, visibleWidth, THEME, bg } = ansi;
-const helpers = require('./helpers.js');
-const { makeRepo, tempDir, removeTree } = helpers;
+const { makeRepo, tempDir, removeTree } = require('./helpers.js');
 
 const wait = (ms) =>
   new Promise((resolve) => {

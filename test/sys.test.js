@@ -1,11 +1,9 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const sys = require('../lib/utilities.js');
-const { npmOpts } = sys;
+const { npmOpts } = require('../lib/utilities.js');
 
 test('npmOpts uses a shell only on Windows', () => {
   const win = npmOpts({ cwd: 'C:\\repo' }, 'win32');

@@ -1,7 +1,6 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const keys = require('../lib/keys.js');
@@ -12,8 +11,7 @@ const { FILES_TASKS_DISABLED, FILES_GIT_DISABLED } = actions;
 const { DIFF_DISABLED, TASKS_DISABLED, BRANCHES_DISABLED } = actions;
 const { COMMITS_DISABLED, UNIT_DISABLED } = actions;
 const { actionFromKey, disabledActions, DASH_IDS } = actions;
-const render = require('../lib/render/render.js');
-const { layoutButtons } = render;
+const { layoutButtons } = require('../lib/render/render.js');
 
 test('decodeChunk maps letters and arrows', () => {
   const keys = decodeChunk('ar').events.map((event) => event.key);
@@ -224,6 +222,7 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('a', 'npm'), 'add');
   assert.equal(actionFromKey('m', 'agents'), 'agentModel');
   assert.equal(actionFromKey('f', 'agents'), 'agentEffort');
+  assert.equal(actionFromKey('r', 'agents'), 'agentReview');
   assert.equal(actionFromKey('e', 'agents'), 'agentParams');
   assert.equal(actionFromKey('l', 'agents'), 'agentLogin');
   assert.equal(actionFromKey('s', 'agents'), 'agentStop');

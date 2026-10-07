@@ -1,7 +1,6 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -12,18 +11,14 @@ const { detectAgents, findBin, splitArgs, planPrompt } = agents;
 const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseNameList } = agents;
 const { parseJsonModels, commandLine, needsAuth } = agents;
-const session = require('../lib/session.js');
-const { Session } = session;
-const git = require('../lib/git.js');
-const { createGitRepo } = git;
-const helpers = require('./helpers.js');
-const { makeRepo, uiSink } = helpers;
+const { groupModels, resolveModel } = agents;
+const { Session } = require('../lib/session.js');
+const { createGitRepo } = require('../lib/git.js');
+const { makeRepo, uiSink } = require('./helpers.js');
 const render = require('../lib/render/render.js');
 const { renderFrame } = render;
-const ansi = require('../lib/ansi.js');
-const { stripAnsi } = ansi;
-const actions = require('../lib/session/actions.js');
-const { actionFromKey } = actions;
+const { stripAnsi, THEME, bg, RESET } = require('../lib/ansi.js');
+const { actionFromKey } = require('../lib/session/actions.js');
 
 const makeBin = (dir, name) => {
   const file = path.join(dir, name);
@@ -171,13 +166,27 @@ test('agents screen lists clis and starts with the review plan', async () => {
     assert.match(text, /claude/);
     assert.match(render.headerText(ui.view()), /agents/);
     ui.handleEvent({ type: 'key', key: 'm' });
+    assert.equal(ui.agents.pick.field, 'model');
+    assert.match(render.headerText(ui.view()), /agents$/);
+    ui.draw();
+    const menu = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(menu, /claude/);
+    assert.match(menu, /opencode/);
+    assert.match(menu, /sonnet/);
+    assert.equal(ui.agents.menuItems().includes('default'), false);
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.pick, null);
     assert.equal(ui.agents.choice('claude').model, 'sonnet');
     ui.draw();
     const after = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.match(after, /claude\s+sonnet\s+default\s+\.review\//);
+    assert.match(after, /\d{4}-\d{2}-\d{2}-\d+\.md {2}editing {2}\d+\/\d+/);
+    assert.equal(after.includes('default'), false);
     assert.equal(after.includes('--model'), false);
     assert.equal(after.includes('claude --'), false);
     ui.handleEvent({ type: 'key', key: 'f' });
+    assert.equal(ui.agents.pick.field, 'effort');
+    assert.equal(ui.agents.menuItems().includes('default'), false);
+    ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.choice('claude').effort, 'low');
     ui.handleEvent({ type: 'key', key: 'e' });
     assert.equal(ui.composeKind, 'agent');
@@ -382,7 +391,7 @@ test('listModels tries the next command after an empty list', async () => {
   ]);
 });
 
-test('agents screen cycles models from the cli catalog', async () => {
+test('agents screen picks a model from the list', async () => {
   const { dir, env } = fakePath('cursor-agent');
   const { ui, repo } = openUi();
   try {
@@ -397,17 +406,18 @@ test('agents screen cycles models from the cli catalog', async () => {
     assert.equal(row.id, 'cursor');
     assert.equal(row.name, 'cursor');
     assert.ok(row.models.includes('grok-4.6'));
-    let guard = 0;
-    while (ui.agents.choice('cursor').model !== 'grok-4.6') {
-      ui.handleEvent({ type: 'key', key: 'm' });
-      guard += 1;
-      assert.ok(guard < 20);
-    }
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.handleEvent({ type: 'key', key: 'g' });
+    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'o' });
+    ui.handleEvent({ type: 'key', key: 'k' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.choice('cursor').model, 'grok-4.6');
     assert.equal(ui.agents.selected().name, 'cursor');
     ui.draw();
     const text = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.match(text, /cursor\s+grok-4\.6\s+default\s+\.review\//);
+    assert.match(text, /cursor\s+grok-4\.6\s+\d{4}-\d{2}-\d{2}-\d+\.md/);
+    assert.equal(text.includes('default'), false);
     assert.equal(text.includes('cursor-agent'), false);
     assert.equal(text.includes('--print'), false);
   } finally {
@@ -438,6 +448,60 @@ test('start falls back to the latest review file', async () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].plan, `.review/${name}`);
     assert.match(calls[0].prompt, /\.review\/2020-01-01-00\.md/);
+    assert.match(calls[0].command, /\.review\/2020-01-01-00\.md$/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen runs the review file chosen in the combo', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    const reviewDir = path.join(repo.dir, '.review');
+    fs.mkdirSync(reviewDir, { recursive: true });
+    const older = '2020-01-01-00.md';
+    const newer = '2020-01-02-00.md';
+    const olderBody = [
+      '---',
+      'status: ready',
+      '---',
+      '',
+      '> a.js',
+      '',
+      '- [x] rewrite loop',
+      '- [ ] still open',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(reviewDir, older), olderBody);
+    const newerBody = '---\nstatus: partial\n---\n';
+    fs.writeFileSync(path.join(reviewDir, newer), newerBody);
+    ui.review.store.reviewPath = '';
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.handleEvent({ type: 'key', key: 'r' });
+    assert.equal(ui.agents.pick.field, 'plan');
+    assert.deepEqual(ui.agents.menuItems(), [
+      `.review/${newer}`,
+      `.review/${older}`,
+    ]);
+    ui.handleEvent({ type: 'key', key: 'down' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.pick, null);
+    ui.draw();
+    const text = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(text, new RegExp(`${older}  ready  1/2`));
+    const calls = [];
+    ui.agents.spawn = (cwd, launch) => {
+      calls.push(launch);
+      return { kill() {} };
+    };
+    ui.agents.start();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].plan, `.review/${older}`);
     assert.match(calls[0].command, /\.review\/2020-01-01-00\.md$/);
   } finally {
     ui.agents.reset();
@@ -498,6 +562,282 @@ test('agents screen runs cursor login when auth is required', async () => {
     assert.equal(ui.agents.viewing, false);
     assert.equal(ui.status, 'logging in');
     assert.equal(ui.agents.jobs.at(-1).action, 'login');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('effort encoded in a model id is chosen separately', () => {
+  const ids = [
+    'auto',
+    'composer-2.5',
+    'composer-2.5-fast',
+    'gpt-5.6-sol-high',
+    'gpt-5.6-sol-low',
+    'gpt-5.6-sol-low-fast',
+    'gpt-5.6-sol-medium',
+    'gpt-5.3-codex',
+    'gpt-5.3-codex-fast',
+    'gpt-5.3-codex-high',
+    'gpt-5.3-codex-high-fast',
+    'claude-opus-5-thinking-high',
+    'claude-opus-5-thinking-xhigh',
+    'claude-4.6-sonnet-medium-thinking',
+    'gpt-5.5-extra-high',
+    'gpt-5.5-extra-high-fast',
+  ];
+  const models = groupModels(ids);
+  const names = models.map((item) => item.model);
+  assert.ok(names.includes('gpt-5.6-sol'));
+  assert.ok(names.includes('gpt-5.6-sol-fast'));
+  assert.equal(names.includes('gpt-5.6-sol-high'), false);
+  assert.equal(names.includes('gpt-5.6-sol-low'), false);
+  const sol = models.find((item) => item.model === 'gpt-5.6-sol');
+  assert.deepEqual(sol.levels, ['low', 'medium', 'high']);
+  assert.equal(sol.ids.get('low'), 'gpt-5.6-sol-low');
+  const codex = models.find((item) => item.model === 'gpt-5.3-codex');
+  assert.ok(codex.levels.includes('default'));
+  assert.equal(codex.ids.get('default'), 'gpt-5.3-codex');
+  assert.equal(codex.ids.get('high'), 'gpt-5.3-codex-high');
+  const codexFast = models.find((item) => item.model === 'gpt-5.3-codex-fast');
+  assert.equal(codexFast.ids.get('default'), 'gpt-5.3-codex-fast');
+  assert.equal(codexFast.ids.get('high'), 'gpt-5.3-codex-high-fast');
+  const fastName = names.filter((name) => name === 'gpt-5.3-codex-fast');
+  assert.equal(fastName.length, 1);
+  const thinking = models.find(
+    (item) => item.model === 'claude-opus-5-thinking',
+  );
+  assert.deepEqual(thinking.levels, ['high', 'xhigh']);
+  const legacy = models.find(
+    (item) => item.model === 'claude-4.6-sonnet-thinking',
+  );
+  assert.equal(legacy.ids.get('medium'), 'claude-4.6-sonnet-medium-thinking');
+  const fast = models.find((item) => item.model === 'composer-2.5-fast');
+  assert.equal(fast.encoded, false);
+  const plain = models.find((item) => item.model === 'gpt-5.5');
+  assert.deepEqual(plain.levels, ['extra-high']);
+  const plainFast = models.find((item) => item.model === 'gpt-5.5-fast');
+  assert.equal(plainFast.ids.get('extra-high'), 'gpt-5.5-extra-high-fast');
+  const cursor = AGENTS.find((row) => row.id === 'cursor');
+  const row = {
+    id: cursor.id,
+    name: cursor.name,
+    bin: '/usr/bin/cursor-agent',
+    spec: cursor,
+    models: ids,
+  };
+  const low = resolveModel(row, {
+    model: 'gpt-5.6-sol',
+    effort: 'low',
+    extra: '',
+  });
+  assert.equal(low.model, 'gpt-5.6-sol-low');
+  assert.equal(low.encoded, true);
+  const launch = buildLaunch(
+    row,
+    { model: 'gpt-5.6-sol-high', effort: 'low', extra: '' },
+    '/tmp/plan.md',
+  );
+  const cmd =
+    'cursor-agent --print --trust --model gpt-5.6-sol-low /tmp/plan.md';
+  assert.equal(launch.command, cmd);
+  assert.equal(launch.command.includes('--effort'), false);
+});
+
+test('clicking the model column opens the model list', async () => {
+  const { dir, env } = fakePath('cursor-agent');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [
+      'gpt-5.6-sol-high',
+      'gpt-5.6-sol-low',
+      'auto',
+    ];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.nav.agentCursor = 2;
+    ui.draw();
+    const hit = ui.lastFrame.fileHits.find((entry) => entry.field === 'model');
+    assert.ok(hit);
+    const click = {
+      type: 'mouse',
+      button: 0,
+      btn: 0,
+      x: hit.x0 + 1,
+      y: hit.y,
+    };
+    ui.handleEvent({ ...click, kind: 'press', press: true });
+    ui.handleEvent({ ...click, kind: 'release', press: false });
+    assert.equal(ui.agents.pick.field, 'model');
+    ui.draw();
+    const text = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(text, /claude/);
+    assert.match(text, /cursor/);
+    assert.match(text, /gpt-5\.6-sol/);
+    assert.equal(text.includes('gpt-5.6-sol-high'), false);
+    assert.equal(text.includes('gpt-5.6-sol-low'), false);
+    ui.handleEvent({ type: 'key', key: 's' });
+    ui.handleEvent({ type: 'key', key: 'o' });
+    ui.handleEvent({ type: 'key', key: 'l' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.choice('cursor').model, 'gpt-5.6-sol');
+    assert.equal(ui.agents.choice('cursor').effort, 'high');
+    ui.handleEvent({ type: 'key', key: 'f' });
+    assert.deepEqual(ui.agents.menuItems(), ['low', 'high']);
+    ui.handleEvent({ type: 'key', key: 'up' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.choice('cursor').effort, 'low');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('model menu uses background and a right scroller', async () => {
+  const { dir, env } = fakePath('cursor-agent');
+  const repo = makeRepo();
+  repo.write('a.js', 'ok\n');
+  repo.git(['add', '.']);
+  repo.git(['commit', '-m', 'init']);
+  const ui = new Session({
+    cwd: repo.dir,
+    stdout: uiSink(),
+    repo: createGitRepo(),
+    color: true,
+    startPane: 'dashboard',
+  });
+  ui.ensureRepo();
+  ui.load();
+  try {
+    const models = Array.from({ length: 16 }, (_, i) => `model-${i}`);
+    ui.agents.listModels = async (bin, spec) =>
+      spec.id === 'cursor' ? models : [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.nav.agentCursor = 2;
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.draw();
+    const plain = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.equal(plain.includes('┌'), false);
+    assert.equal(plain.includes('│'), false);
+    assert.equal(plain.includes('─'), false);
+    assert.equal(plain.includes('▸'), false);
+    const thumb = bg(THEME.taskHeadBg);
+    const track = bg(THEME.buttonBg);
+    const menuRows = () =>
+      ui.lastFrame.rows.filter(
+        (row) =>
+          row.includes(bg(THEME.noteBg)) || row.includes(bg(THEME.checkBg)),
+      );
+    const open = menuRows();
+    assert.match(plain, /model-0/);
+    assert.ok(open.length > 1);
+    assert.ok(open.some((row) => row.includes(bg(THEME.checkBg))));
+    assert.ok(open.some((row) => row.includes(bg(THEME.noteBg))));
+    assert.ok(open.some((row) => row.includes(thumb)));
+    assert.ok(open.some((row) => row.includes(track)));
+    const thumbAt = open.findIndex((row) => row.includes(thumb));
+    ui.handleEvent({ type: 'key', key: 'end' });
+    ui.draw();
+    const scrolled = menuRows();
+    const nextAt = scrolled.findIndex((row) => row.includes(thumb));
+    assert.ok(nextAt > thumbAt);
+    assert.ok(scrolled.at(-1).includes(thumb));
+    assert.equal(scrolled[0].includes(thumb), false);
+    const itemFace = (row) => {
+      const mark = row.includes(bg(THEME.checkBg))
+        ? bg(THEME.checkBg)
+        : bg(THEME.noteBg);
+      const at = row.indexOf(mark);
+      const start = row.indexOf('m', at) + 1;
+      const end = row.indexOf(RESET, start);
+      return row.slice(start, end);
+    };
+    assert.match(itemFace(open.find((row) => row.includes(thumb))), /^ /);
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    ui.handleEvent({ type: 'key', key: 'f' });
+    ui.draw();
+    const effort = menuRows();
+    assert.ok(effort.length > 1);
+    assert.equal(
+      effort.some((row) => row.includes(thumb)),
+      false,
+    );
+    const low = itemFace(effort.find((row) => stripAnsi(row).includes('low')));
+    assert.match(low, /^ /);
+    assert.match(low, / $/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen remembers model and effort in .reslop', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.handleEvent({ type: 'key', key: 'f' });
+    ui.handleEvent({ type: 'key', key: 'down' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.choice('claude').model, 'sonnet');
+    assert.equal(ui.agents.choice('claude').effort, 'medium');
+    const file = path.join(repo.dir, '.reslop');
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(saved.agents.claude, {
+      model: 'sonnet',
+      effort: 'medium',
+    });
+    ui.agents.choices = new Map();
+    ui.agents.refresh(env);
+    assert.equal(ui.agents.choice('claude').model, 'sonnet');
+    assert.equal(ui.agents.choice('claude').effort, 'medium');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen lists runs for the selected model', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.agents.spawn = () => ({ kill() {} });
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    ui.draw();
+    const lines = stripAnsi(ui.lastFrame.rows.join('\n')).split('\n');
+    const live = (row) => /claude/.test(row) && /running/.test(row);
+    assert.ok(lines.some(live));
+    assert.match(ui.agents.jobs[0].command, /claude --model sonnet/);
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.handleEvent({ type: 'key', key: 'down' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.draw();
+    const opus = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.equal(opus.includes('running'), false);
+    ui.handleEvent({ type: 'key', key: 'm' });
+    ui.handleEvent({ type: 'key', key: 'up' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.handleEvent({ type: 'key', key: 'right' });
+    assert.equal(ui.agents.focus, 'runs');
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.viewing, true);
+    assert.equal(ui.agents.viewId, ui.agents.jobs[0].id);
   } finally {
     ui.agents.reset();
     repo.cleanup();

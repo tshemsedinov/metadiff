@@ -1,14 +1,11 @@
 'use strict';
 
-const helpers = require('./helpers.js');
-const { sampleHunk, reviewView } = helpers;
+const { sampleHunk, reviewView } = require('./helpers.js');
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const diff = require('../lib/diff/diff.js');
-const { displayLines } = diff;
+const { displayLines } = require('../lib/diff/diff.js');
 const render = require('../lib/render/render.js');
 const { REPO_TASKS_LABEL } = require('../lib/files.js');
 const wrap = require('../lib/wrap.js');

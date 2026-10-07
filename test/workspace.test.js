@@ -1,42 +1,29 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const childProcess = require('node:child_process');
-const { spawnSync } = childProcess;
+const { spawnSync } = require('node:child_process');
 
 const workspace = require('../lib/workspace.js');
 const { workspaceAt, sumNumstat, readDiffStat } = workspace;
-const gitLib = require('../lib/git.js');
-const { load } = gitLib;
-const fileLib = require('../lib/files.js');
-const { fileEntries, fileTotals } = fileLib;
+const { load } = require('../lib/git.js');
+const { fileEntries, fileTotals } = require('../lib/files.js');
 const { countCommits, taskStats, pickRun } = workspace;
 const tiles = require('../lib/render/tiles.js');
 const { equalGrid, pageWindow, placeEqualTiles } = tiles;
-const table = require('../lib/render/dash-table.js');
-const { size } = table;
-const repos = require('../lib/render/repos.js');
-const { paintBodyRepos } = repos;
-const render = require('../lib/render/render.js');
-const { renderFrame } = render;
+const { size } = require('../lib/render/dash-table.js');
+const { paintBodyRepos } = require('../lib/render/repos.js');
+const { renderFrame } = require('../lib/render/render.js');
 const ansi = require('../lib/ansi.js');
 const { stripAnsi } = ansi;
-const actions = require('../lib/session/actions.js');
-const { actionFromKey } = actions;
-const filesPane = require('../lib/session/files-pane.js');
-const { onEscape } = filesPane;
-const cli = require('../lib/cli.js');
-const { run, loadSession, parseArgv } = cli;
-const reviewLib = require('../lib/review.js');
-const { createStore, addTask, flushReview } = reviewLib;
-const runs = require('../lib/runs.js');
-const { RunRecorder } = runs;
-const helpers = require('./helpers.js');
-const { sink, tempDir, removeTree } = helpers;
+const { actionFromKey } = require('../lib/session/actions.js');
+const { onEscape } = require('../lib/session/files-pane.js');
+const { run, loadSession, parseArgv } = require('../lib/cli.js');
+const { createStore, addTask, flushReview } = require('../lib/review.js');
+const { RunRecorder } = require('../lib/runs.js');
+const { sink, tempDir, removeTree } = require('./helpers.js');
 
 const gitEnv = {
   ...process.env,

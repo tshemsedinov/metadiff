@@ -1,13 +1,11 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const remote = require('../lib/remote.js');
 const { RemoteClient, parseLinkNext, parseNextPage, noteFromLocation } = remote;
-const diff = require('../lib/diff/diff.js');
-const { parseDiff, itemsFromFiles } = diff;
+const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 
 const DIFF = `diff --git a/lib/parser.js b/lib/parser.js
 index 1111111..2222222 100644
