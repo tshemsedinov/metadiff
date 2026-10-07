@@ -407,8 +407,8 @@ test('listModels tries the next command after an empty list', async () => {
       stderr: '',
     };
   };
-  const names = await listModels('agent', spec, { run });
-  assert.deepEqual(names, ['auto', 'grok-4.6']);
+  const listed = await listModels('agent', spec, { run });
+  assert.deepEqual(listed.names, ['auto', 'grok-4.6']);
   assert.deepEqual(calls, [
     ['agent', '--list-models'],
     ['agent', 'models'],
