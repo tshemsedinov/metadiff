@@ -1094,25 +1094,27 @@ test('diff activity scrolls minutes left and blinks the current one', () => {
     assert.equal(visibleWidth(part.text), 1);
   }
   assert.ok(footer.indexOf('◉') < footer.indexOf('+'));
-  assert.equal(footer.endsWith('∙'), true);
-  assert.equal(block.footer.at(-4).bg, null);
-  assert.deepEqual(block.footer.at(-1).bg, THEME.heat4);
+  assert.equal(footer.endsWith(' '), true);
+  assert.equal(block.footer.at(-2).text, '∙');
+  assert.equal(block.footer[1].text, ' ');
+  assert.equal(block.footer.at(-1).text, ' ');
+  for (const part of block.footer) {
+    assert.equal(part.bg, null);
+  }
   const flash = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
-  assert.deepEqual(flash.footer.at(-1).bg, THEME.heatBlink);
+  assert.equal(flash.footer.at(-2).text, '█');
+  assert.equal(flash.footer.at(-2).tone, 'blink');
   const painted = paintTile(tile, flash, 40, 6, true);
   const row = painted.at(-1);
   const plain = stripAnsi(row);
-  assert.equal(flash.footer.at(-1).text, '◎');
   assert.equal(visibleWidth(plain), 40);
-  assert.equal(plain.endsWith('◎'), true);
-  assert.equal(/\s/.test(row.slice(row.lastIndexOf('◎'))), false);
-  assert.ok(row.includes(bg(THEME.heatBlink)));
+  assert.equal(plain.endsWith('█ '), true);
   model.diffs.activity.live = false;
   const done = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
-  assert.equal(done.footer.at(-1).text, 'x');
+  assert.equal(done.footer.at(-2).text, 'x');
 });
 
-test('diff activity background runs from the first minute to now', () => {
+test('diff activity keeps a foreground-only timeline with edge gaps', () => {
   const minute = 60_000;
   const now = 5 * minute;
   const totals = {
@@ -1141,20 +1143,15 @@ test('diff activity background runs from the first minute to now', () => {
   };
   const tile = { key: 'd', title: 'diffs' };
   const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
-  const before = block.footer.at(-5);
-  const open = block.footer.at(-4);
-  const gap = block.footer.at(-3);
-  const mark = block.footer.at(-2);
-  const end = block.footer.at(-1);
-  assert.equal(before.bg, null);
-  assert.equal(open.text, '◉');
-  assert.deepEqual(open.bg, THEME.heat1);
-  assert.equal(gap.text, ' ');
-  assert.deepEqual(gap.bg, THEME.heatTrack);
-  assert.equal(mark.text, '*');
-  assert.deepEqual(mark.bg, THEME.heatTrack);
-  assert.equal(end.text, ' ');
-  assert.deepEqual(end.bg, THEME.heatTrack);
+  const timeline = block.footer.slice(1).map((part) => part.text).join('');
+  assert.equal(timeline[0], ' ');
+  assert.equal(timeline.at(-1), ' ');
+  assert.ok(timeline.includes('◉'));
+  assert.ok(timeline.includes('*'));
+  assert.ok(timeline.includes('─'));
+  for (const part of block.footer) {
+    assert.equal(part.bg, null);
+  }
 });
 
 test('diff activity marks removals and pulses the current minute', () => {
@@ -1191,15 +1188,16 @@ test('diff activity marks removals and pulses the current minute', () => {
   const footer = text(quiet.footer);
   assert.ok(footer.includes('!'));
   assert.ok(footer.indexOf('!') < footer.indexOf('-'));
-  assert.equal(quiet.footer.at(-1).text, '∙');
+  assert.equal(quiet.footer.at(-2).text, '∙');
+  assert.equal(quiet.footer.at(-1).text, ' ');
   const low = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
-  assert.equal(low.footer.at(-1).text, '◦');
+  assert.equal(low.footer.at(-2).text, '◦');
   model.diffs.activity.minutes[2].level = 90;
   const high = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
-  assert.equal(high.footer.at(-1).text, '•');
+  assert.equal(high.footer.at(-2).text, '•');
   model.diffs.activity.minutes[2].level = 400;
   const top = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
-  assert.equal(top.footer.at(-1).text, '◎');
+  assert.equal(top.footer.at(-2).text, '█');
 });
 
 test('diff rows keep removals when the tile is narrow', () => {

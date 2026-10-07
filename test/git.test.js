@@ -490,23 +490,23 @@ test('load root commit via diff-tree', () => {
   }
 });
 
-test('load omits files under .review', () => {
+test('load omits files under .plan', () => {
   const repo = makeRepo();
   try {
     repo.write('keep.txt', 'k\n');
     repo.git(['add', 'keep.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('keep.txt', 'K\n');
-    repo.write('.review/2026-09-07-00.md', '---\nstatus: editing\n---\n');
-    repo.write('.review/templates.json', '[]\n');
+    repo.write('.plan/2026-09-07-00.md', '---\nstatus: editing\n---\n');
+    repo.write('.plan/templates.json', '[]\n');
     const dirty = load(repo.dir);
     const dirtyPaths = dirty.items.map((item) => item.file.newPath);
     assert.deepEqual(dirtyPaths, ['keep.txt']);
-    repo.git(['add', '.review/2026-09-07-00.md']);
+    repo.git(['add', '.plan/2026-09-07-00.md']);
     const mixed = load(repo.dir);
     for (const item of mixed.items) {
       const rel = item.file.newPath || item.file.oldPath;
-      assert.equal(rel.startsWith('.review'), false);
+      assert.equal(rel.startsWith('.plan'), false);
     }
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'notes']);
@@ -514,7 +514,7 @@ test('load omits files under .review', () => {
     const committed = load(repo.dir, [], { commit: sha });
     for (const item of committed.items) {
       const rel = item.file.newPath || item.file.oldPath;
-      assert.equal(rel.startsWith('.review'), false);
+      assert.equal(rel.startsWith('.plan'), false);
     }
   } finally {
     repo.cleanup();

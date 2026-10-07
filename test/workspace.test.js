@@ -302,7 +302,7 @@ test('opening a folder of repositories starts on repo tiles', async () => {
     initRepo(alpha);
     initRepo(beta);
     fs.appendFileSync(path.join(alpha, 'app.js'), 'next\n');
-    const store = createStore(path.join(alpha, '.review', '2026-10-02-01.md'));
+    const store = createStore(path.join(alpha, '.plan', '2026-10-02-01.md'));
     addTask(store, 'TODOs', 'ship tiles', false, 'backlog');
     addTask(store, 'TODOs', 'check diffs', false, 'issues');
     flushReview(store, true);

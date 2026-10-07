@@ -19,11 +19,11 @@ test('allocateReviewPath uses 00 then 01 on the same day', () => {
   const date = new Date(2026, 8, 7);
   const dir = '/repo';
   const first = allocateReviewPath(dir, date, []);
-  assert.equal(first, path.join('/repo', '.review', '2026-09-07-00.md'));
+  assert.equal(first, path.join('/repo', '.plan', '2026-09-07-00.md'));
   const second = allocateReviewPath(dir, date, ['2026-09-07-00.md']);
-  assert.equal(second, path.join('/repo', '.review', '2026-09-07-01.md'));
+  assert.equal(second, path.join('/repo', '.plan', '2026-09-07-01.md'));
   const other = allocateReviewPath(dir, date, ['2026-09-06-09.md']);
-  assert.equal(other, path.join('/repo', '.review', '2026-09-07-00.md'));
+  assert.equal(other, path.join('/repo', '.plan', '2026-09-07-00.md'));
 });
 
 test('latestReviewName picks the newest date then index', () => {
@@ -46,7 +46,7 @@ test('resolveReviewPath resumes editing and starts new otherwise', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
     const date = new Date(2026, 8, 7);
-    const folder = path.join(dir, '.review');
+    const folder = path.join(dir, '.plan');
     fs.mkdirSync(folder);
     const current = path.join(folder, '2026-09-07-00.md');
     const names = ['2026-09-07-00.md'];
@@ -60,10 +60,7 @@ test('resolveReviewPath resumes editing and starts new otherwise', () => {
     writeStatus('ready');
     const ready = resolveReviewPath(dir, date, names);
     assert.equal(ready.resume, false);
-    assert.equal(
-      ready.reviewPath,
-      path.join(dir, '.review', '2026-09-07-01.md'),
-    );
+    assert.equal(ready.reviewPath, path.join(dir, '.plan', '2026-09-07-01.md'));
     writeStatus('pending');
     assert.equal(resolveReviewPath(dir, date, names).resume, false);
     writeStatus('partial');
@@ -75,7 +72,7 @@ test('resolveReviewPath resumes editing and starts new otherwise', () => {
     assert.equal(forced.resume, false);
     assert.equal(
       forced.reviewPath,
-      path.join(dir, '.review', '2026-09-07-01.md'),
+      path.join(dir, '.plan', '2026-09-07-01.md'),
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -134,7 +131,7 @@ test('rememberTemplate increments when reused on a new hunk', () => {
 });
 
 test('serializeReview groups todos then feedback with position', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   addTask(store, 'lib/session.js', 'rewrite the retry loop');
   setFeedback(store, 'unstaged:lib/session.js:84:84:0', {
     file: 'lib/session.js',
@@ -163,7 +160,7 @@ test('serializeReview groups todos then feedback with position', () => {
 });
 
 test('serializeReview writes ready when status is ready', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   store.status = 'ready';
   addTask(store, 'a.js', 'follow up');
   const md = serializeReview(store);
@@ -189,7 +186,7 @@ test('parseFrontmatterStatus maps pending to ready', () => {
 });
 
 test('parseReview restores todos and feedback keys', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   addTask(store, 'lib/session.js', 'rewrite the retry loop');
   const key = 'lib/session.js:84:84:0';
   setFeedback(store, key, {
@@ -231,7 +228,7 @@ test('parseReview reads the old HTML comment feedback format', () => {
     '- [ ] old note',
     '',
   ].join('\n');
-  const loaded = parseReview(md, '/repo/.review/x.md');
+  const loaded = parseReview(md, '/repo/.plan/x.md');
   const note = loaded.feedback.get('lib/database.js:41:41:0');
   assert.equal(note.text, 'old note');
   assert.equal(note.file, 'lib/database.js');
@@ -255,7 +252,7 @@ test('parseReview keeps checked todos and feedback', () => {
     '- [X] extract helper - a.js:1:1:0',
     '',
   ].join('\n');
-  const loaded = parseReview(md, '/repo/.review/x.md');
+  const loaded = parseReview(md, '/repo/.plan/x.md');
   assert.equal(loaded.tasks[0].done, true);
   assert.equal(loaded.tasks[0].text, 'rewrite loop');
   assert.equal(loaded.tasks[1].done, false);
@@ -270,7 +267,7 @@ test('parseReview keeps checked todos and feedback', () => {
 
 test('noteCounts counts filled feedback todos and code', () => {
   const empty = { feedback: 0, tasks: 0, tasksDone: 0, code: 0 };
-  const store = createStore('/repo/.review/x.md');
+  const store = createStore('/repo/.plan/x.md');
   assert.deepEqual(noteCounts(null), empty);
   assert.deepEqual(noteCounts(store), empty);
   addTask(store, 'a.js', '');
@@ -308,7 +305,7 @@ test('noteCounts counts filled feedback todos and code', () => {
 });
 
 test('empty text is omitted from markdown and hasNotes', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   addTask(store, 'a.js', '   ');
   setFeedback(store, 'k', {
     file: 'a.js',
@@ -386,7 +383,7 @@ test('setTaskText deletes empty todos without template history', () => {
 test('flushReview writes markdown and templates when notes exist', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
-    const reviewPath = path.join(dir, '.review', '2026-09-07-00.md');
+    const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
     const store = createStore(reviewPath);
     setFeedback(store, 'k', {
       file: 'a.js',
@@ -410,7 +407,7 @@ test('flushReview writes markdown and templates when notes exist', () => {
 test('flushReview merges disk todos instead of overwriting', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
-    const reviewPath = path.join(dir, '.review', '2026-09-07-00.md');
+    const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
     const store = createStore(reviewPath);
     addTask(store, 'TODOs', 'alpha');
     const beta = addTask(store, 'TODOs', 'beta');
@@ -448,7 +445,7 @@ test('flushReview merges disk todos instead of overwriting', () => {
 test('flushReview skips write when there are no notes', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
-    const reviewPath = path.join(dir, '.review', '2026-09-07-00.md');
+    const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
     const store = createStore(reviewPath);
     store.dirty = true;
     const wrote = flushReview(store);
@@ -478,7 +475,7 @@ test('parseReview keeps tasks from the previous section names', () => {
     '',
     '- [ ] crash',
   ].join('\n');
-  const loaded = parseReview(md, '/repo/.review/x.md');
+  const loaded = parseReview(md, '/repo/.plan/x.md');
   const kindOf = (text) => loaded.tasks.find((item) => item.text === text).kind;
   assert.equal(kindOf('old'), 'debt');
   assert.equal(kindOf('follow up'), 'debt');
@@ -488,7 +485,7 @@ test('parseReview keeps tasks from the previous section names', () => {
 
 test('parseReview reads a legacy TODOs heading as technical debt', () => {
   const md = '---\nstatus: editing\n---\n\n## TODOs\n\n- [ ] keep\n';
-  const loaded = parseReview(md, '/repo/.review/x.md');
+  const loaded = parseReview(md, '/repo/.plan/x.md');
   assert.equal(loaded.tasks[0].file, 'TODOs');
   assert.equal(loaded.tasks[0].text, 'keep');
   assert.equal(loaded.tasks[0].kind, 'debt');
@@ -615,7 +612,7 @@ test('applyImportedNotes keeps feedback open if any comment is open', () => {
 });
 
 test('imported feedback serializes reviewer and location once', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   applyImportedNotes(store, {
     feedback: [
       {
@@ -641,7 +638,7 @@ test('imported feedback serializes reviewer and location once', () => {
 });
 
 test('serializeReview writes fenced code proposals', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   setCode(store, 'a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
@@ -660,7 +657,7 @@ test('serializeReview writes fenced code proposals', () => {
 });
 
 test('code proposal with fence markers uses a longer fence', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   setCode(store, 'a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
@@ -675,7 +672,7 @@ test('code proposal with fence markers uses a longer fence', () => {
 });
 
 test('empty code proposal still counts as a note', () => {
-  const store = createStore('/repo/.review/2026-09-07-00.md');
+  const store = createStore('/repo/.plan/2026-09-07-00.md');
   setCode(store, 'a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
