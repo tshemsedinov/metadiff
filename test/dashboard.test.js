@@ -32,7 +32,7 @@ const { actionFromKey, DASH_BLOCKS } = require('../lib/session/actions.js');
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
 const ansi = require('../lib/ansi.js');
-const { stripAnsi, visibleWidth, THEME, bg } = ansi;
+const { stripAnsi, visibleWidth } = ansi;
 const { makeRepo, tempDir, removeTree } = require('./helpers.js');
 
 const wait = (ms) =>
@@ -1143,7 +1143,10 @@ test('diff activity keeps a foreground-only timeline with edge gaps', () => {
   };
   const tile = { key: 'd', title: 'diffs' };
   const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
-  const timeline = block.footer.slice(1).map((part) => part.text).join('');
+  const timeline = block.footer
+    .slice(1)
+    .map((part) => part.text)
+    .join('');
   assert.equal(timeline[0], ' ');
   assert.equal(timeline.at(-1), ' ');
   assert.ok(timeline.includes('◉'));
