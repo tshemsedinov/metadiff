@@ -29,6 +29,8 @@ test('decodeChunk maps letters and arrows', () => {
   assert.equal(back.key, 'backspace');
   const tab = decodeChunk('\t').events[0];
   assert.equal(tab.key, 'tab');
+  const backTab = decodeChunk('\x1b[Z').events[0];
+  assert.equal(backTab.key, 'shift-tab');
   const save = decodeChunk('\x13').events[0];
   assert.equal(save.key, 'ctrl-s');
   const undo = decodeChunk('\x1a').events[0];
@@ -221,9 +223,10 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('a', 'dashboard'), 'dashAgents');
   assert.equal(actionFromKey('a', 'npm'), 'add');
   assert.equal(actionFromKey('m', 'agents'), 'agentModel');
-  assert.equal(actionFromKey('f', 'agents'), 'agentEffort');
+  assert.equal(actionFromKey('e', 'agents'), 'agentEffort');
+  assert.equal(actionFromKey('a', 'agents'), 'agentFast');
+  assert.equal(actionFromKey('o', 'agents'), 'agentContext');
   assert.equal(actionFromKey('r', 'agents'), 'agentReview');
-  assert.equal(actionFromKey('e', 'agents'), 'agentParams');
   assert.equal(actionFromKey('l', 'agents'), 'agentLogin');
   assert.equal(actionFromKey('s', 'agents'), 'agentStop');
   assert.equal(actionFromKey('enter', 'agents'), 'open');

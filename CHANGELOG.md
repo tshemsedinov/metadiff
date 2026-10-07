@@ -3,8 +3,10 @@
 ## [Unreleased][unreleased]
 
 - Execute review results and plan in cli agents
-- Detect local agent, choose effort, and model
-- Add ".reslop" config file
+- Detect available agents and choose its model, effort, context
+- Save agent settings `.reslop`
+- Show agent execution and progress
+- Rename `.review` to `.plan`
 
 ## [0.2.7][] - 2026-10-03
 

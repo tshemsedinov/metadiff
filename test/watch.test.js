@@ -158,7 +158,7 @@ test('events for paths untouched since watch start are stale', async () => {
 });
 
 test('ignoredRel skips review, modules, and git internals', () => {
-  assert.equal(ignoredRel('.review/x.md'), true);
+  assert.equal(ignoredRel('.plan/x.md'), true);
   assert.equal(ignoredRel('node_modules/x'), true);
   assert.equal(ignoredRel('.git/objects/aa'), true);
   assert.equal(ignoredRel('.git/index.lock'), true);
@@ -186,8 +186,8 @@ test('own directory event is not a file change', () => {
 test('review markdown notifies onReview and not onChange', async () => {
   const cwd = tempDir('reslop-watch-');
   fs.mkdirSync(path.join(cwd, '.git'));
-  fs.mkdirSync(path.join(cwd, '.review'));
-  const file = path.join(cwd, '.review', '2026-09-23-00.md');
+  fs.mkdirSync(path.join(cwd, '.plan'));
+  const file = path.join(cwd, '.plan', '2026-09-23-00.md');
   fs.writeFileSync(file, '---\nstatus: editing\n---\n');
   let changes = 0;
   let reviews = 0;
@@ -452,8 +452,8 @@ for (const recursive of [false, true]) {
 test('disk watcher keeps a code change during a review write', async () => {
   const cwd = tempDir('reslop-watch-');
   fs.mkdirSync(path.join(cwd, '.git'));
-  fs.mkdirSync(path.join(cwd, '.review'));
-  const review = path.join(cwd, '.review', '2026-09-23-00.md');
+  fs.mkdirSync(path.join(cwd, '.plan'));
+  const review = path.join(cwd, '.plan', '2026-09-23-00.md');
   const code = path.join(cwd, 'a.js');
   fs.writeFileSync(review, '---\nstatus: editing\n---\n');
   fs.writeFileSync(code, 'x\n');

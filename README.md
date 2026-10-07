@@ -66,7 +66,7 @@ Run the full check with `npm t`. Run one or more test files with `reslop t -- no
 
 `reslop t` records each run in `.log/.runs/` so that the dashboard can show commands started by an agent in another terminal.
 
-Reviews go in `.review/YYYY-MM-DD-NN.md` with frontmatter `status`:
+Reviews go in `.plan/YYYY-MM-DD-NN.md` with frontmatter `status`:
 
 - `editing`: still writing the review in reslop
 - `ready`: ready for AI to work through the checkboxes
