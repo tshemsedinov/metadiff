@@ -1,31 +1,25 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const deps = require('../lib/deps.js');
-const depsDiff = require('../lib/deps-diff.js');
+const { diffSections, mergeResolved } = require('../lib/deps-diff.js');
 const manifest = require('../lib/manifest.js');
-const diff = require('../lib/diff/diff.js');
+const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 const git = require('../lib/git.js');
 const gitDeps = require('../lib/git-deps.js');
 const { proposedNpmPlan } = gitDeps;
 const render = require('../lib/render/render.js');
-const session = require('../lib/session.js');
-const { Session } = session;
+const { Session } = require('../lib/session.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { realpathSync } = fs;
-const helpers = require('./helpers.js');
-const { makeRepo, sink } = helpers;
-const ansi = require('../lib/ansi.js');
-const { stripAnsi, THEME, bg } = ansi;
-const { parseDiff, itemsFromFiles } = diff;
+const { makeRepo, sink } = require('./helpers.js');
+const { stripAnsi, THEME, bg } = require('../lib/ansi.js');
 const { load, loadExtras, addItem, unstageItem, revertItem } = git;
 const { foldDepItems, collectUsedNames, parseAuditReport } = deps;
 const { parseOutdatedReport, proposeDepItems, mergeProposedItems } = deps;
-const { diffSections, mergeResolved } = depsDiff;
 const { readSections, lockEntries, lockPackageCount } = manifest;
 const { mergeDepFile, applyWantedRange, patchedFromRange } = manifest;
 

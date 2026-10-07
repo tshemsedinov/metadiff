@@ -1,16 +1,13 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const npm = require('../lib/npm-commands.js');
-const ansi = require('../lib/ansi.js');
-const { stripAnsi } = ansi;
-const helpers = require('./helpers.js');
-const { tempDir } = helpers;
+const { stripAnsi } = require('../lib/ansi.js');
+const { tempDir } = require('./helpers.js');
 
 const { listCommands, reduceOutput, logFileName } = npm;
 const { nextLogFile, saveLogs } = npm;

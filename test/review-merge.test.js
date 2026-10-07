@@ -1,11 +1,9 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const reviewMerge = require('../lib/review-merge.js');
-const { captureBaseline, mergeReview } = reviewMerge;
+const { captureBaseline, mergeReview } = require('../lib/review-merge.js');
 
 const todo = (id, text, done = false) => ({ id, file: 'TODO', text, done });
 

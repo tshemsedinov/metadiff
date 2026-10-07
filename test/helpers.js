@@ -3,8 +3,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const childProcess = require('node:child_process');
-const { spawnSync } = childProcess;
+const { spawnSync } = require('node:child_process');
 
 const gitEnv = {
   ...process.env,

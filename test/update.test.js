@@ -1,7 +1,6 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -12,10 +11,8 @@ const { isNpmInstall, cacheFile } = update;
 const { readCache, writeCache, isFresh, planUpdate } = update;
 const { checkUpdate, markSkipped } = update;
 const { CHECK_INTERVAL_MS } = update;
-const utilities = require('../lib/utilities.js');
-const { parseVersion, cmpVersion } = utilities;
-const helpers = require('./helpers.js');
-const { tempDir } = helpers;
+const { parseVersion, cmpVersion } = require('../lib/utilities.js');
+const { tempDir } = require('./helpers.js');
 
 const cachePath = () => path.join(tempDir('reslop-cache-'), 'update.json');
 

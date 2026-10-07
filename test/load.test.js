@@ -1,17 +1,12 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const load = require('../lib/session/load.js');
-const { LoadCoordinator, tagLoaded } = load;
-const utilities = require('../lib/utilities.js');
-const { isAbort } = utilities;
-const session = require('../lib/session.js');
-const { Session } = session;
-const helpers = require('./helpers.js');
-const { uiSink, sampleHunk, tempDir } = helpers;
+const { LoadCoordinator, tagLoaded } = require('../lib/session/load.js');
+const { isAbort } = require('../lib/utilities.js');
+const { Session } = require('../lib/session.js');
+const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
 
 const sampleItem = (name) => ({
   origin: 'unstaged',

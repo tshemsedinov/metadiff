@@ -1,12 +1,10 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const select = require('../lib/select.js');
-const ansi = require('../lib/ansi.js');
-const { ESC, stripAnsi, paint, THEME, fg, bg, seq } = ansi;
+const { ESC, stripAnsi, paint, THEME, fg, bg, seq } = require('../lib/ansi.js');
 
 test('extractText copies a same-row range', () => {
   const rows = ['abcdef', 'ghijkl'];

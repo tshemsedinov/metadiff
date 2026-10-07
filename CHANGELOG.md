@@ -4,6 +4,7 @@
 
 - Execute review results and plan in cli agents
 - Detect local agent, choose effort, and model
+- Add ".reslop" config file
 
 ## [0.2.7][] - 2026-10-03
 

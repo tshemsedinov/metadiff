@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-const cli = require('../lib/cli.js');
-const { run, errorMessage } = cli;
-const session = require('../lib/session.js');
-const { LEAVE_TERM } = session;
+const { run, errorMessage } = require('../lib/cli.js');
+const { LEAVE_TERM } = require('../lib/session.js');
 
 const fail = (reason) => {
   try {

@@ -2,14 +2,11 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const detect = require('../lib/detect.js');
-const { detectLang } = detect;
-const highlight = require('../lib/highlight.js');
-const { tokenize, overlayTokens, tokensText } = highlight;
+const { detectLang } = require('../lib/detect.js');
+const { tokenize, overlayTokens, tokensText } = require('../lib/highlight.js');
 
 const stylesOf = (tokens, text) =>
   tokens.filter((t) => t.text === text).map((t) => t.style);

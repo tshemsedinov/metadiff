@@ -1,29 +1,22 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const session = require('../lib/session.js');
-const { Session } = session;
-const ops = require('../lib/session/ops.js');
-const { OpsRunner } = ops;
-const keys = require('../lib/keys.js');
-const { hitAction } = keys;
-const helpers = require('./helpers.js');
-const { uiSink, sampleHunk, tempDir } = helpers;
+const { Session } = require('../lib/session.js');
+const { OpsRunner } = require('../lib/session/ops.js');
+const { hitAction } = require('../lib/keys.js');
+const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
 const review = require('../lib/review.js');
 const { createStore, addTask, serializeReview } = review;
 const { parseReview } = review;
 const ansi = require('../lib/ansi.js');
 const { stripAnsi, THEME, BOLD, seq } = ansi;
-const npm = require('../lib/render/npm.js');
-const { logViewRows } = npm;
+const { logViewRows } = require('../lib/render/npm.js');
 const { setTheme, themeName } = ansi;
-const files = require('../lib/files.js');
-const { REVIEW_DIR } = files;
+const { REVIEW_DIR } = require('../lib/files.js');
 
 const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] ', '[ ] '];
 const clipboard = require('../lib/clipboard.js');

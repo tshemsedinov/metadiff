@@ -1,16 +1,12 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const helpers = require('./helpers.js');
-const { tempDir } = helpers;
-const reportParse = require('../lib/report-parse.js');
-const { buildDocument } = reportParse;
-const reportRender = require('../lib/report-render.js');
-const { renderDocument } = reportRender;
+const { tempDir } = require('./helpers.js');
+const { buildDocument } = require('../lib/report-parse.js');
+const { renderDocument } = require('../lib/report-render.js');
 
 const parsed = (lines, root = '/repo') => {
   const doc = buildDocument(lines.join('\n'), '', root, 1, 'test');

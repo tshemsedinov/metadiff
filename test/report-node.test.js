@@ -1,20 +1,14 @@
 'use strict';
 
-const nodeTest = require('node:test');
-const { test } = nodeTest;
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const childProcess = require('node:child_process');
-const { spawnSync } = childProcess;
-const helpers = require('./helpers.js');
-const { tempDir } = helpers;
-const reportParse = require('../lib/report-parse.js');
-const { buildDocument } = reportParse;
-const render = require('../lib/report-render.js');
-const { renderDocument } = render;
-const reportView = require('../lib/render/report.js');
-const { renderReport } = reportView;
+const { spawnSync } = require('node:child_process');
+const { tempDir } = require('./helpers.js');
+const { buildDocument } = require('../lib/report-parse.js');
+const { renderDocument } = require('../lib/report-render.js');
+const { renderReport } = require('../lib/render/report.js');
 
 const fixture = String.raw`
 'use strict';

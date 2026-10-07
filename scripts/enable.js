@@ -3,11 +3,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const childProcess = require('node:child_process');
-const { spawnSync } = childProcess;
+const { spawnSync } = require('node:child_process');
 
-const utilities = require('../lib/utilities.js');
-const { spawnBase } = utilities;
+const { spawnBase } = require('../lib/utilities.js');
 const paths = require('./install-paths.js');
 const { IS_WIN, MARK_BEGIN, MARK_END, home, destDir, dest } = paths;
 const { stripMarkedBlock } = paths;
