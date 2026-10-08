@@ -1,6 +1,8 @@
 node_modules
 */skills/metaskills
-.review/
+.plan/
+.cursor/
 .log/
+.reslop
 AGENTS.md
 CLAUDE.md
