@@ -12,7 +12,7 @@ const { detectAgents, findBin, splitArgs, planPrompt } = agents;
 const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseCursorWide } = agents;
 const { parseNameList, hasAgentSession } = agents;
-const { parseJsonModels, commandLine, needsAuth } = agents;
+const { parseJsonModels, commandLine, needsAuth, authState } = agents;
 const { groupModels, resolveModel } = agents;
 const { claudeSession, cursorSession } = sessions;
 const { Session } = require('../lib/session.js');
@@ -144,6 +144,7 @@ const openUi = () => {
   });
   ui.ensureRepo();
   ui.load();
+  ui.agents.authProbe = () => true;
   return { ui, repo, stdout };
 };
 
@@ -408,6 +409,11 @@ test('cursor fallback includes grok-4.6', () => {
   assert.equal(login.command, 'cursor-agent login');
   assert.equal(buildLogin({ ...row, spec: AGENTS[0] }).error, 'no login');
   assert.equal(needsAuth('Error: Authentication required. Please run'), true);
+  const signedIn = '{"isAuthenticated":true,"status":"authenticated"}';
+  assert.equal(authState(signedIn), true);
+  assert.equal(authState('Not logged in'), false);
+  assert.equal(authState('✓ Logged in as a@b.c'), true);
+  assert.equal(authState(''), null);
   const saved = buildLaunch(
     row,
     { model: 'grok-4.6', extra: '', effort: 'high', fast: true },
@@ -696,20 +702,72 @@ test('plan combo lists plain markdown and aligns columns', async () => {
   }
 });
 
-test('agents screen runs cursor login when auth is required', async () => {
+test('agents screen logs in before a run when signed out', async () => {
   const { dir, bins, env } = fakePath('cursor-agent');
   const { ui, repo } = openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
     await ui.agents.open();
-    ui.nav.agentCursor = 2;
+    const at = ui.agents.rows().findIndex((row) => row.id === 'cursor');
+    ui.nav.agentCursor = at;
     const ready = renderFrame(ui.view(), {
       width: 80,
       height: 24,
       color: false,
     });
-    assert.ok(ready.buttons.some((hit) => hit.id === 'agentLogin'));
+    const footer = stripAnsi(ready.rows.at(-1));
+    assert.equal(
+      ready.buttons.some((hit) => hit.id === 'agentLogin'),
+      false,
+    );
+    assert.equal(footer.includes('login'), false);
+    const calls = [];
+    let finishLogin = null;
+    ui.agents.spawn = (cwd, launch, onData, onClose) => {
+      calls.push(launch);
+      if (launch.kind === 'login') {
+        onData('open a browser to finish login\n');
+        finishLogin = (status) => onClose({ status, text: 'done\n' });
+        return { kill() {} };
+      }
+      onData('hello\n');
+      return { kill() {} };
+    };
+    ui.agents.authProbe = () => false;
+    ui.agents.start();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].cmd, bins['cursor-agent']);
+    assert.deepEqual(calls[0].args, ['login']);
+    assert.equal(calls[0].command, 'cursor-agent login');
+    assert.equal(ui.status, 'not logged in');
+    assert.equal(ui.agents.viewing, false);
+    assert.equal(ui.agents.jobs[0].action, 'login');
+    finishLogin(1);
+    assert.equal(calls.length, 1);
+    assert.equal(ui.status, 'not logged in');
+    ui.agents.start();
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].kind, 'login');
+    finishLogin(0);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[2].kind, 'run');
+    assert.equal(ui.agents.viewing, true);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen runs cursor login when auth is required', async () => {
+  const { dir, env } = fakePath('cursor-agent');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.nav.agentCursor = 2;
     const calls = [];
     ui.agents.spawn = (cwd, launch, onData, onClose) => {
       calls.push(launch);
@@ -722,32 +780,20 @@ test('agents screen runs cursor login when auth is required', async () => {
       onClose({ status: 1, text });
       return { kill() {} };
     };
-    ui.handleEvent({ type: 'key', key: 'l' });
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].cmd, bins['cursor-agent']);
-    assert.deepEqual(calls[0].args, ['login']);
-    assert.equal(calls[0].command, 'cursor-agent login');
-    assert.equal(ui.agents.viewing, false);
-    assert.equal(ui.status, 'logging in');
-    assert.equal(ui.agents.jobs[0].status, 'running');
-    ui.handleEvent({ type: 'key', key: 'enter' });
-    assert.equal(ui.agents.viewing, true);
-    ui.handleEvent({ type: 'key', key: 's' });
-    assert.equal(ui.agents.jobs[0].status, 'stopped');
-    ui.handleEvent({ type: 'key', key: 'escape' });
-    assert.equal(ui.agents.viewing, false);
-    assert.equal(ui.status, '');
-    ui.nav.agentCursor = 0;
-    ui.handleEvent({ type: 'key', key: 'l' });
-    assert.equal(ui.status, 'no login');
-    assert.equal(calls.length, 1);
-    ui.nav.agentCursor = 2;
     ui.agents.start();
-    assert.equal(calls.length, 3);
-    assert.equal(calls[2].kind, 'login');
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].kind, 'run');
+    assert.equal(calls[1].kind, 'login');
     assert.equal(ui.agents.viewing, false);
     assert.equal(ui.status, 'logging in');
     assert.equal(ui.agents.jobs.at(-1).action, 'login');
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.viewing, true);
+    ui.handleEvent({ type: 'key', key: 's' });
+    assert.equal(ui.agents.jobs.at(-1).status, 'stopped');
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    assert.equal(ui.agents.viewing, false);
+    assert.equal(ui.status, '');
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1458,7 +1504,7 @@ test('selecting a model keeps only context sizes it offers', async () => {
     assert.equal(ui.agents.choice('cursor').effort, 'high');
     ui.handleEvent({ type: 'key', key: 'a' });
     assert.equal(ui.agents.choice('cursor').fast, true);
-    ui.handleEvent({ type: 'key', key: 'o' });
+    ui.handleEvent({ type: 'key', key: 't' });
     assert.deepEqual(ui.agents.menuItems(), ['256k', '1m']);
     ui.handleEvent({ type: 'key', key: 'down' });
     ui.handleEvent({ type: 'key', key: 'enter' });
@@ -1470,7 +1516,7 @@ test('selecting a model keeps only context sizes it offers', async () => {
     assert.equal(ui.agents.choice('cursor').context, '256k');
     assert.equal(ui.agents.choice('cursor').fast, false);
     assert.equal(ui.agents.choice('cursor').effort, 'high');
-    ui.handleEvent({ type: 'key', key: 'o' });
+    ui.handleEvent({ type: 'key', key: 't' });
     assert.deepEqual(ui.agents.menuItems(), ['256k', '500k']);
     ui.handleEvent({ type: 'key', key: 'down' });
     ui.handleEvent({ type: 'key', key: 'enter' });
@@ -1543,7 +1589,7 @@ test('agents screen selects a cursor context size', async () => {
     ui.agents.refresh(env);
     await ui.agents.open();
     ui.nav.agentCursor = 2;
-    ui.handleEvent({ type: 'key', key: 'o' });
+    ui.handleEvent({ type: 'key', key: 't' });
     assert.equal(ui.agents.pick.field, 'context');
     assert.deepEqual(ui.agents.menuItems(), ['256k', '1m']);
     ui.handleEvent({ type: 'key', key: 'down' });
