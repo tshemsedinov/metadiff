@@ -1221,6 +1221,8 @@ test('recorded runs stay listed for the selected cli', async () => {
         exit: 1,
         elapsed: 4,
         startedAt: 1,
+        session: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+        log: 'cursor-old.log',
         output: '',
       },
       {
@@ -1236,6 +1238,8 @@ test('recorded runs stay listed for the selected cli', async () => {
         stopped: true,
         elapsed: 0,
         startedAt: 2,
+        session: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
+        log: 'cursor-new.log',
         output: '',
       },
       {
@@ -1251,6 +1255,8 @@ test('recorded runs stay listed for the selected cli', async () => {
         exit: 0,
         elapsed: 1,
         startedAt: 3,
+        session: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
+        log: 'claude-only.log',
         output: '',
       },
     ];
@@ -1263,18 +1269,16 @@ test('recorded runs stay listed for the selected cli', async () => {
     const at = ui.agents.rows().findIndex((row) => row.id === 'cursor');
     ui.nav.agentCursor = at;
     ui.agents.choice('cursor').model = 'auto';
-    const cursor = ui.agents.rows().find((row) => row.id === 'cursor');
-    const shown = ui.agents.runRows(cursor).map((row) => row.command);
-    assert.deepEqual(shown, ['cursor new grok', 'cursor old grok']);
+    const shown = ui.agents.sessionRows().map((row) => row.name);
+    assert.deepEqual(shown, ['<new session>', 'cursor-new', 'cursor-old']);
     ui.draw();
     const text = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.match(text, /stopped/);
-    assert.match(text, /exit 1/);
+    assert.match(text, /cursor-new/);
+    assert.match(text, /cursor-old/);
     const claudeAt = ui.agents.rows().findIndex((row) => row.id === 'claude');
     ui.nav.agentCursor = claudeAt;
-    const claude = ui.agents.rows().find((row) => row.id === 'claude');
-    const claudeRuns = ui.agents.runRows(claude).map((row) => row.command);
-    assert.deepEqual(claudeRuns, ['claude only']);
+    const claudeRuns = ui.agents.sessionRows().map((row) => row.name);
+    assert.deepEqual(claudeRuns, ['<new session>', 'claude-only']);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1282,7 +1286,7 @@ test('recorded runs stay listed for the selected cli', async () => {
   }
 });
 
-test('agents screen lists every run for the selected cli', async () => {
+test('agents screen lists sessions for the selected cli', async () => {
   const { dir, env } = fakePath('claude');
   const { ui, repo } = openUi();
   try {
@@ -1297,21 +1301,12 @@ test('agents screen lists every run for the selected cli', async () => {
     ui.draw();
     const lines = stripAnsi(ui.lastFrame.rows.join('\n')).split('\n');
     assert.ok(lines.some((row) => /claude/.test(row)));
-    assert.ok(lines.some((row) => /running/.test(row)));
+    assert.ok(lines.some((row) => /<new session>/.test(row)));
     const title = lines.findIndex((line) => /agent\s+model/.test(line));
     const runHit = ui.lastFrame.fileHits.find((hit) => hit.side === 'runs');
     assert.ok(runHit);
     assert.equal(runHit.y, title + 1);
     assert.match(ui.agents.jobs[0].command, /claude --model sonnet/);
-    ui.handleEvent({ type: 'key', key: 'm' });
-    ui.handleEvent({ type: 'key', key: 'down' });
-    ui.handleEvent({ type: 'key', key: 'enter' });
-    ui.draw();
-    const opus = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.match(opus, /running/);
-    ui.handleEvent({ type: 'key', key: 'm' });
-    ui.handleEvent({ type: 'key', key: 'up' });
-    ui.handleEvent({ type: 'key', key: 'enter' });
     ui.handleEvent({ type: 'key', key: 'right' });
     assert.equal(ui.agents.focus, 'runs');
     ui.handleEvent({ type: 'key', key: 'tab' });
@@ -1320,10 +1315,14 @@ test('agents screen lists every run for the selected cli', async () => {
     assert.equal(ui.agents.focus, 'runs');
     ui.handleEvent({ type: 'key', key: 'left' });
     assert.equal(ui.agents.focus, 'cli');
+    const live = ui.agents.jobs[0];
+    live.status = 'exit 0';
+    live.child = null;
+    ui.agents.closeView();
     ui.handleEvent({ type: 'key', key: 'right' });
     ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.jobs.length, 2);
     assert.equal(ui.agents.viewing, true);
-    assert.equal(ui.agents.viewId, ui.agents.jobs[0].id);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1343,6 +1342,9 @@ test('agents panels scroll past one screen', async () => {
       ui.agents.jobs.push({
         id: i + 1,
         cliId: 'claude',
+        session: `sess-${i}`,
+        logName: `run-${i}.log`,
+        startedAt: i + 1,
         model: 'sonnet',
         status: 'exit 0',
         command: `run-${i}`,
@@ -1715,11 +1717,15 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     const list = stripAnsi(ui.lastFrame.rows.join('\n'));
     assert.equal(list.includes('▶'), false);
     assert.equal(list.includes('status'), false);
-    assert.match(list, /exit 0/);
-    assert.match(list, /\d+:\d{2}/);
-    assert.match(list, /1\/2/);
+    assert.match(list, /<new session>/);
+    assert.match(list, /-agent-/);
+    assert.equal(list.includes('exit 0'), false);
+    ui.handleEvent({ type: 'key', key: 'down' });
     ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.viewing, true);
+    ui.draw();
+    const opened = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(opened, /hello from agent/);
     const folder = path.join(repo.dir, '.log');
     const jsonName = fs
       .readdirSync(folder)
@@ -1748,10 +1754,12 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     assert.equal(session.cli, 'claude');
     assert.equal(session.files, 9);
     assert.equal(session.tokens, 1234);
+    assert.match(session.name, /-agent-/);
     assert.equal(fs.existsSync(path.join(repo.dir, '.reslop')), false);
     ui.agents.reset();
     assert.equal(ui.agents.jobs[0].status, 'exit 0');
-    assert.match(ui.agents.jobs[0].output, /hello from agent/);
+    ui.agents.openSession(sessionId);
+    assert.match(ui.agents.historyText, /hello from agent/);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1905,12 +1913,21 @@ test('buildLaunch continues a previous session', () => {
     spec: cursor,
     models: cursor.models,
   };
-  const kept = buildLaunch(row, emptyChoice(row), '/tmp/plan.md', '/tmp', true);
+  const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+  const kept = buildLaunch(
+    row,
+    emptyChoice(row),
+    '/tmp/plan.md',
+    '/tmp',
+    sessionId,
+  );
   assert.equal(kept.args[0], '--trust');
-  assert.equal(kept.args[1], '--continue');
-  assert.match(kept.command, /^cursor-agent --trust --continue /);
+  assert.equal(kept.args[1], `--resume=${sessionId}`);
+  assert.equal(kept.session, sessionId);
+  assert.match(kept.command, /--resume=/);
   const fresh = buildLaunch(row, emptyChoice(row), '/tmp/plan.md', '/tmp');
   assert.equal(fresh.args.includes('--continue'), false);
+  assert.equal(fresh.session, undefined);
   const codex = AGENTS.find((item) => item.id === 'codex');
   const codexRow = {
     id: codex.id,
@@ -1924,10 +1941,10 @@ test('buildLaunch continues a previous session', () => {
     { model: 'gpt-5', extra: '', effort: 'high' },
     '/tmp/plan.md',
     '/tmp',
-    true,
+    sessionId,
   );
   assert.equal(resumed.args[0], 'resume');
-  assert.equal(resumed.args[1], '--last');
+  assert.equal(resumed.args[1], sessionId);
   assert.ok(resumed.args.includes('--model'));
   assert.ok(resumed.args.includes('model_reasoning_effort=high'));
 });
@@ -1968,7 +1985,7 @@ test('stored chats count as a previous agent session', () => {
   }
 });
 
-test('starting an agent asks to continue or start new', async () => {
+test('starting an agent uses the selected session', async () => {
   const { dir, env } = fakePath('cursor-agent');
   const { ui, repo } = openUi();
   try {
@@ -1977,40 +1994,128 @@ test('starting an agent asks to continue or start new', async () => {
     await ui.agents.open();
     const at = ui.agents.rows().findIndex((row) => row.id === 'cursor');
     ui.nav.agentCursor = at;
-    ui.agents.sessionKnown = () => true;
     const calls = [];
     ui.agents.spawn = (cwd, launch) => {
       calls.push(launch);
       return { kill() {} };
     };
-    ui.agents.start();
-    assert.equal(calls.length, 0);
-    assert.equal(ui.mode, 'confirmSession');
     ui.draw();
-    const prompt = stripAnsi(ui.lastFrame.rows.at(-2));
-    assert.match(prompt, /session\? {2}continue {2}new session/);
-    ui.handleEvent({ type: 'key', key: 'escape' });
-    assert.equal(ui.mode, 'review');
-    assert.equal(calls.length, 0);
+    const chooser = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(chooser, /<new session>/);
+    assert.equal(chooser.includes('session?'), false);
     ui.agents.start();
-    ui.handleEvent({ type: 'key', key: 'n' });
     assert.equal(ui.mode, 'review');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].args.includes('--continue'), false);
-    ui.handleEvent({ type: 'key', key: 'escape' });
     const started = ui.agents.jobs.find((job) => job.status === 'running');
+    const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
     started.status = 'exit 0';
     started.child = null;
-    started.session = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+    started.session = sessionId;
+    started.logName = '2026-10-09-agent-01.log';
+    started.startedAt = 1;
+    ui.agents.closeView();
+    ui.agents.focusRuns();
+    ui.agents.move(1);
+    ui.agents.focusCli();
     ui.agents.start();
-    assert.equal(ui.mode, 'confirmSession');
-    ui.handleEvent({ type: 'key', key: 'c' });
     assert.equal(calls.length, 2);
     assert.equal(calls[1].args[0], '--trust');
-    assert.equal(calls[1].args[1], '--continue');
-    assert.equal(calls[1].session, started.session);
-    assert.match(calls[1].command, /--continue/);
+    assert.equal(calls[1].args[1], `--resume=${sessionId}`);
+    assert.equal(calls[1].session, sessionId);
+    assert.match(calls[1].command, /--resume=/);
     assert.match(calls[1].prompt, /repair plan/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agent raw log keeps terminal escapes', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const colored = '\x1b[31mred\x1b[0m\n';
+    ui.agents.spawn = (cwd, launch, onData, onClose) => {
+      const child = {
+        kill() {},
+        raw: () => colored,
+      };
+      queueMicrotask(() => {
+        onData('red\n');
+        onClose({ status: 0, text: 'red\n' });
+      });
+      return child;
+    };
+    ui.agents.start();
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+    const folder = path.join(repo.dir, '.log');
+    const jsonName = fs
+      .readdirSync(folder)
+      .find((name) => name.endsWith('.json'));
+    const runPath = path.join(folder, jsonName);
+    const run = JSON.parse(fs.readFileSync(runPath, 'utf8'));
+    const savedRaw = fs.readFileSync(path.join(folder, run.raw), 'utf8');
+    const savedLog = fs.readFileSync(path.join(folder, run.log), 'utf8');
+    assert.ok(savedRaw.includes('\x1b[31mred'));
+    assert.equal(savedLog.includes('\x1b'), false);
+    assert.match(savedLog, /red/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a session opens on its last run and loads older on scroll', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+    const folder = path.join(repo.dir, '.log');
+    fs.mkdirSync(folder, { recursive: true });
+    const older = '2026-10-09-agent-01';
+    const newer = '2026-10-09-agent-02';
+    fs.writeFileSync(path.join(folder, `${older}.raw`), 'older line\n');
+    fs.writeFileSync(path.join(folder, `${newer}.raw`), 'newer line\n');
+    ui.agents.jobs = [
+      {
+        id: 1,
+        cliId: 'claude',
+        session: sessionId,
+        logName: `${older}.log`,
+        rawName: `${older}.raw`,
+        startedAt: 1,
+      },
+      {
+        id: 2,
+        cliId: 'claude',
+        session: sessionId,
+        logName: `${newer}.log`,
+        rawName: `${newer}.raw`,
+        startedAt: 2,
+      },
+    ];
+    ui.agents.openSession(sessionId);
+    assert.match(ui.agents.historyText, /newer line/);
+    assert.equal(ui.agents.historyText.includes('older line'), false);
+    ui.agents.followEnd = false;
+    ui.agents.logScroll = 0;
+    ui.agents.scrollLog(-1);
+    assert.match(ui.agents.historyText, /older line/);
+    assert.match(ui.agents.historyText, /newer line/);
+    const olderAt = ui.agents.historyText.indexOf('older line');
+    const newerAt = ui.agents.historyText.indexOf('newer line');
+    assert.ok(olderAt < newerAt);
   } finally {
     ui.agents.reset();
     repo.cleanup();
