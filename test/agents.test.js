@@ -7,12 +7,14 @@ const os = require('node:os');
 const path = require('node:path');
 
 const agents = require('../lib/agents.js');
+const sessions = require('../lib/agent-sessions.js');
 const { detectAgents, findBin, splitArgs, planPrompt } = agents;
 const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseCursorWide } = agents;
-const { parseNameList } = agents;
+const { parseNameList, hasAgentSession } = agents;
 const { parseJsonModels, commandLine, needsAuth } = agents;
 const { groupModels, resolveModel } = agents;
+const { claudeSession, cursorSession } = sessions;
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
 const { makeRepo, uiSink } = require('./helpers.js');
@@ -20,6 +22,7 @@ const render = require('../lib/render/render.js');
 const { renderFrame } = render;
 const { stripAnsi, THEME, bg, RESET, BOLD } = require('../lib/ansi.js');
 const { actionFromKey } = require('../lib/session/actions.js');
+const { runStats } = require('../lib/session/agent-jobs.js');
 
 const makeBin = (dir, name) => {
   const file = path.join(dir, name);
@@ -163,6 +166,8 @@ test('agents screen lists clis and starts with the review plan', async () => {
     ui.draw();
     const text = stripAnsi(ui.lastFrame.rows.join('\n'));
     assert.match(text, /agent\s+model\s+effort\s+fast\s+review/);
+    assert.equal(text.includes('▶'), false);
+    assert.equal(text.includes('status'), false);
     assert.match(text, /claude/);
     assert.match(text, /opencode/);
     assert.match(text, /cursor/);
@@ -571,7 +576,7 @@ test('plan combo lists plain markdown and aligns columns', async () => {
     fs.writeFileSync(path.join(reviewDir, dated), datedBody);
     fs.writeFileSync(path.join(reviewDir, note), noteBody);
     fs.writeFileSync(path.join(reviewDir, ideas), '# ideas\n\nJust a note.\n');
-    fs.writeFileSync(path.join(reviewDir, 'templates.json'), '[]\n');
+    fs.writeFileSync(path.join(reviewDir, '.templates'), '[]\n');
     ui.review.store.reviewPath = '';
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -764,6 +769,18 @@ test('effort encoded in a model id is chosen separately', () => {
   );
   assert.equal(grok.args.includes('grok-4.7-high[context=256k]'), false);
   assert.ok(grok.args.includes('grok-4.7-high'));
+  const half = buildLaunch(
+    row,
+    {
+      model: 'grok-4.7-high',
+      effort: 'high',
+      extra: '',
+      fast: false,
+      context: '500k',
+    },
+    '/tmp/plan.md',
+  );
+  assert.ok(half.args.includes('grok-4.7-high[context=500k]'));
 });
 
 test('model menu omits a fast name that has a plain sibling', async () => {
@@ -1209,7 +1226,7 @@ test('agents screen toggles fast mode with a', async () => {
   }
 });
 
-test('double click on the fast column toggles it', async () => {
+test('single click on the fast column toggles it', async () => {
   const { dir, env } = fakePath('claude');
   const { ui, repo } = openUi();
   try {
@@ -1229,9 +1246,6 @@ test('double click on the fast column toggles it', async () => {
     const press = (kind) => {
       ui.handleEvent({ ...click, kind, press: kind === 'press' });
     };
-    press('press');
-    press('release');
-    assert.equal(ui.agents.choice('claude').fast, false);
     press('press');
     press('release');
     assert.equal(ui.agents.choice('claude').fast, true);
@@ -1282,7 +1296,12 @@ test('selecting a model keeps only context sizes it offers', async () => {
     assert.equal(ui.agents.choice('cursor').fast, false);
     assert.equal(ui.agents.choice('cursor').effort, 'high');
     ui.handleEvent({ type: 'key', key: 'o' });
-    assert.deepEqual(ui.agents.menuItems(), ['256k']);
+    assert.deepEqual(ui.agents.menuItems(), ['256k', '500k']);
+    ui.handleEvent({ type: 'key', key: 'down' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    assert.equal(ui.agents.choice('cursor').context, '500k');
+    assert.equal(ui.agents.choice('cursor').effort, 'high');
+    assert.equal(ui.agents.choice('cursor').fast, false);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1328,7 +1347,7 @@ test('clicking the context column drops the size list', async () => {
     press('press');
     press('release');
     assert.equal(ui.agents.pick && ui.agents.pick.field, 'context');
-    assert.deepEqual(ui.agents.menuItems(), ['256k']);
+    assert.deepEqual(ui.agents.menuItems(), ['256k', '500k']);
     assert.equal(calls.length, 0);
     press('press');
     press('release');
@@ -1390,7 +1409,8 @@ test('agent columns fill the row in proportion to their content', async () => {
     const titleAt = plain.findIndex((line) => /agent\s+model/.test(line));
     assert.equal(titleAt, 2);
     assert.equal(plain[1].trim(), '');
-    assert.match(plain[titleAt], /review {5}status/);
+    assert.match(plain[titleAt], /review/);
+    assert.equal(plain[titleAt].includes('status'), false);
     const plan = ui.lastFrame.fileHits.find((hit) => hit.field === 'plan');
     const model = ui.lastFrame.fileHits.find((hit) => hit.field === 'model');
     assert.ok(plan);
@@ -1430,9 +1450,17 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
     await ui.agents.open();
+    const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+    const text = [
+      'hello from agent',
+      'total tokens: 1,234',
+      'Grok 4.7 256K High · 44.3% · 9 files edited',
+      `To resume this session: agent --resume=${sessionId}`,
+      '',
+    ].join('\n');
     ui.agents.spawn = (cwd, launch, onData, onClose) => {
-      onData('hello from agent\n');
-      onClose({ status: 0, text: 'hello from agent\n' });
+      onData(text);
+      onClose({ status: 0, text });
       return { kill() {} };
     };
     ui.agents.start();
@@ -1462,20 +1490,358 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     ui.agents.focusRuns();
     ui.draw();
     const list = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.equal(list.includes('▶'), false);
+    assert.equal(list.includes('status'), false);
     assert.match(list, /exit 0/);
     assert.match(list, /\d+:\d{2}/);
     assert.match(list, /1\/2/);
     ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.viewing, true);
-    const saved = JSON.parse(
-      fs.readFileSync(path.join(repo.dir, '.reslop'), 'utf8'),
+    const runs = JSON.parse(
+      fs.readFileSync(path.join(repo.dir, '.plan', '.runs'), 'utf8'),
     );
-    assert.equal(saved.runs.length, 1);
-    assert.match(saved.runs[0].output, /hello from agent/);
-    assert.match(saved.runs[0].command, /claude/);
+    assert.equal(runs.length, 1);
+    assert.equal(runs[0].exit, 0);
+    assert.equal(runs[0].status, undefined);
+    assert.equal(runs[0].endedAt, undefined);
+    assert.equal(typeof runs[0].elapsed, 'number');
+    assert.equal(runs[0].files, 9);
+    assert.equal(runs[0].session, sessionId);
+    assert.match(runs[0].output, /hello from agent/);
+    assert.match(runs[0].command, /claude/);
+    const sessions = JSON.parse(
+      fs.readFileSync(path.join(repo.dir, '.plan', '.sessions'), 'utf8'),
+    );
+    const session = sessions[sessionId];
+    assert.equal(session.cli, 'claude');
+    assert.equal(session.files, 9);
+    assert.equal(session.tokens, 1234);
+    assert.equal(fs.existsSync(path.join(repo.dir, '.reslop')), false);
     ui.agents.reset();
     assert.equal(ui.agents.jobs[0].status, 'exit 0');
     assert.match(ui.agents.jobs[0].output, /hello from agent/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agent output shows a scroller when the log overflows', async () => {
+  const { dir, env } = fakePath('claude');
+  const repo = makeRepo();
+  repo.write('a.js', 'ok\n');
+  repo.git(['add', '.']);
+  repo.git(['commit', '-m', 'init']);
+  const stdout = uiSink();
+  stdout.columns = 80;
+  stdout.rows = 16;
+  const ui = new Session({
+    cwd: repo.dir,
+    stdout,
+    repo: createGitRepo(),
+    color: true,
+    startPane: 'dashboard',
+  });
+  ui.ensureRepo();
+  ui.load();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const text = Array.from({ length: 80 }, (_, i) => `line ${i}`).join('\n');
+    ui.agents.spawn = (cwd, launch, onData, onClose) => {
+      onData(`${text}\n`);
+      onClose({ status: 0, text: `${text}\n` });
+      return { kill() {} };
+    };
+    ui.agents.start();
+    assert.equal(ui.agents.viewing, true);
+    ui.draw();
+    const thumb = bg(THEME.taskHeadBg);
+    const track = bg(THEME.buttonBg);
+    const ground = bg(THEME.ctxBg);
+    const logRows = () =>
+      ui.lastFrame.rows.filter((row) => {
+        if (!row.includes(ground)) return false;
+        return row.includes(thumb) || row.includes(track);
+      });
+    const open = logRows();
+    assert.ok(open.some((row) => row.includes(thumb)));
+    assert.ok(open.some((row) => !row.includes(thumb)));
+    const thumbAt = open.findIndex((row) => row.includes(thumb));
+    assert.ok(thumbAt > 0);
+    ui.handleEvent({ type: 'key', key: 'home' });
+    ui.draw();
+    const top = logRows();
+    const nextAt = top.findIndex((row) => row.includes(thumb));
+    assert.ok(nextAt < thumbAt);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('dragging the agent output scroller scrolls the log', async () => {
+  const { dir, env } = fakePath('claude');
+  const repo = makeRepo();
+  repo.write('a.js', 'ok\n');
+  repo.git(['add', '.']);
+  repo.git(['commit', '-m', 'init']);
+  const stdout = uiSink();
+  stdout.columns = 80;
+  stdout.rows = 16;
+  const ui = new Session({
+    cwd: repo.dir,
+    stdout,
+    repo: createGitRepo(),
+    color: true,
+    startPane: 'dashboard',
+  });
+  ui.ensureRepo();
+  ui.load();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const text = Array.from({ length: 80 }, (_, i) => `line ${i}`).join('\n');
+    ui.agents.spawn = (cwd, launch, onData, onClose) => {
+      onData(`${text}\n`);
+      onClose({ status: 0, text: `${text}\n` });
+      return { kill() {} };
+    };
+    ui.agents.start();
+    ui.draw();
+    const bar = ui.lastFrame.scrollBar;
+    assert.ok(bar);
+    const max = bar.count - bar.rows;
+    assert.ok(max > 0);
+    const thumb = bg(THEME.taskHeadBg);
+    const thumbAt = ui.lastFrame.rows.findIndex((row) => row.includes(thumb));
+    assert.ok(thumbAt > 1);
+    const pointer = (kind, x, y) => {
+      ui.handleEvent({
+        type: 'mouse',
+        button: kind === 'drag' ? 32 : 0,
+        btn: 0,
+        kind,
+        x,
+        y,
+        press: kind !== 'release',
+      });
+    };
+    pointer('press', bar.x, thumbAt + 1);
+    pointer('drag', bar.x, thumbAt - 1);
+    pointer('release', bar.x, thumbAt - 1);
+    ui.draw();
+    assert.equal(ui.nav.selection, null);
+    assert.equal(ui.agents.followEnd, false);
+    assert.ok(ui.agents.logScroll > 0);
+    assert.ok(ui.agents.logScroll < max);
+    const mid = ui.lastFrame.scrollBar;
+    pointer('press', mid.x, mid.y + mid.height - 1);
+    pointer('drag', mid.x, mid.y);
+    pointer('release', mid.x, mid.y);
+    ui.draw();
+    assert.equal(ui.nav.selection, null);
+    assert.equal(ui.agents.logScroll, 0);
+    const shown = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(shown, /line 0/);
+    assert.equal(shown.includes('line 79'), false);
+    const line = ui.lastFrame.rows.findIndex((row) =>
+      stripAnsi(row).includes('line 0'),
+    );
+    assert.ok(line >= 0);
+    pointer('press', 4, line + 1);
+    pointer('drag', 12, line + 1);
+    assert.ok(ui.nav.selection);
+    assert.equal(ui.agents.logScroll, 0);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('buildLaunch continues a previous session', () => {
+  const cursor = AGENTS.find((row) => row.id === 'cursor');
+  const row = {
+    id: cursor.id,
+    name: cursor.name,
+    bin: '/usr/bin/cursor-agent',
+    spec: cursor,
+    models: cursor.models,
+  };
+  const kept = buildLaunch(row, emptyChoice(row), '/tmp/plan.md', '/tmp', true);
+  assert.equal(kept.args[0], '--trust');
+  assert.equal(kept.args[1], '--continue');
+  assert.match(kept.command, /^cursor-agent --trust --continue /);
+  const fresh = buildLaunch(row, emptyChoice(row), '/tmp/plan.md', '/tmp');
+  assert.equal(fresh.args.includes('--continue'), false);
+  const codex = AGENTS.find((item) => item.id === 'codex');
+  const codexRow = {
+    id: codex.id,
+    name: codex.name,
+    bin: '/usr/bin/codex',
+    spec: codex,
+    models: codex.models,
+  };
+  const resumed = buildLaunch(
+    codexRow,
+    { model: 'gpt-5', extra: '', effort: 'high' },
+    '/tmp/plan.md',
+    '/tmp',
+    true,
+  );
+  assert.equal(resumed.args[0], 'resume');
+  assert.equal(resumed.args[1], '--last');
+  assert.ok(resumed.args.includes('--model'));
+  assert.ok(resumed.args.includes('model_reasoning_effort=high'));
+});
+
+test('stored chats count as a previous agent session', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-chats-'));
+  const cwd = '/tmp/work';
+  try {
+    const chat = path.join(root, 'bucket', 'chat-id');
+    fs.mkdirSync(chat, { recursive: true });
+    const meta = { cwd, hasConversation: true };
+    fs.writeFileSync(path.join(chat, 'meta.json'), JSON.stringify(meta));
+    assert.equal(cursorSession(cwd, root), true);
+    assert.equal(cursorSession('/tmp/other', root), false);
+    const empty = path.join(root, 'bucket', 'empty');
+    fs.mkdirSync(empty);
+    const blank = { cwd: '/tmp/empty', hasConversation: false };
+    fs.writeFileSync(path.join(empty, 'meta.json'), JSON.stringify(blank));
+    assert.equal(cursorSession('/tmp/empty', root), false);
+    const projects = path.join(root, 'projects');
+    const dir = path.join(projects, cwd.split(path.sep).join('-'));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'session.jsonl'), '{}\n');
+    assert.equal(claudeSession(cwd, projects), true);
+    assert.equal(claudeSession('/tmp/other', projects), false);
+    const cursor = AGENTS.find((row) => row.id === 'cursor');
+    const row = { id: 'cursor', spec: cursor };
+    const jobs = [{ cliId: 'cursor', action: 'run' }];
+    assert.equal(hasAgentSession(row, '/nowhere', jobs), true);
+    const login = [{ cliId: 'cursor', action: 'login' }];
+    assert.equal(hasAgentSession(row, '/nowhere', login), false);
+    const probe = { cursor: (dirPath) => cursorSession(dirPath, root) };
+    assert.equal(hasAgentSession(row, cwd, [], probe), true);
+    const bare = { id: 'cursor', spec: { resume: [] } };
+    assert.equal(hasAgentSession(bare, cwd, jobs, probe), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('starting an agent asks to continue or start new', async () => {
+  const { dir, env } = fakePath('cursor-agent');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const at = ui.agents.rows().findIndex((row) => row.id === 'cursor');
+    ui.nav.agentCursor = at;
+    ui.agents.sessionKnown = () => true;
+    const calls = [];
+    ui.agents.spawn = (cwd, launch) => {
+      calls.push(launch);
+      return { kill() {} };
+    };
+    ui.agents.start();
+    assert.equal(calls.length, 0);
+    assert.equal(ui.mode, 'confirmSession');
+    ui.draw();
+    const prompt = stripAnsi(ui.lastFrame.rows.at(-2));
+    assert.match(prompt, /session\? {2}continue {2}new session/);
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    assert.equal(ui.mode, 'review');
+    assert.equal(calls.length, 0);
+    ui.agents.start();
+    ui.handleEvent({ type: 'key', key: 'n' });
+    assert.equal(ui.mode, 'review');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args.includes('--continue'), false);
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    const started = ui.agents.jobs.find((job) => job.status === 'running');
+    started.status = 'exit 0';
+    started.child = null;
+    started.session = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+    ui.agents.start();
+    assert.equal(ui.mode, 'confirmSession');
+    ui.handleEvent({ type: 'key', key: 'c' });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].args[0], '--trust');
+    assert.equal(calls[1].args[1], '--continue');
+    assert.equal(calls[1].session, started.session);
+    assert.match(calls[1].command, /--continue/);
+    assert.match(calls[1].prompt, /repair plan/);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('run output yields the session, files, and tokens', () => {
+  const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+  const text = [
+    'total tokens: 1,234',
+    '8 files edited',
+    `To resume this session: agent --resume=${sessionId}`,
+  ].join('\n');
+  assert.deepEqual(runStats(text), {
+    session: sessionId,
+    files: 8,
+    tokens: 1234,
+  });
+  const usage = '{"input_tokens": 10, "output_tokens": 5}';
+  assert.equal(runStats(usage).tokens, 15);
+  assert.deepEqual(runStats('hello'), {});
+});
+
+test('legacy .reslop runs move into .plan', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    const legacy = {
+      id: 4,
+      cliId: 'claude',
+      name: 'claude',
+      model: 'sonnet',
+      cmd: '/bin/claude',
+      args: [],
+      command: 'claude plan',
+      plan: '.plan/a.md',
+      action: 'run',
+      status: 'exit 0',
+      exit: 0,
+      output: 'done\n',
+      startedAt: 1000,
+      endedAt: 4000,
+    };
+    const prefs = { agents: { claude: { model: 'sonnet' } }, runs: [legacy] };
+    const file = path.join(repo.dir, '.reslop');
+    fs.writeFileSync(file, `${JSON.stringify(prefs, null, 2)}\n`);
+    ui.agents.loadRuns();
+    assert.equal(ui.agents.jobs.length, 1);
+    assert.equal(ui.agents.jobs[0].status, 'exit 0');
+    assert.equal(ui.agents.jobs[0].elapsed(), '0:03');
+    const runs = JSON.parse(
+      fs.readFileSync(path.join(repo.dir, '.plan', '.runs'), 'utf8'),
+    );
+    assert.equal(runs[0].exit, 0);
+    assert.equal(runs[0].status, undefined);
+    assert.equal(runs[0].elapsed, 3);
+    assert.equal(runs[0].endedAt, undefined);
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(saved.runs, undefined);
+    assert.equal(saved.agents.claude.model, 'sonnet');
   } finally {
     ui.agents.reset();
     repo.cleanup();

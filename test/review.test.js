@@ -29,11 +29,7 @@ test('allocateReviewPath uses 00 then 01 on the same day', () => {
 test('latestReviewName picks the newest date then index', () => {
   assert.equal(latestReviewName([]), '');
   assert.equal(
-    latestReviewName([
-      'templates.json',
-      '2026-09-06-09.md',
-      '2026-09-07-00.md',
-    ]),
+    latestReviewName(['.templates', '2026-09-06-09.md', '2026-09-07-00.md']),
     '2026-09-07-00.md',
   );
   assert.equal(
@@ -392,6 +388,9 @@ test('flushReview writes markdown and templates when notes exist', () => {
       header: '@@ -3,1 +3,1 @@',
       text: 'rename this',
     });
+    const folder = path.dirname(reviewPath);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'templates.json'), '[]\n');
     const wrote = flushReview(store);
     assert.equal(wrote, true);
     assert.equal(store.dirty, false);
@@ -399,6 +398,32 @@ test('flushReview writes markdown and templates when notes exist', () => {
     assert.match(md, /rename this/);
     const templates = loadTemplates(dir);
     assert.equal(templates.length, 0);
+    assert.equal(fs.existsSync(path.join(folder, '.templates')), true);
+    assert.equal(fs.existsSync(path.join(folder, 'templates.json')), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadTemplates prefers .templates and reads templates.json', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
+  try {
+    const folder = path.join(dir, '.plan');
+    fs.mkdirSync(folder);
+    const legacy = [{ text: 'extract helper', count: 2 }];
+    fs.writeFileSync(
+      path.join(folder, 'templates.json'),
+      `${JSON.stringify(legacy)}\n`,
+    );
+    assert.equal(loadTemplates(dir)[0].text, 'extract helper');
+    assert.equal(loadTemplates(dir)[0].count, 2);
+    const next = [{ text: 'new name', count: 4 }];
+    fs.writeFileSync(
+      path.join(folder, '.templates'),
+      `${JSON.stringify(next)}\n`,
+    );
+    assert.equal(loadTemplates(dir)[0].text, 'new name');
+    assert.equal(loadTemplates(dir)[0].count, 4);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
