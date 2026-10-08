@@ -213,7 +213,7 @@ test('log names are dated and numbered', async () => {
   const first = nextLogFile(root, 'test', now);
   await saveLogs(first, 'exit 0\n', 'raw output\n');
   assert.equal(first.name, '2026-09-22-test-01.log');
-  assert.equal(first.rawName, '2026-09-22-test-01.raw.log');
+  assert.equal(first.rawName, '2026-09-22-test-01.raw');
   assert.equal(read(first.name), 'exit 0\n');
   assert.equal(read(first.rawName), 'raw output\n');
   assert.ok(!fs.existsSync(path.join(root, first.name)));

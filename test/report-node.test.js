@@ -106,8 +106,8 @@ for (const reporter of ['tap', 'spec']) {
       assert.ok(!controller.output.includes('## '));
       const logDir = path.join(root, '.log');
       const logs = fs.readdirSync(logDir);
-      const reduced = logs.find((name) => !name.endsWith('.raw.log'));
-      const rawName = logs.find((name) => name.endsWith('.raw.log'));
+      const reduced = logs.find((name) => name.endsWith('.log'));
+      const rawName = logs.find((name) => name.endsWith('.raw'));
       assert.equal(logs.length, 2);
       const md = renderDocument(doc, rawName);
       const logText = md

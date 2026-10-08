@@ -1720,18 +1720,27 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     assert.match(list, /1\/2/);
     ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.viewing, true);
-    const runs = JSON.parse(
-      fs.readFileSync(path.join(repo.dir, '.plan', '.runs'), 'utf8'),
-    );
-    assert.equal(runs.length, 1);
-    assert.equal(runs[0].exit, 0);
-    assert.equal(runs[0].status, undefined);
-    assert.equal(runs[0].endedAt, undefined);
-    assert.equal(typeof runs[0].elapsed, 'number');
-    assert.equal(runs[0].files, 9);
-    assert.equal(runs[0].session, sessionId);
-    assert.match(runs[0].output, /hello from agent/);
-    assert.match(runs[0].command, /claude/);
+    const folder = path.join(repo.dir, '.log');
+    const jsonName = fs
+      .readdirSync(folder)
+      .find((name) => name.endsWith('.json'));
+    const runPath = path.join(folder, jsonName);
+    const run = JSON.parse(fs.readFileSync(runPath, 'utf8'));
+    assert.equal(run.exit, 0);
+    assert.equal(run.status, undefined);
+    assert.equal(run.endedAt, undefined);
+    assert.equal(run.output, undefined);
+    assert.equal(typeof run.elapsed, 'number');
+    assert.equal(run.files, 9);
+    assert.equal(run.session, sessionId);
+    assert.match(run.command, /claude/);
+    assert.match(run.log, /\.log$/);
+    assert.match(run.raw, /\.raw$/);
+    const savedLog = fs.readFileSync(path.join(folder, run.log), 'utf8');
+    const savedRaw = fs.readFileSync(path.join(folder, run.raw), 'utf8');
+    assert.match(savedLog, /hello from agent/);
+    assert.match(savedRaw, /hello from agent/);
+    assert.equal(fs.existsSync(path.join(repo.dir, '.plan', '.runs')), false);
     const sessions = JSON.parse(
       fs.readFileSync(path.join(repo.dir, '.plan', '.sessions'), 'utf8'),
     );
@@ -2026,7 +2035,7 @@ test('run output yields the session, files, and tokens', () => {
   assert.deepEqual(runStats('hello'), {});
 });
 
-test('legacy .reslop runs move into .plan', async () => {
+test('legacy .reslop runs move into .log', async () => {
   const { dir, env } = fakePath('claude');
   const { ui, repo } = openUi();
   try {
@@ -2055,13 +2064,19 @@ test('legacy .reslop runs move into .plan', async () => {
     assert.equal(ui.agents.jobs.length, 1);
     assert.equal(ui.agents.jobs[0].status, 'exit 0');
     assert.equal(ui.agents.jobs[0].elapsed(), '0:03');
-    const runs = JSON.parse(
-      fs.readFileSync(path.join(repo.dir, '.plan', '.runs'), 'utf8'),
-    );
-    assert.equal(runs[0].exit, 0);
-    assert.equal(runs[0].status, undefined);
-    assert.equal(runs[0].elapsed, 3);
-    assert.equal(runs[0].endedAt, undefined);
+    const folder = path.join(repo.dir, '.log');
+    const jsonName = fs
+      .readdirSync(folder)
+      .find((name) => name.endsWith('.json'));
+    const runPath = path.join(folder, jsonName);
+    const run = JSON.parse(fs.readFileSync(runPath, 'utf8'));
+    assert.equal(run.exit, 0);
+    assert.equal(run.status, undefined);
+    assert.equal(run.elapsed, 3);
+    assert.equal(run.endedAt, undefined);
+    const body = fs.readFileSync(path.join(folder, run.log), 'utf8');
+    assert.match(body, /done/);
+    assert.equal(fs.existsSync(path.join(repo.dir, '.plan', '.runs')), false);
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(saved.runs, undefined);
     assert.equal(saved.agents.claude.model, 'sonnet');

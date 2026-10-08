@@ -167,8 +167,8 @@ test(prettyView, async () => {
     assert.equal(controller.output.trimEnd(), raw);
     const directory = path.join(root, '.log');
     const names = fs.readdirSync(directory);
-    const reduced = names.find((name) => !name.endsWith('.raw.log'));
-    const rawName = names.find((name) => name.endsWith('.raw.log'));
+    const reduced = names.find((name) => name.endsWith('.log'));
+    const rawName = names.find((name) => name.endsWith('.raw'));
     assert.equal(names.length, 2);
     const log = fs.readFileSync(path.join(directory, reduced), 'utf8');
     assert.match(log, /## comparison 1/);
