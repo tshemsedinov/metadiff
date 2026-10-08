@@ -516,12 +516,12 @@ test('a pipe prints markdown and writes a log', async () => {
     assert.match(text, /passed: 1/);
     assert.ok(!text.includes('hidden'));
     const logs = savedLogs(dir);
-    const reduced = logs.find((name) => !name.endsWith('.raw.log'));
-    const rawName = logs.find((name) => name.endsWith('.raw.log'));
-    assert.equal(logs.length, 2);
+    const reduced = logs.find((name) => name.endsWith('.log'));
+    const rawName = logs.find((name) => name.endsWith('.raw'));
+    assert.ok(logs.some((name) => name.endsWith('.json')));
     const saved = fs.readFileSync(path.join(dir, '.log', reduced), 'utf8');
     assert.equal(saved, text);
-    assert.match(text, /read the raw log `\.log\/.+\.raw\.log`/);
+    assert.match(text, /read the raw log `\.log\/.+\.raw`/);
     const raw = fs.readFileSync(path.join(dir, '.log', rawName), 'utf8');
     assert.match(raw, /✔ hidden/);
     assert.match(raw, /ℹ tests 1/);
@@ -566,7 +566,15 @@ test('RESLOP_OUTPUT selects raw and rejects unknown', async () => {
     assert.equal(await run(raw), 0);
     assert.equal(fs.readFileSync(out, 'utf8'), '✔ hidden');
     assert.equal(raw.stdoutText(), '');
-    assert.deepEqual(savedLogs(dir), []);
+    const rawLogs = savedLogs(dir);
+    assert.equal(
+      rawLogs.some((name) => name.endsWith('.log')),
+      false,
+    );
+    assert.equal(
+      rawLogs.some((name) => name.endsWith('.raw')),
+      false,
+    );
     const pretty = fakeProc(dir, {
       argv: ['node', 'reslop', 't', '--', 'node', '-e', 'process.exit(0)'],
       env: { RESLOP_OUTPUT: 'pretty' },
@@ -601,7 +609,15 @@ test('raw mode records test counts and passes the output through', async () => {
     });
     assert.equal(await run(proc), 0);
     assert.match(proc.stdoutText(), /✔ one/);
-    assert.equal(savedLogs(dir).length, 0);
+    const names = savedLogs(dir);
+    assert.equal(
+      names.some((name) => name.endsWith('.log')),
+      false,
+    );
+    assert.equal(
+      names.some((name) => name.endsWith('.raw')),
+      false,
+    );
     const [record] = readRuns(dir);
     assert.equal(record.progress.done, 1);
     assert.equal(record.result.tests, 1);

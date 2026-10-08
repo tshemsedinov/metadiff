@@ -303,8 +303,8 @@ test('TUI groups and saves TAP without a version header', async () => {
     assert.ok(!controller.output.includes('node:'));
     const directory = path.join(root, '.log');
     const names = fs.readdirSync(directory);
-    const reduced = names.find((name) => !name.endsWith('.raw.log'));
-    const rawName = names.find((name) => name.endsWith('.raw.log'));
+    const reduced = names.find((name) => name.endsWith('.log'));
+    const rawName = names.find((name) => name.endsWith('.raw'));
     assert.equal(names.length, 2);
     const log = fs.readFileSync(path.join(directory, reduced), 'utf8');
     assert.match(log, /count: 2/);
