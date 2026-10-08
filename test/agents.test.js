@@ -165,7 +165,7 @@ test('agents screen lists clis and starts with the review plan', async () => {
     assert.equal(rows[1].bin, '');
     ui.draw();
     const text = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.match(text, /agent\s+model\s+effort\s+fast\s+review/);
+    assert.match(text, /agent\s+model\s+effort\s+fast\s+(?:context\s+)?plan/);
     assert.equal(text.includes('▶'), false);
     assert.equal(text.includes('status'), false);
     assert.match(text, /claude/);
@@ -233,6 +233,13 @@ test('agents screen lists clis and starts with the review plan', async () => {
     const log = stripAnsi(ui.lastFrame.rows.join('\n'));
     assert.match(log, /hello/);
     assert.match(render.headerText(ui.view()), /agents log/);
+    const watching = renderFrame(ui.view(), {
+      width: 80,
+      height: 24,
+      color: false,
+    });
+    assert.ok(watching.buttons.some((hit) => hit.id === 'agentStop'));
+    assert.match(log, /re-run/);
     ui.handleEvent({ type: 'key', key: 'escape' });
     assert.equal(ui.agents.viewing, false);
     assert.equal(ui.agents.jobs[0].status, 'running');
@@ -250,7 +257,9 @@ test('agents screen lists clis and starts with the review plan', async () => {
       frame.buttons.some((hit) => hit.id === 'agentParams'),
       false,
     );
-    assert.ok(frame.buttons.some((hit) => hit.id === 'agentStop'));
+    const footer = stripAnsi(frame.rows.at(-1));
+    assert.equal(footer.includes('stop'), false);
+    assert.match(footer, /plan/);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -293,7 +302,7 @@ test('agent jobs keep running after leaving the log', async () => {
     ui.agents.start();
     assert.equal(ui.agents.jobs.length, 1);
     assert.equal(ui.status, `busy ${path.basename(ui.agents.planFile())}`);
-    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'p' });
     ui.handleEvent({ type: 'key', key: 'enter' });
     ui.agents.start();
     assert.equal(ui.agents.jobs.length, 2);
@@ -301,11 +310,51 @@ test('agent jobs keep running after leaving the log', async () => {
     assert.equal(ui.agents.runningCount(), 2);
     ui.handleEvent({ type: 'key', key: 'escape' });
     ui.handleEvent({ type: 'key', key: 's' });
+    assert.equal(killed.length, 0);
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    ui.handleEvent({ type: 'key', key: 's' });
     assert.equal(killed.length, 1);
     assert.equal(ui.agents.runningCount(), 1);
     const live = ui.agents.jobs.filter((job) => job.status === 'running');
     assert.equal(live.length, 1);
     assert.equal(live[0].name, 'claude');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('r in the agent log repeats the command', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo } = openUi();
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    const calls = [];
+    let close = null;
+    ui.agents.spawn = (cwd, launch, onData, onClose) => {
+      calls.push(launch);
+      onData('live\n');
+      close = onClose;
+      return {
+        kill() {
+          onClose({ status: 1, text: 'bye\n' });
+        },
+      };
+    };
+    ui.agents.start();
+    assert.equal(ui.agents.viewing, true);
+    ui.handleEvent({ type: 'key', key: 'r' });
+    assert.equal(calls.length, 1);
+    close({ status: 0, text: 'done\n' });
+    ui.handleEvent({ type: 'key', key: 'r' });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].command, calls[0].command);
+    ui.handleEvent({ type: 'key', key: 'escape' });
+    ui.handleEvent({ type: 'key', key: 'r' });
+    assert.equal(calls.length, 2);
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -334,7 +383,7 @@ test('cursor fallback includes grok-4.6', () => {
     '/tmp/plan.md',
   );
   const hardCmd =
-    'cursor-agent --trust --model auto --effort xhigh /tmp/plan.md';
+    'cursor-agent --trust --model auto[effort=xhigh] /tmp/plan.md';
   assert.equal(hard.command, hardCmd);
   const codex = AGENTS.find((item) => item.id === 'codex');
   const codexRow = {
@@ -359,6 +408,47 @@ test('cursor fallback includes grok-4.6', () => {
   assert.equal(login.command, 'cursor-agent login');
   assert.equal(buildLogin({ ...row, spec: AGENTS[0] }).error, 'no login');
   assert.equal(needsAuth('Error: Authentication required. Please run'), true);
+  const saved = buildLaunch(
+    row,
+    { model: 'grok-4.6', extra: '', effort: 'high', fast: true },
+    '/tmp/plan.md',
+  );
+  const savedCmd =
+    'cursor-agent --trust --model grok-4.6[effort=high,fast=true] ' +
+    '/tmp/plan.md';
+  assert.equal(saved.command, savedCmd);
+});
+
+test('cursor grok-4.6 uses the listed effort slug', () => {
+  const cursor = AGENTS.find((row) => row.id === 'cursor');
+  const row = {
+    id: cursor.id,
+    name: cursor.name,
+    bin: '/usr/bin/cursor-agent',
+    spec: cursor,
+    models: [
+      'grok-4.6',
+      'cursor-grok-4.6-low',
+      'cursor-grok-4.6-high',
+      'cursor-grok-4.6-high-fast',
+      'cursor-grok-4.6-xhigh',
+    ],
+  };
+  const launch = buildLaunch(
+    row,
+    {
+      model: 'grok-4.6',
+      extra: '',
+      effort: 'high',
+      fast: true,
+      context: '256k',
+    },
+    '/tmp/plan.md',
+  );
+  const cmd =
+    'cursor-agent --trust --model cursor-grok-4.6-high-fast /tmp/plan.md';
+  assert.equal(launch.command, cmd);
+  assert.equal(launch.args.includes('--effort'), false);
 });
 
 test('parseCursorModels reads id dash name rows', () => {
@@ -512,7 +602,7 @@ test('agents screen runs the review file chosen in the combo', async () => {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
     await ui.agents.open();
-    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'p' });
     assert.equal(ui.agents.pick.field, 'plan');
     assert.deepEqual(ui.agents.menuItems(), [
       `${newer}  partial  0/0`,
@@ -581,7 +671,7 @@ test('plan combo lists plain markdown and aligns columns', async () => {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
     await ui.agents.open();
-    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'p' });
     assert.deepEqual(ui.agents.menuItems(), [
       `${dated}  partial  0/1`,
       ideas,
@@ -594,7 +684,7 @@ test('plan combo lists plain markdown and aligns columns', async () => {
     const text = stripAnsi(ui.lastFrame.rows.join('\n'));
     assert.match(text, /ideas\.md/);
     assert.equal(text.includes('ideas.md  editing'), false);
-    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'p' });
     ui.handleEvent({ type: 'key', key: 'down' });
     ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(path.basename(ui.agents.planFile()), note);
@@ -642,11 +732,11 @@ test('agents screen runs cursor login when auth is required', async () => {
     assert.equal(ui.agents.jobs[0].status, 'running');
     ui.handleEvent({ type: 'key', key: 'enter' });
     assert.equal(ui.agents.viewing, true);
+    ui.handleEvent({ type: 'key', key: 's' });
+    assert.equal(ui.agents.jobs[0].status, 'stopped');
     ui.handleEvent({ type: 'key', key: 'escape' });
     assert.equal(ui.agents.viewing, false);
-    assert.equal(ui.agents.jobs[0].status, 'running');
-    assert.equal(ui.status, 'logging in');
-    ui.handleEvent({ type: 'key', key: 's' });
+    assert.equal(ui.status, '');
     ui.nav.agentCursor = 0;
     ui.handleEvent({ type: 'key', key: 'l' });
     assert.equal(ui.status, 'no login');
@@ -960,7 +1050,7 @@ test('model menu uses background and a right scroller', async () => {
     ui.draw();
     const head = ui.lastFrame.rows.find((row) => {
       const plain = stripAnsi(row);
-      return plain.includes('model') && plain.includes('review');
+      return plain.includes('model') && plain.includes('plan');
     });
     assert.ok(head);
     assert.equal(head.includes(BOLD), false);
@@ -1065,7 +1155,88 @@ test('agents screen remembers model and effort in .reslop', async () => {
   }
 });
 
-test('agents screen lists runs for the selected model', async () => {
+test('recorded runs stay listed for the selected cli', async () => {
+  const { dir, env } = fakePath('cursor-agent', 'claude');
+  const { ui, repo } = openUi();
+  try {
+    const plan = path.join(repo.dir, '.plan');
+    fs.mkdirSync(plan, { recursive: true });
+    const recorded = [
+      {
+        id: 1,
+        cliId: 'cursor',
+        name: 'cursor',
+        model: 'grok-4.6',
+        cmd: '/bin/cursor-agent',
+        args: [],
+        command: 'cursor old grok',
+        plan: '.plan/a.md',
+        action: 'run',
+        exit: 1,
+        elapsed: 4,
+        startedAt: 1,
+        output: '',
+      },
+      {
+        id: 2,
+        cliId: 'cursor',
+        name: 'cursor',
+        model: 'cursor-grok-4.6',
+        cmd: '/bin/cursor-agent',
+        args: [],
+        command: 'cursor new grok',
+        plan: '.plan/a.md',
+        action: 'run',
+        stopped: true,
+        elapsed: 0,
+        startedAt: 2,
+        output: '',
+      },
+      {
+        id: 3,
+        cliId: 'claude',
+        name: 'claude',
+        model: 'sonnet',
+        cmd: '/bin/claude',
+        args: [],
+        command: 'claude only',
+        plan: '.plan/a.md',
+        action: 'run',
+        exit: 0,
+        elapsed: 1,
+        startedAt: 3,
+        output: '',
+      },
+    ];
+    const file = path.join(plan, '.runs');
+    fs.writeFileSync(file, `${JSON.stringify(recorded, null, 2)}\n`);
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    ui.agents.loadRuns();
+    await ui.agents.open();
+    const at = ui.agents.rows().findIndex((row) => row.id === 'cursor');
+    ui.nav.agentCursor = at;
+    ui.agents.choice('cursor').model = 'auto';
+    const cursor = ui.agents.rows().find((row) => row.id === 'cursor');
+    const shown = ui.agents.runRows(cursor).map((row) => row.command);
+    assert.deepEqual(shown, ['cursor new grok', 'cursor old grok']);
+    ui.draw();
+    const text = stripAnsi(ui.lastFrame.rows.join('\n'));
+    assert.match(text, /stopped/);
+    assert.match(text, /exit 1/);
+    const claudeAt = ui.agents.rows().findIndex((row) => row.id === 'claude');
+    ui.nav.agentCursor = claudeAt;
+    const claude = ui.agents.rows().find((row) => row.id === 'claude');
+    const claudeRuns = ui.agents.runRows(claude).map((row) => row.command);
+    assert.deepEqual(claudeRuns, ['claude only']);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen lists every run for the selected cli', async () => {
   const { dir, env } = fakePath('claude');
   const { ui, repo } = openUi();
   try {
@@ -1079,15 +1250,19 @@ test('agents screen lists runs for the selected model', async () => {
     ui.handleEvent({ type: 'key', key: 'escape' });
     ui.draw();
     const lines = stripAnsi(ui.lastFrame.rows.join('\n')).split('\n');
-    const live = (row) => /claude/.test(row) && /running/.test(row);
-    assert.ok(lines.some(live));
+    assert.ok(lines.some((row) => /claude/.test(row)));
+    assert.ok(lines.some((row) => /running/.test(row)));
+    const title = lines.findIndex((line) => /agent\s+model/.test(line));
+    const runHit = ui.lastFrame.fileHits.find((hit) => hit.side === 'runs');
+    assert.ok(runHit);
+    assert.equal(runHit.y, title + 1);
     assert.match(ui.agents.jobs[0].command, /claude --model sonnet/);
     ui.handleEvent({ type: 'key', key: 'm' });
     ui.handleEvent({ type: 'key', key: 'down' });
     ui.handleEvent({ type: 'key', key: 'enter' });
     ui.draw();
     const opus = stripAnsi(ui.lastFrame.rows.join('\n'));
-    assert.equal(opus.includes('running'), false);
+    assert.match(opus, /running/);
     ui.handleEvent({ type: 'key', key: 'm' });
     ui.handleEvent({ type: 'key', key: 'up' });
     ui.handleEvent({ type: 'key', key: 'enter' });
@@ -1172,7 +1347,7 @@ test('agents screen blocks a review file that is already running', async () => {
     ui.agents.start();
     assert.equal(calls.length, 1);
     assert.equal(ui.status, `busy ${newer}`);
-    ui.handleEvent({ type: 'key', key: 'r' });
+    ui.handleEvent({ type: 'key', key: 'p' });
     assert.deepEqual(ui.agents.menuItems(), [
       `${newer}  ready  0/0`,
       `${older}  ready  0/0`,
@@ -1389,7 +1564,7 @@ test('agents screen selects a cursor context size', async () => {
     ui.agents.choice('cursor').model = 'grok-4.6';
     ui.agents.start();
     assert.equal(calls.length, 1);
-    assert.ok(calls[0].args.includes('grok-4.6[context=1m]'));
+    assert.ok(calls[0].args.includes('grok-4.6[context=1m,effort=medium]'));
   } finally {
     ui.agents.reset();
     repo.cleanup();
@@ -1409,7 +1584,9 @@ test('agent columns fill the row in proportion to their content', async () => {
     const titleAt = plain.findIndex((line) => /agent\s+model/.test(line));
     assert.equal(titleAt, 2);
     assert.equal(plain[1].trim(), '');
-    assert.match(plain[titleAt], /review/);
+    assert.match(plain[titleAt], /plan/);
+    assert.match(plain[titleAt], /^ {2}agent/);
+    assert.equal(/^ {3}agent/.test(plain[titleAt]), false);
     assert.equal(plain[titleAt].includes('status'), false);
     const plan = ui.lastFrame.fileHits.find((hit) => hit.field === 'plan');
     const model = ui.lastFrame.fileHits.find((hit) => hit.field === 'model');
