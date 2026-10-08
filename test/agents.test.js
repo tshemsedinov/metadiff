@@ -319,9 +319,9 @@ test('cursor fallback includes grok-4.6', () => {
     models: cursor.models,
   };
   const launch = buildLaunch(row, { model: 'auto', extra: '' }, '/tmp/plan.md');
-  assert.equal(launch.args[0], '--print');
-  assert.equal(launch.args[1], '--trust');
-  const shown = 'cursor-agent --print --trust --model auto /tmp/plan.md';
+  assert.equal(launch.args[0], '--trust');
+  assert.equal(launch.pty, true);
+  const shown = 'cursor-agent --trust --model auto /tmp/plan.md';
   assert.equal(launch.command, shown);
   const hard = buildLaunch(
     row,
@@ -329,7 +329,7 @@ test('cursor fallback includes grok-4.6', () => {
     '/tmp/plan.md',
   );
   const hardCmd =
-    'cursor-agent --print --trust --model auto --effort xhigh /tmp/plan.md';
+    'cursor-agent --trust --model auto --effort xhigh /tmp/plan.md';
   assert.equal(hard.command, hardCmd);
   const codex = AGENTS.find((item) => item.id === 'codex');
   const codexRow = {
@@ -731,8 +731,7 @@ test('effort encoded in a model id is chosen separately', () => {
     { model: 'gpt-5.6-sol-high', effort: 'low', extra: '' },
     '/tmp/plan.md',
   );
-  const cmd =
-    'cursor-agent --print --trust --model gpt-5.6-sol-low /tmp/plan.md';
+  const cmd = 'cursor-agent --trust --model gpt-5.6-sol-low /tmp/plan.md';
   assert.equal(launch.command, cmd);
   assert.equal(launch.command.includes('--effort'), false);
   const fastOn = buildLaunch(
@@ -741,7 +740,7 @@ test('effort encoded in a model id is chosen separately', () => {
     '/tmp/plan.md',
   );
   const fastCmd =
-    'cursor-agent --print --trust --model gpt-5.6-sol-low-fast /tmp/plan.md';
+    'cursor-agent --trust --model gpt-5.6-sol-low-fast /tmp/plan.md';
   assert.equal(fastOn.command, fastCmd);
   const sized = buildLaunch(
     row,
@@ -749,7 +748,7 @@ test('effort encoded in a model id is chosen separately', () => {
     '/tmp/plan.md',
   );
   const sizedCmd =
-    'cursor-agent --print --trust --model gpt-5.6-sol-low[context=1m] ' +
+    'cursor-agent --trust --model gpt-5.6-sol-low[context=1m] ' +
     '/tmp/plan.md';
   assert.equal(sized.command, sizedCmd);
   const normal = buildLaunch(
@@ -1444,7 +1443,15 @@ test('agent history keeps the launch, output, time, and progress', async () => {
     stdout.columns = 160;
     assert.equal(ui.agents.viewing, true);
     ui.draw();
-    const log = stripAnsi(ui.lastFrame.rows.join('\n'));
+    const rows = ui.lastFrame.rows.map((row) => stripAnsi(row));
+    const log = rows.join('\n');
+    assert.equal(rows[1].trim(), '');
+    const command = rows.find((row) => row.includes('.plan/'));
+    const status = rows.find((row) => row.includes('exit 0'));
+    assert.match(command, /^ {2}\S/);
+    assert.match(status, /^ {2}exit 0/);
+    assert.equal(command.slice(-2), '  ');
+    assert.equal(status.slice(-2), '  ');
     assert.match(log, /claude/);
     assert.match(log, /hello from agent/);
     assert.match(log, /exit 0/);
