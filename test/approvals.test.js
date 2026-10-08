@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const term = require('../lib/term-screen.js');
-const { createScreen, screenWrite, pendingKind } = term;
+const { createScreen, screenWrite, styledText, pendingKind } = term;
 const { pendingHint, answerBytes, requestTitle } = term;
 const { permissionTokens, rememberedTokens } = term;
 const allow = require('../lib/agent-allow.js');
@@ -50,6 +50,17 @@ test('terminal screen shows an approval request', () => {
   assert.equal(pendingKind(busy), '');
   assert.equal(pendingHint('idle'), '');
   assert.equal(pendingKind(`Run this command?\n${idle}`), 'decision');
+});
+
+test('styled terminal text keeps color and scrolled lines', () => {
+  const screen = createScreen(8, 2);
+  screenWrite(screen, '\x1b[31mred\x1b[0m\r\nmore\r\nthird');
+  const styled = styledText(screen);
+  assert.ok(styled.includes('\x1b[31mred'));
+  assert.match(styled, /more/);
+  assert.match(styled, /third/);
+  const plain = screenWrite(screen, '');
+  assert.equal(plain.includes('\x1b'), false);
 });
 
 test('plan edits and test commands are remembered in the cursor config', () => {
