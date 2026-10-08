@@ -44,6 +44,12 @@ test('terminal screen shows an approval request', () => {
   assert.equal(pendingKind(reply), 'text');
   assert.equal(answerBytes('s', 'text'), 's');
   assert.equal(answerBytes('escape', 'text'), '\x1b');
+  const idle = '→ Add a follow-up\nGrok 4.7 256K High · 8 files edited';
+  const busy = `${idle}\nctrl+c to stop`;
+  assert.equal(pendingKind(idle), 'idle');
+  assert.equal(pendingKind(busy), '');
+  assert.equal(pendingHint('idle'), '');
+  assert.equal(pendingKind(`Run this command?\n${idle}`), 'decision');
 });
 
 test('plan edits and test commands are remembered in the cursor config', () => {
@@ -146,6 +152,43 @@ test('the agent log answers an approval and remembers it', async () => {
     repo.cleanup();
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(configDir, { recursive: true, force: true });
+  }
+});
+
+test('a finished cursor agent is closed', async () => {
+  const dir = binDir();
+  const { ui, repo } = openUi();
+  const writes = [];
+  let push = null;
+  try {
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh({ PATH: dir });
+    await ui.agents.open();
+    ui.nav.agentCursor = 2;
+    ui.agents.spawn = (cwd, launch, onData) => {
+      push = onData;
+      onData('→ Add a follow-up\n');
+      return {
+        kill() {},
+        write(data) {
+          writes.push(data);
+        },
+        resize() {},
+      };
+    };
+    ui.agents.start();
+    assert.deepEqual(writes, []);
+    push('working\nctrl+c to stop\n');
+    assert.deepEqual(writes, []);
+    push('done\n→ Add a follow-up\n');
+    assert.deepEqual(writes, ['\x04']);
+    push('done\n→ Add a follow-up\n');
+    assert.deepEqual(writes, ['\x04']);
+    assert.equal(ui.agents.jobs[0].pending, 'idle');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

@@ -498,7 +498,7 @@ test('load omits files under .plan', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('keep.txt', 'K\n');
     repo.write('.plan/2026-09-07-00.md', '---\nstatus: editing\n---\n');
-    repo.write('.plan/templates.json', '[]\n');
+    repo.write('.plan/.templates', '[]\n');
     const dirty = load(repo.dir);
     const dirtyPaths = dirty.items.map((item) => item.file.newPath);
     assert.deepEqual(dirtyPaths, ['keep.txt']);
