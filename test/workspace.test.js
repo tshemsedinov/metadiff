@@ -161,6 +161,14 @@ test('equal tiles keep one width and height', () => {
   assert.equal(widths.size, 1);
   assert.equal(heights.size, 1);
   assert.equal(bands[0].tiles.length, grid.cols);
+  const wide = equalGrid(81, 24, 2, 34, 7);
+  const pair = placeEqualTiles([{ id: 'a' }, { id: 'b' }], wide);
+  const left = pair[0].tiles[0];
+  const right = pair[0].tiles[1];
+  assert.equal(left.w + 2 + right.w, 81);
+  assert.ok(Math.abs(left.w - right.w) <= 1);
+  const edge = left.x + left.w + 2 + right.w;
+  assert.equal(edge, wide.width);
 });
 
 test('a repo tile shows size, extensions, tasks, and diffs', () => {

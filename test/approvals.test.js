@@ -87,6 +87,7 @@ const openUi = () => {
   });
   ui.ensureRepo();
   ui.load();
+  ui.agents.authProbe = () => true;
   return { ui, repo };
 };
 
