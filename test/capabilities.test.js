@@ -24,6 +24,9 @@ test('capability matrix covers local commit remotes and read-only', () => {
   });
   assert.deepEqual(capabilitiesFor('pr'), SOURCE_CAPS.pr);
   assert.deepEqual(capabilitiesFor('mr'), SOURCE_CAPS.mr);
+  assert.deepEqual(capabilitiesFor('issue'), SOURCE_CAPS.issue);
+  assert.deepEqual(capabilitiesFor('gl-issue'), SOURCE_CAPS['gl-issue']);
+  assert.equal(capabilitiesFor('issue').changes, false);
   assert.equal(capabilitiesFor('readonly').changes, false);
   assert.equal(capabilitiesFor('local', { readOnly: true }).changes, false);
   assert.equal(capabilitiesFor('local', { readOnly: true }).branches, false);

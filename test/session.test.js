@@ -1753,6 +1753,106 @@ test('tasks import asks for a url and applies the pull request', async () => {
   assert.match(session.notes.tasks[0].text, /add tests/);
 });
 
+test('tasks import accepts a github or gitlab issue url', async () => {
+  const { session } = openSession([sampleItem('a.js')], {
+    loadGithubIssue: async () => ({
+      imported: {
+        feedback: [],
+        tasks: [
+          {
+            file: 'issue',
+            text: '@alice review at github: add the flag',
+            done: false,
+          },
+        ],
+      },
+    }),
+    loadGitlabIssue: async () => ({
+      imported: {
+        feedback: [],
+        tasks: [
+          {
+            file: 'issue',
+            text: '@bob review at gitlab: from gitlab',
+            done: false,
+          },
+        ],
+      },
+    }),
+  });
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://github.com/acme/demo/issues/4');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.importPromise;
+  assert.equal(session.status, 'imported');
+  assert.match(session.notes.tasks[0].text, /add the flag/);
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://gitlab.com/acme/demo/-/issues/8');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.importPromise;
+  assert.equal(session.notes.tasks.length, 2);
+  assert.match(session.notes.tasks[1].text, /from gitlab/);
+});
+
+test('tasks import accepts a github or gitlab issue list', async () => {
+  let githubTarget = null;
+  let gitlabTarget = null;
+  const { session } = openSession([sampleItem('a.js')], {
+    loadGithubIssue: async (issue) => {
+      githubTarget = issue;
+      return {
+        imported: {
+          feedback: [],
+          tasks: [
+            {
+              file: 'issue',
+              text: '@ScriptHound at github: line numbers',
+              done: false,
+            },
+          ],
+        },
+      };
+    },
+    loadGitlabIssue: async (issue) => {
+      gitlabTarget = issue;
+      return {
+        imported: {
+          feedback: [],
+          tasks: [
+            {
+              file: 'issue',
+              text: '@bob at gitlab: from the list',
+              done: false,
+            },
+          ],
+        },
+      };
+    },
+  });
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://github.com/tshemsedinov/reslop/issues');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.importPromise;
+  assert.equal(session.status, 'imported');
+  assert.deepEqual(githubTarget, {
+    owner: 'tshemsedinov',
+    repo: 'reslop',
+    list: true,
+  });
+  assert.match(session.notes.tasks[0].text, /@ScriptHound at github:/);
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://gitlab.com/acme/demo');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.importPromise;
+  assert.equal(gitlabTarget.project, 'acme/demo');
+  assert.equal(gitlabTarget.list, true);
+  assert.match(session.notes.tasks[1].text, /@bob at gitlab:/);
+});
+
 test('todo edits in the list not the note line', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 24;

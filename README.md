@@ -48,6 +48,8 @@ Requires Node.js `>=18.15.0`.
 - `reslop path/file` show only that path or file (starts on the file list)
 - `reslop 7ac260c` show that commit (read-only)
 - `reslop https://github.com/metarhia/metacom/pull/555` GitHub/GitLab PR/MR
+- `reslop https://github.com/metarhia/metacom/issues/550` import GitHub/GitLab issue
+- `reslop https://github.com/metarhia/metacom/issues` import all issues
 - `reslop -n` start a new review even if the latest is still editing
 - `reslop -r` read-only mode
 - `reslop -light` light color theme (default dark)
@@ -75,7 +77,6 @@ Reviews go in `.plan/YYYY-MM-DD-NN.md` with frontmatter `status`:
 
 ## Future
 
-- Import issues from GitHub and GitLab
 - Search, blame, and file history in the review
 - Security and code-quality audit; propose a repair plan
 - Send anonymized code blocks for expert review
