@@ -4118,6 +4118,39 @@ test('line numbers stay off until the diff view asks for them', () => {
   assert.ok(on.buttons.find((hit) => hit.id === 'lines'));
 });
 
+test('line number column fills the body down to the status', () => {
+  const hunk = sampleHunk([
+    { type: 'del', text: 'hello', noNl: false, blockId: 0 },
+    { type: 'add', text: 'world', noNl: false, blockId: 0 },
+  ]);
+  const item = {
+    origin: 'unstaged',
+    file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
+    hunk,
+    blockId: 0,
+  };
+  const frame = render.renderFrame(
+    reviewView(item, { pane: 'diff', lineNumbers: true }),
+    { width: 40, height: 12, color: true },
+  );
+  const gutter = bg(THEME.lineNoBg);
+  const body = frame.rows.slice(1, -2);
+  assert.ok(body.length > 2);
+  for (const row of body) assert.ok(row.includes(gutter));
+  assert.ok(!frame.rows[0].includes(gutter));
+  assert.ok(!frame.rows.at(-1).includes(gutter));
+  assert.ok(!frame.rows.at(-2).includes(gutter));
+  const side = render.renderFrame(
+    reviewView(item, { pane: 'diff', layout: 'side', lineNumbers: true }),
+    { width: 80, height: 12, color: true },
+  );
+  const gap = side.rows[1];
+  assert.ok(gap.includes(gutter));
+  assert.ok(gap.includes(bg(THEME.splitGutterBg)));
+  assert.ok(!side.rows[0].includes(gutter));
+  assert.ok(!side.rows.at(-1).includes(gutter));
+});
+
 test('side layout numbers the old file left and the new file right', () => {
   const hunk = {
     oldStart: 3,
