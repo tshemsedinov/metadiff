@@ -15,7 +15,7 @@ const { PLAN_ALLOWS, ensureAllows, cursorConfigPath } = allow;
 const { startAgent } = require('../lib/agents.js');
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
-const { makeRepo, uiSink } = require('./helpers.js');
+const { makeRepo, uiSink, removeTree } = require('./helpers.js');
 const { stripAnsi } = require('../lib/ansi.js');
 
 test('terminal screen shows an approval request', () => {
@@ -225,49 +225,56 @@ test('a finished cursor agent is closed', async () => {
   }
 });
 
-test('cursor agent approvals stay on a tty', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-pty-'));
-  const script = path.join(__dirname, 'fixtures', 'tty-agent.js');
-  const config = path.join(dir, 'cli-config.json');
-  const previous = process.env.RESLOP_CURSOR_CONFIG;
-  process.env.RESLOP_CURSOR_CONFIG = config;
-  let handle = null;
-  try {
-    const seen = [];
-    handle = startAgent(
-      dir,
-      { cmd: process.execPath, args: [script], pty: true },
-      (text) => seen.push(text),
-      () => {},
-    );
-    assert.equal(typeof handle.write, 'function');
-    const ready = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('no tty')), 4000);
-      const timerId = setInterval(() => {
-        if (!seen.some((text) => text.includes('tty=true/true'))) return;
-        clearInterval(timerId);
-        clearTimeout(timer);
-        resolve();
-      }, 30);
-    });
-    void ready;
-    handle.write('y');
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('no key')), 4000);
-      const timerId = setInterval(() => {
-        if (!seen.some((text) => text.includes('key="y"'))) return;
-        clearInterval(timerId);
-        clearTimeout(timer);
-        resolve();
-      }, 30);
-    });
-    const saved = JSON.parse(fs.readFileSync(config, 'utf8'));
-    assert.ok(saved.permissions.allow.includes('Write(.plan/**/*.md)'));
-    assert.ok(saved.permissions.allow.includes('Shell(npm)'));
-  } finally {
-    if (handle) handle.kill();
-    if (previous === undefined) delete process.env.RESLOP_CURSOR_CONFIG;
-    else process.env.RESLOP_CURSOR_CONFIG = previous;
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
+test(
+  'cursor agent approvals stay on a tty',
+  {
+    skip:
+      process.platform === 'win32' ? 'windows agent runner has no pty' : false,
+  },
+  async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-pty-'));
+    const script = path.join(__dirname, 'fixtures', 'tty-agent.js');
+    const config = path.join(dir, 'cli-config.json');
+    const previous = process.env.RESLOP_CURSOR_CONFIG;
+    process.env.RESLOP_CURSOR_CONFIG = config;
+    let handle = null;
+    try {
+      const seen = [];
+      handle = startAgent(
+        dir,
+        { cmd: process.execPath, args: [script], pty: true },
+        (text) => seen.push(text),
+        () => {},
+      );
+      assert.equal(typeof handle.write, 'function');
+      const ready = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('no tty')), 4000);
+        const timerId = setInterval(() => {
+          if (!seen.some((text) => text.includes('tty=true/true'))) return;
+          clearInterval(timerId);
+          clearTimeout(timer);
+          resolve();
+        }, 30);
+      });
+      void ready;
+      handle.write('y');
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('no key')), 4000);
+        const timerId = setInterval(() => {
+          if (!seen.some((text) => text.includes('key="y"'))) return;
+          clearInterval(timerId);
+          clearTimeout(timer);
+          resolve();
+        }, 30);
+      });
+      const saved = JSON.parse(fs.readFileSync(config, 'utf8'));
+      assert.ok(saved.permissions.allow.includes('Write(.plan/**/*.md)'));
+      assert.ok(saved.permissions.allow.includes('Shell(npm)'));
+    } finally {
+      if (handle) handle.kill();
+      if (previous === undefined) delete process.env.RESLOP_CURSOR_CONFIG;
+      else process.env.RESLOP_CURSOR_CONFIG = previous;
+      await removeTree(dir);
+    }
+  },
+);
