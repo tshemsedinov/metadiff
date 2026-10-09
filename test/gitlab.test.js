@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 
 const gitlab = require('../lib/gitlab.js');
 const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
-const { parseGitlabMrUrl, gitlabToken, loadMergeRequest } = gitlab;
+const { parseGitlabMrUrl, parseGitlabIssueUrl, gitlabToken } = gitlab;
+const { parseGitlabIssueListUrl } = gitlab;
+const { loadMergeRequest, loadGitlabIssue } = gitlab;
 const { mrApiUrl, discussionToNotes } = gitlab;
 
 const MR = {
@@ -622,4 +624,244 @@ test('loadMergeRequest still opens when discussion import fails', async () => {
   });
   assert.equal(loaded.change.number, 123);
   assert.deepEqual(loaded.imported, { feedback: [], tasks: [] });
+});
+
+const GL_ISSUE = {
+  host: 'gitlab.com',
+  project: 'acme/app',
+  number: 12,
+  origin: 'https://gitlab.com',
+};
+
+const GL_ISSUE_JSON = JSON.parse(`{
+  "iid": 12,
+  "title": "Add import",
+  "description": "from the cli",
+  "state": "opened",
+  "web_url": "https://gitlab.com/acme/app/-/issues/12",
+  "author": { "username": "alice" }
+}`);
+
+const glIssueFetch = (json, notes, status = 200) => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const headers = init.headers || {};
+    calls.push({ url: `${url}`, auth: headers['PRIVATE-TOKEN'] || '' });
+    if (`${url}`.includes('/notes')) return jsonResponse(200, notes);
+    return jsonResponse(status, json);
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
+};
+
+test('parseGitlabIssueUrl reads gitlab issue URLs', () => {
+  const urls = [
+    'https://gitlab.com/acme/app/-/issues/12',
+    'https://gitlab.com/acme/app/-/issues/12/',
+    'https://www.gitlab.com/acme/app/-/issues/12',
+    'http://gitlab.com/acme/app/-/issues/12',
+    'gitlab.com/acme/app/-/issues/12',
+    'https://gitlab.com/acme/app/issues/12',
+    'https://gitlab.com/acme/app/-/issues/12#note_9',
+  ];
+  for (const url of urls) {
+    const parsed = parseGitlabIssueUrl(url);
+    assert.equal(parsed.host, 'gitlab.com', url);
+    assert.equal(parsed.project, 'acme/app', url);
+    assert.equal(parsed.number, 12, url);
+    assert.match(parsed.origin, /^https?:\/\/gitlab\.com$/, url);
+  }
+});
+
+test('parseGitlabIssueUrl reads nested groups and self-hosted hosts', () => {
+  const nested = parseGitlabIssueUrl(
+    'https://gitlab.example.com/group/sub/app/-/issues/9',
+  );
+  assert.deepEqual(nested, {
+    host: 'gitlab.example.com',
+    project: 'group/sub/app',
+    number: 9,
+    origin: 'https://gitlab.example.com',
+  });
+});
+
+test('parseGitlabIssueUrl rejects non issue URLs', () => {
+  const urls = [
+    '',
+    'lib/parser.js',
+    'https://gitlab.com/acme/app',
+    'https://gitlab.com/acme/app/-/merge_requests/12',
+    'https://gitlab.com/acme/app/-/issues',
+    'https://github.com/acme/app/issues/12',
+    'https://gitlab.com/acme/app/-/issues/0',
+  ];
+  for (const url of urls) {
+    assert.equal(parseGitlabIssueUrl(url), null, url);
+  }
+});
+
+test('loadGitlabIssue imports the title, description, and notes', async () => {
+  const notes = [
+    { author: { username: 'bob' }, body: '  seen  ', system: false },
+    {
+      author: { username: 'git' },
+      body: 'changed the description',
+      system: true,
+    },
+    { author: { username: 'cara' }, body: '   ', system: false },
+  ];
+  const fetchImpl = glIssueFetch(GL_ISSUE_JSON, notes);
+  const loaded = await loadGitlabIssue(GL_ISSUE, {
+    cwd: '/repo',
+    fetch: fetchImpl,
+    token: 'secret',
+  });
+  assert.deepEqual(loaded.items, []);
+  assert.equal(loaded.sourceLabel, '#12');
+  assert.equal(loaded.change.source, 'issue');
+  assert.equal(loaded.change.repository, 'acme/app');
+  assert.equal(loaded.change.url, GL_ISSUE_JSON['web_url']);
+  assert.equal(loaded.imported.tasks.length, 2);
+  assert.match(loaded.imported.tasks[0].text, /^@alice at gitlab: Add import/);
+  assert.match(loaded.imported.tasks[0].text, /from the cli/);
+  assert.equal(
+    loaded.imported.tasks[0].text.endsWith(
+      '\nIssue: https://gitlab.com/acme/app/-/issues/12',
+    ),
+    true,
+  );
+  assert.equal(loaded.imported.tasks[0].done, false);
+  assert.match(loaded.imported.tasks[1].text, /^@bob at gitlab: seen$/);
+  const noteCall = fetchImpl.calls.find((call) => call.url.includes('/notes'));
+  assert.match(noteCall.url, /\/projects\/acme%2Fapp\/issues\/12\/notes/);
+  assert.equal(fetchImpl.calls[0].auth, 'secret');
+});
+
+test('loadGitlabIssue marks a closed issue done', async () => {
+  const closed = { ...GL_ISSUE_JSON, state: 'closed', description: '' };
+  const fetchImpl = glIssueFetch(closed, []);
+  const loaded = await loadGitlabIssue(GL_ISSUE, {
+    fetch: fetchImpl,
+    token: '',
+  });
+  assert.equal(loaded.imported.tasks.length, 1);
+  assert.equal(loaded.imported.tasks[0].done, true);
+});
+
+test('parseGitlabIssueListUrl reads a repo and an issue list', () => {
+  const urls = [
+    'https://gitlab.com/acme/app',
+    'https://gitlab.com/acme/app/',
+    'https://gitlab.com/acme/app.git',
+    'https://gitlab.com/group/sub/app/-/issues',
+    'https://gitlab.com/acme/app/issues/',
+    'gitlab.com/acme/app/-/issues?state=opened',
+  ];
+  for (const url of urls) {
+    const parsed = parseGitlabIssueListUrl(url);
+    assert.equal(parsed.list, true, url);
+    assert.equal(parsed.host, 'gitlab.com', url);
+    assert.match(parsed.project, /app$/, url);
+    assert.match(parsed.origin, /^https?:\/\/gitlab\.com$/, url);
+  }
+  const nested = parseGitlabIssueListUrl(
+    'https://gitlab.example.com/group/sub/app',
+  );
+  assert.equal(nested.project, 'group/sub/app');
+  assert.equal(nested.origin, 'https://gitlab.example.com');
+});
+
+test('parseGitlabIssueListUrl rejects other gitlab URLs', () => {
+  const urls = [
+    '',
+    'lib/parser.js',
+    'https://gitlab.com/acme',
+    'https://gitlab.com/acme/app/-/issues/12',
+    'https://gitlab.com/acme/app/-/merge_requests/12',
+    'https://gitlab.com/acme/app/-/blob/main/README.md',
+    'https://github.com/acme/app/issues',
+  ];
+  for (const url of urls) {
+    assert.equal(parseGitlabIssueListUrl(url), null, url);
+  }
+});
+
+test('loadGitlabIssue imports every open issue from a list', async () => {
+  const open = {
+    iid: 31,
+    title: 'Support conflict resolution',
+    description: 'when a rebase stops',
+    state: 'opened',
+    author: { username: 'ScriptHound' },
+  };
+  const closed = {
+    iid: 2,
+    title: 'Old',
+    description: 'done',
+    state: 'closed',
+    author: { username: 'alice' },
+  };
+  const later = {
+    iid: 129,
+    title: 'Line numbers',
+    description: '',
+    state: 'opened',
+    author: { username: 'ScriptHound' },
+  };
+  const notes = {
+    31: [
+      { author: { username: 'cara' }, body: 'agree', system: false },
+      { author: { username: 'git' }, body: 'changed', system: true },
+    ],
+    129: [],
+  };
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const href = `${url}`;
+    calls.push(href);
+    const note = /issues\/(\d+)\/notes/.exec(href);
+    if (note) return jsonResponse(200, notes[note[1]] ?? []);
+    return jsonResponse(200, [later, closed, open]);
+  };
+  const loaded = await loadGitlabIssue(
+    {
+      host: GL_ISSUE.host,
+      project: GL_ISSUE.project,
+      origin: GL_ISSUE.origin,
+      list: true,
+    },
+    { fetch: fetchImpl, token: '' },
+  );
+  assert.match(calls[0], /\/projects\/acme%2Fapp\/issues\?/);
+  assert.match(calls[0], /state=opened/);
+  assert.equal(loaded.sourceLabel, 'acme/app');
+  assert.equal(loaded.imported.tasks.length, 3);
+  const texts = loaded.imported.tasks.map((task) => task.text);
+  assert.match(texts[0], /^@ScriptHound at gitlab: Line numbers/);
+  assert.equal(
+    texts[0].endsWith('\nIssue: https://gitlab.com/acme/app/-/issues/129'),
+    true,
+  );
+  assert.match(texts[1], /^@ScriptHound at gitlab: Support conflict/);
+  assert.equal(
+    texts[1].endsWith('\nIssue: https://gitlab.com/acme/app/-/issues/31'),
+    true,
+  );
+  assert.match(texts[2], /^@cara at gitlab: agree$/);
+  assert.equal(
+    texts.some((text) => text.includes('Old')),
+    false,
+  );
+  assert.equal(
+    calls.some((href) => href.includes('/issues/2/')),
+    false,
+  );
+});
+
+test('loadGitlabIssue maps 404 to a not found error', async () => {
+  const fetchImpl = glIssueFetch({ message: '404 Not found' }, [], 404);
+  await assert.rejects(
+    () => loadGitlabIssue(GL_ISSUE, { fetch: fetchImpl, token: '' }),
+    /GitLab issue not found/,
+  );
 });

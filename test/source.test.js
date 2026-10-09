@@ -26,6 +26,57 @@ test('selectChangeSource recognizes a GitLab merge request URL', () => {
   assert.deepEqual(selected.paths, []);
 });
 
+test('selectChangeSource recognizes a GitHub issue URL', () => {
+  const url = 'https://github.com/acme/app/issues/12';
+  const selected = selectChangeSource([url, 'lib']);
+  assert.equal(selected.kind, 'issue');
+  assert.deepEqual(selected.issue, { owner: 'acme', repo: 'app', number: 12 });
+  assert.deepEqual(selected.paths, ['lib']);
+});
+
+test('selectChangeSource recognizes a GitLab issue URL', () => {
+  const url = 'https://gitlab.com/group/app/-/issues/4';
+  const selected = selectChangeSource([url]);
+  assert.equal(selected.kind, 'gl-issue');
+  assert.deepEqual(selected.issue, {
+    host: 'gitlab.com',
+    project: 'group/app',
+    number: 4,
+    origin: 'https://gitlab.com',
+  });
+  assert.deepEqual(selected.paths, []);
+});
+
+test('selectChangeSource recognizes a GitHub issue list', () => {
+  const list = 'https://github.com/tshemsedinov/reslop/issues';
+  const repo = 'https://github.com/tshemsedinov/reslop';
+  const fromList = selectChangeSource([list]);
+  const fromRepo = selectChangeSource([repo]);
+  const expected = { owner: 'tshemsedinov', repo: 'reslop', list: true };
+  assert.equal(fromList.kind, 'issue');
+  assert.deepEqual(fromList.issue, expected);
+  assert.equal(fromRepo.kind, 'issue');
+  assert.deepEqual(fromRepo.issue, expected);
+});
+
+test('selectChangeSource recognizes a GitLab issue list', () => {
+  const list = 'https://gitlab.com/acme/app/-/issues';
+  const repo = 'https://gitlab.com/acme/app';
+  const fromList = selectChangeSource([list]);
+  const fromRepo = selectChangeSource([repo]);
+  assert.equal(fromList.kind, 'gl-issue');
+  assert.equal(fromList.issue.project, 'acme/app');
+  assert.equal(fromList.issue.list, true);
+  assert.equal(fromRepo.kind, 'gl-issue');
+  assert.equal(fromRepo.issue.project, 'acme/app');
+  const numbered = selectChangeSource([
+    'https://gitlab.com/acme/app/-/issues/4',
+  ]);
+  assert.equal(numbered.kind, 'gl-issue');
+  assert.equal(numbered.issue.number, 4);
+  assert.equal(numbered.issue.list, undefined);
+});
+
 test('selectChangeSource does not treat review as a subcommand', () => {
   const url = 'https://github.com/acme/app/pull/123';
   const selected = selectChangeSource(['review', url, 'lib']);

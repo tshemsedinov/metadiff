@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const review = require('../lib/review.js');
+const { ReviewController } = require('../lib/session/review.js');
 const { allocateReviewPath, rankedTemplates } = review;
 const { prefixTemplates, upsertTemplate, createStore } = review;
 const { hasNotes, setFeedback, setCode, noteCounts, rememberTemplate } = review;
@@ -653,6 +654,59 @@ test('applyImportedNotes maps comments onto feedback and todos', () => {
   assert.equal(store.tasks[0].text, 'add tests');
   assert.equal(store.tasks[0].done, false);
   assert.equal(store.tasks[1].done, true);
+});
+
+test('applyImportedNotes skips an identical issue and adds an edit', () => {
+  const store = createStore('/tmp/x.md');
+  const page = 'https://github.com/acme/app/issues/12';
+  const same = {
+    file: 'issue',
+    text: `@alice at github: Add import\n\nfrom the cli\nIssue: ${page}`,
+    done: false,
+  };
+  applyImportedNotes(store, { tasks: [same, same] });
+  assert.equal(store.tasks.length, 1);
+  applyImportedNotes(store, { tasks: [same] });
+  assert.equal(store.tasks.length, 1);
+  const saved = store.tasks[0].text.trim().replace(/\n/g, ' ');
+  store.tasks[0] = { ...store.tasks[0], text: saved };
+  applyImportedNotes(store, { tasks: [same] });
+  assert.equal(store.tasks.length, 1);
+  const edited = {
+    ...same,
+    text: `@alice at github: Add import\n\nplease\nIssue: ${page}`,
+  };
+  applyImportedNotes(store, { tasks: [edited] });
+  assert.equal(store.tasks.length, 2);
+  assert.match(store.tasks[1].text, /please/);
+});
+
+test('a resumed plan imports an edited issue and skips the same one', () => {
+  const page = 'https://github.com/acme/app/issues/12';
+  const same = {
+    file: 'issue',
+    text: `@alice at github: Add import\nIssue: ${page}`,
+    done: false,
+  };
+  const pull = { file: 'pull request', text: 'add tests', done: false };
+  const first = new ReviewController();
+  first.store = createStore('/tmp/plan.md');
+  first.didResume = true;
+  first.applyImported({ tasks: [same, pull] });
+  assert.equal(first.store.tasks.length, 1);
+  assert.match(first.store.tasks[0].text, /Add import/);
+  const second = new ReviewController();
+  second.store = first.store;
+  second.didResume = true;
+  second.applyImported({ tasks: [same, pull] });
+  assert.equal(second.store.tasks.length, 1);
+  const third = new ReviewController();
+  third.store = first.store;
+  third.didResume = true;
+  third.applyImported({
+    tasks: [{ ...same, text: `@alice at github: Edited\nIssue: ${page}` }],
+  });
+  assert.equal(third.store.tasks.length, 2);
 });
 
 test('applyImportedNotes keeps feedback open if any comment is open', () => {
