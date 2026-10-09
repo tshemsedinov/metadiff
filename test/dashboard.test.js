@@ -20,7 +20,8 @@ const dashTable = require('../lib/render/dash-table.js');
 const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
 const { labelOf, pickGroups, titleAside } = dashTable;
 const activity = require('../lib/render/dash-activity.js');
-const { runMetrics, branchesBlock, runsBlock } = activity;
+const { runMetrics, branchesBlock, runsBlock, commitsBlock } = activity;
+const { agentsBlock } = require('../lib/render/agents.js');
 const dashBlocks = require('../lib/render/dash-blocks.js');
 const { filesBlock, diffsBlock, npmBlock, npmContent, tasksBlock } = dashBlocks;
 const { paintBodyPackages } = require('../lib/render/packages.js');
@@ -32,7 +33,7 @@ const { actionFromKey, DASH_BLOCKS } = require('../lib/session/actions.js');
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
 const ansi = require('../lib/ansi.js');
-const { stripAnsi, visibleWidth, THEME, BOLD, seq } = ansi;
+const { stripAnsi, visibleWidth, THEME, seq } = ansi;
 const { makeRepo, tempDir, removeTree } = require('./helpers.js');
 
 const wait = (ms) =>
@@ -1002,6 +1003,10 @@ test('the files share bar stays on a narrow tile', () => {
   };
   assert.equal(end(header, 'size'), end(folder, '40'));
   assert.equal(end(header, 'lines'), end(folder, '8'));
+  const sizeLabel = block.titleLine.find((part) => part.text === 'size');
+  const linesLabel = block.titleLine.find((part) => part.text === 'lines');
+  assert.equal(sizeLabel.tone, 'caption');
+  assert.equal(linesLabel.tone, 'caption');
   assert.match(folder, /📁 lib/);
   assert.equal(folder.includes('📁  '), false);
   assert.equal(ext.indexOf('*.js'), folder.indexOf('lib'));
@@ -1320,7 +1325,8 @@ test('the branches header shows the local count', () => {
   assert.equal(header.startsWith('branches'), true);
   assert.equal(header.endsWith('2'), true);
   const count = block.titleLine.find((part) => part.text === '2');
-  assert.equal(count.tone, 'muted');
+  assert.equal(count.tone, 'key');
+  assert.equal(count.bold, true);
 });
 
 test('the npm tile lists packages under the header counts', () => {
@@ -1349,9 +1355,9 @@ test('the npm tile lists packages under the header counts', () => {
   const header = text(block.titleLine);
   const body = block.lines.map(text).join('\n');
   assert.equal(header.startsWith('npm'), true);
-  assert.match(header, /deps: 1/);
-  assert.match(header, /dev: 0/);
-  assert.match(header, /all: 2 \(20\)/);
+  assert.match(header, /deps:1 dev:0 all:2\/20/);
+  const summary = block.titleLine.find((part) => part.text.startsWith('deps:'));
+  assert.equal(summary.tone, 'caption');
   assert.equal(header.includes('🚨'), false);
   assert.equal(header.includes('⚠️'), false);
   assert.equal(body.includes('deps'), false);
@@ -1465,11 +1471,7 @@ test('the npm tile shows current, wanted, and latest', () => {
   const text = (line) => line.map((part) => part.text).join('');
   const body = block.lines.map(text);
   const header = text(block.titleLine);
-  assert.match(header, /deps: 3/);
-  assert.match(header, /dev: 0/);
-  assert.match(header, /all: 3 \(24\)/);
-  assert.match(header, /🚨 1/);
-  assert.match(header, /⚠️ 2/);
+  assert.match(header, /deps:3 dev:0 all:3\/24 🚨 1 ⚠️ 2/);
   assert.equal(body.join('\n').includes('deps'), false);
   const labels = body.find((line) => line.includes('current'));
   const heading = block.lines.find((line) =>
@@ -1769,12 +1771,12 @@ test('the tasks header shows done against the total', () => {
   assert.equal(header.endsWith('2026-10-09-00.md'), true);
   assert.equal(header.length, 48);
   const name = block.titleLine.find((part) => part.text === '2026-10-09-00.md');
-  assert.equal(name.tone, 'sha');
-  assert.equal(name.bold, true);
+  assert.equal(name.tone, 'caption');
+  assert.equal(name.bold, false);
   const painted = paintTile(tile, block, 50, 8, true);
   const head = painted[0];
-  const blue = `${BOLD}${seq(THEME.shaFg, THEME.dashHeadBg)}`;
-  assert.ok(head.includes(`${blue}2026-10-09-00.md`));
+  const ink = seq(THEME.dashCaptionFg, THEME.dashHeadBg);
+  assert.ok(head.includes(`${ink}2026-10-09-00.md`));
   assert.equal(stripAnsi(head).endsWith('2026-10-09-00.md '), true);
   assert.equal(header.includes('3/8'), false);
   assert.equal(header.includes('─'), false);
@@ -1930,6 +1932,10 @@ test('run captions sit in the header with total and duration', () => {
     return visibleWidth(line.slice(0, at + value.length));
   };
   assert.equal(header.startsWith('run'), true);
+  const done = block.titleLine.find((part) => part.text === 'done');
+  const duration = block.titleLine.find((part) => part.text === 'duration');
+  assert.equal(done.tone, 'caption');
+  assert.equal(duration.tone, 'caption');
   assert.equal(row.includes('done'), false);
   assert.equal(end(header, 'done'), end(row, '10'));
   assert.equal(end(header, 'ok'), end(row, '8'));
@@ -2076,6 +2082,63 @@ test('run names use the npm script, or the command', () => {
   assert.equal(runName(nested), 'lint');
   assert.equal(runName({ command: 'eslint .', script: 'lint' }), 'lint');
   assert.equal(runName({ command: 'node --test', script: '' }), 'node --test');
+});
+
+test('commit counts use the header hotkey color', () => {
+  const tile = { key: 'c', title: 'commits' };
+  const model = {
+    commits: {
+      ready: true,
+      info: { total: 12, recent: [] },
+      rebase: null,
+      changedAt: 0,
+    },
+  };
+  const block = commitsBlock(model, 24, 4, { now: 1, frame: 0 }, tile);
+  const count = block.titleLine.find((part) => part.text === '12');
+  assert.equal(count.tone, 'key');
+  assert.equal(count.bold, true);
+});
+
+test('agent status sits in the table and the header totals sessions', () => {
+  const tile = { key: 'a', title: 'agents' };
+  const model = {
+    agents: {
+      ready: true,
+      installed: 2,
+      total: 2,
+      running: 3,
+      items: [
+        { name: 'claude', bin: '/bin/claude', model: 'sonnet', running: 2 },
+        { name: 'cursor', bin: '', model: 'composer', running: 0 },
+      ],
+    },
+  };
+  const text = (line) => line.map((part) => part.text).join('');
+  const rowOf = (block, name) =>
+    block.lines.find((line) => line.some((part) => part.text === name));
+  const tones = ['key', 'add', 'sha', 'warn'];
+  for (let frame = 0; frame < tones.length; frame++) {
+    const block = agentsBlock(model, 40, 4, { now: 1, frame }, tile);
+    const header = text(block.titleLine);
+    assert.equal(header.startsWith('agents'), true);
+    assert.equal(header.endsWith('3'), true);
+    assert.equal(header.includes('run'), false);
+    assert.equal(header.includes('/'), false);
+    const total = block.titleLine.find((part) => part.text === '3');
+    assert.equal(total.tone, 'key');
+    assert.equal(total.bold, true);
+    const claude = rowOf(block, 'claude');
+    const bubble = claude.find((part) => part.text === '●');
+    assert.equal(bubble.tone, tones[frame]);
+    const sessions = claude.find((part) => part.text === ' 2');
+    assert.equal(sessions.tone, 'key');
+    assert.equal(sessions.bold, true);
+    const cursor = rowOf(block, 'cursor');
+    const quiet = cursor.find((part) => part.text === '●');
+    assert.equal(quiet.tone, 'muted');
+    assert.equal(text(cursor).includes('0'), false);
+  }
 });
 
 test('stat pairs become label and value table rows', () => {
