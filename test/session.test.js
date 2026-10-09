@@ -10,15 +10,15 @@ const { OpsRunner } = require('../lib/session/ops.js');
 const { hitAction } = require('../lib/keys.js');
 const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
 const review = require('../lib/review.js');
-const { createStore, addTask, serializeReview } = review;
+const { createStore, addTask, setFeedback, serializeReview } = review;
 const { parseReview } = review;
 const ansi = require('../lib/ansi.js');
-const { stripAnsi, THEME, BOLD, seq } = ansi;
+const { stripAnsi, THEME, BOLD, seq, bg } = ansi;
 const { logViewRows } = require('../lib/render/npm.js');
 const { setTheme, themeName } = ansi;
 const { REVIEW_DIR } = require('../lib/files.js');
 
-const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] ', '[ ] '];
+const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] ', '[ ] ', '[ ] '];
 const clipboard = require('../lib/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
@@ -1399,8 +1399,261 @@ test('todo list scrolls the focused row into view', () => {
   session.draw();
   const paged = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.equal(session.tasksFocus, 33);
-  assert.match(paged, /Research/);
+  assert.match(paged, /Research|Refactoring/);
   assert.ok(!/item 0(?!\d)/.test(paged));
+});
+
+test('scrolling back to the top shows the first header and blank line', () => {
+  const { session, stdout } = openSession([sampleItem('a.js')]);
+  stdout.rows = 12;
+  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  session.composer.tasks.openTasksPage();
+  session.tasksFocus = 0;
+  for (let i = 0; i < 25; i++) session.dispatch('scrollDown');
+  session.draw();
+  assert.ok(session.scroll > 0);
+  session.handleEvent({ type: 'key', key: 'home' });
+  session.draw();
+  assert.equal(session.tasksFocus, 0);
+  assert.equal(session.scroll, 0);
+  const rows = session.lastFrame.rows.map((row) => stripAnsi(row));
+  assert.equal(rows[1].trim(), '');
+  assert.match(rows[2], /Feature requests and Enhancements/);
+});
+
+test('tasks list shows a blank line after the blocks at the scroll end', () => {
+  const { session, stdout } = openSession([sampleItem('a.js')]);
+  stdout.rows = 12;
+  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  session.composer.tasks.openTasksPage();
+  session.draw();
+  const statusAt = session.lastFrame.rows.length - 2;
+  const plain = () => session.lastFrame.rows.map((row) => stripAnsi(row));
+  assert.ok(session.lastFrame.scrollMax > 0);
+  assert.notEqual(plain()[statusAt - 1].trim(), '');
+  session.handleEvent({ type: 'key', key: 'end' });
+  session.draw();
+  assert.equal(session.scroll, session.lastFrame.scrollMax);
+  const endRows = plain();
+  assert.equal(endRows[statusAt - 1].trim(), '');
+  assert.notEqual(endRows[statusAt - 2].trim(), '');
+  session.handleEvent({ type: 'key', key: 'home' });
+  session.draw();
+  assert.equal(session.scroll, 0);
+  assert.notEqual(plain()[statusAt - 1].trim(), '');
+});
+
+test('a short tasks list does not scroll for a trailing blank', () => {
+  const { session, stdout } = openSession([sampleItem('a.js')]);
+  stdout.rows = 40;
+  session.composer.tasks.openTasksPage();
+  session.draw();
+  assert.equal(session.lastFrame.scrollMax, 0);
+});
+
+test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  session.dispatch('tasks');
+  session.pushInput('first');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.pushInput('second');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.tasksFocus = 0;
+  session.handleEvent({ type: 'key', key: 'ctrl-down' });
+  assert.deepEqual(
+    session.notes.tasks.map((task) => task.text),
+    ['second', 'first'],
+  );
+  session.handleEvent({ type: 'key', key: 'ctrl-down' });
+  const moved = session.notes.tasks.find((task) => task.text === 'first');
+  assert.equal(moved.kind, 'improvements');
+  setFeedback(session.notes, 'a.js:1:1:0', {
+    file: 'a.js',
+    oldStart: 1,
+    newStart: 1,
+    blockId: 0,
+    text: 'quote one',
+  });
+  setFeedback(session.notes, 'a.js:2:2:0', {
+    file: 'a.js',
+    oldStart: 2,
+    newStart: 2,
+    blockId: 0,
+    text: 'quote two',
+  });
+  session.notes.tasks = [
+    {
+      id: 9,
+      file: 'TODOs',
+      text: 'only',
+      done: false,
+      kind: 'security',
+    },
+  ];
+  const rows = session.composer.tasks.rows();
+  const security = rows.findIndex(
+    (row) => row.task && row.task.text === 'only',
+  );
+  session.tasksFocus = security;
+  session.handleEvent({ type: 'key', key: 'ctrl-down' });
+  assert.equal(session.notes.tasks[0].kind, 'security');
+  const quote = session.composer.tasks
+    .rows()
+    .findIndex((row) => row.quote && row.note.text === 'quote one');
+  session.tasksFocus = quote;
+  session.handleEvent({ type: 'key', key: 'ctrl-down' });
+  const quoted = [];
+  for (const note of session.notes.feedback.values()) quoted.push(note.text);
+  assert.deepEqual(quoted, ['quote two', 'quote one']);
+  session.handleEvent({ type: 'key', key: 'ctrl-up' });
+  session.handleEvent({ type: 'key', key: 'ctrl-up' });
+  const stayed = [];
+  for (const note of session.notes.feedback.values()) stayed.push(note.text);
+  assert.deepEqual(stayed, ['quote one', 'quote two']);
+  assert.equal(session.notes.tasks[0].kind, 'security');
+  session.draw();
+  const body = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(body, /a\.js/);
+  assert.match(body, /quote one/);
+  assert.match(body, /ctrl\+up/);
+  assert.match(body, /ctrl\+down/);
+});
+
+test('quoted feedback can be edited from the tasks screen', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  setFeedback(session.notes, 'a.js:1:1:0', {
+    file: 'a.js',
+    oldStart: 1,
+    newStart: 1,
+    blockId: 0,
+    text: 'quote',
+  });
+  session.composer.tasks.openTasksPage();
+  const quote = session.composer.tasks.rows().findIndex((row) => row.quote);
+  session.tasksFocus = quote;
+  session.handleEvent({ type: 'key', key: 'enter' });
+  session.pushInput(' more');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  const note = session.notes.feedback.get('a.js:1:1:0');
+  assert.equal(note.text, 'quote more');
+  session.handleEvent({ type: 'key', key: ' ' });
+  assert.equal(session.notes.feedback.get('a.js:1:1:0').done, true);
+});
+
+test('tasks status switches plan files and defaults to the last one', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')]);
+  const dir = path.join(cwd, REVIEW_DIR);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, '2020-01-01-00.md'),
+    [
+      '---',
+      'status: editing',
+      '---',
+      '',
+      '## Feature requests',
+      '',
+      '- [ ] from older',
+      '',
+    ].join('\n'),
+  );
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.draw();
+  const status = stripAnsi(session.lastFrame.rows.at(-2));
+  const current = session.composer.tasks.planName();
+  const names = session.composer.tasks.planNames();
+  assert.equal(names.at(-1), current);
+  assert.ok(names.includes('2020-01-01-00.md'));
+  assert.match(status, /▾/);
+  assert.match(status, /tasks \d+\/\d+\s*$/);
+  const ratios = status.match(/\d+\/\d+/g);
+  assert.deepEqual(ratios, [status.match(/tasks (\d+\/\d+)/)[1]]);
+  session.composer.tasks.togglePlanMenu();
+  session.draw();
+  const menu = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(menu, /2020-01-01-00\.md\s+editing/);
+  const hit = session.lastFrame.statusHits.find(
+    (entry) => entry.id === 'plan-item' && entry.cursor === 0,
+  );
+  assert.ok(hit);
+  session.handleEvent({
+    type: 'mouse',
+    button: 0,
+    btn: 0,
+    kind: 'press',
+    x: hit.x0 + 1,
+    y: hit.y,
+    press: true,
+  });
+  session.handleEvent({
+    type: 'mouse',
+    button: 0,
+    btn: 0,
+    kind: 'release',
+    x: hit.x0 + 1,
+    y: hit.y,
+    press: false,
+  });
+  assert.equal(session.planOpen, false);
+  assert.match(session.composer.tasks.planName(), /2020-01-01-00\.md/);
+  assert.equal(session.notes.tasks[0].text, 'from older');
+});
+
+test('tasks plan combo filters in place and keeps the agent menu', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], { color: true });
+  const dir = path.join(cwd, REVIEW_DIR);
+  fs.mkdirSync(dir, { recursive: true });
+  for (let i = 0; i < 12; i++) {
+    const name = `note-${String(i).padStart(2, '0')}.md`;
+    fs.writeFileSync(path.join(dir, name), `# ${name}\n`);
+  }
+  fs.writeFileSync(path.join(dir, 'beta-plan.md'), '# beta\n');
+  fs.writeFileSync(path.join(dir, 'main-plan.md'), '# main\n');
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.composer.tasks.togglePlanMenu();
+  session.draw();
+  const menuRows = () =>
+    session.lastFrame.rows.filter(
+      (row) =>
+        row.includes(bg(THEME.noteBg)) || row.includes(bg(THEME.checkBg)),
+    );
+  const open = menuRows();
+  assert.ok(open.length > 1);
+  assert.ok(open.some((row) => row.includes(bg(THEME.checkBg))));
+  assert.ok(open.some((row) => row.includes(bg(THEME.noteBg))));
+  const opened = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(opened, /note-11\.md/);
+  assert.equal(opened.includes('beta-plan'), false);
+  session.handleEvent({ type: 'key', key: 'home' });
+  session.draw();
+  const top = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(top, /beta-plan\.md/);
+  assert.equal(top.includes('note-11'), false);
+  session.handleEvent({ type: 'key', key: 'm' });
+  session.draw();
+  const status = stripAnsi(session.lastFrame.rows.at(-2));
+  const afterBranch = status.slice(status.indexOf('main') + 'main'.length);
+  assert.match(afterBranch, /^ {2}m/);
+  const hit = session.lastFrame.statusHits.find(
+    (entry) => entry.id === 'plan-item',
+  );
+  assert.ok(hit);
+  assert.ok(hit.x0 >= status.indexOf('main') + 'main'.length);
+  assert.ok(session.lastFrame.rows.at(-2).includes(bg(THEME.searchBg)));
+  session.handleEvent({ type: 'key', key: 'backspace' });
+  session.handleEvent({ type: 'key', key: 'b' });
+  session.handleEvent({ type: 'key', key: 'e' });
+  session.draw();
+  const shown = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(shown, /beta-plan\.md/);
+  assert.equal(shown.includes('note-00'), false);
+  assert.equal(shown.includes('main-plan'), false);
+  const lines = shown.split('\n').map((line) => line.trim());
+  assert.equal(lines.includes('be'), false);
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.composer.tasks.planName(), 'beta-plan.md');
 });
 
 test('todo edits in the list not the note line', () => {
@@ -1412,7 +1665,7 @@ test('todo edits in the list not the note line', () => {
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /\[ \] in the list/);
   assert.match(body, /Feature requests/);
-  assert.match(body, /Bug reports/);
+  assert.match(body, /Bug Reports and Fixes/);
   assert.match(body, /Technical debt/);
   assert.match(body, /Research/);
   assert.match(body, /Security/);
@@ -1742,10 +1995,10 @@ test('home end and page keys jump the todo list', () => {
   session.handleEvent({ type: 'key', key: 'home' });
   assert.equal(session.tasksFocus, 0);
   session.handleEvent({ type: 'key', key: 'end' });
-  assert.equal(session.tasksFocus, 7);
+  assert.equal(session.tasksFocus, 8);
   session.handleEvent({ type: 'key', key: 'home' });
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 7);
+  assert.equal(session.tasksFocus, 8);
   session.handleEvent({ type: 'key', key: 'pageUp' });
   assert.equal(session.tasksFocus, 0);
 });
@@ -1864,7 +2117,7 @@ test('todo edit page keys jump across todos', () => {
   assert.equal(session.tasksFocus, 0);
   assert.equal(session.editor.text, 'first');
   session.handleEvent({ type: 'key', key: 'pageDown' });
-  assert.equal(session.tasksFocus, 7);
+  assert.equal(session.tasksFocus, 8);
   assert.equal(session.editor.text, '');
 });
 

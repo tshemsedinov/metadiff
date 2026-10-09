@@ -1742,10 +1742,13 @@ test('the tasks header shows done against the total', () => {
   const lines = block.lines.map(text);
   const body = lines.join('\n');
   const backlog = lines.find((line) => line.includes('Feature requests'));
-  const barAt = (line) => line.search(/[█░]/);
+  const barAt = (line) => line.indexOf('─');
   assert.equal(header.startsWith('tasks'), true);
   assert.equal(header.trimEnd().endsWith('3/8'), true);
+  assert.ok(barAt(header) > 0);
   assert.ok(barAt(header) < header.lastIndexOf('3/8'));
+  assert.ok(!header.includes('█'));
+  assert.ok(!header.includes('░'));
   assert.match(body, /Bug reports/);
   assert.match(body, /1\/2/);
   assert.match(body, /Technical debt/);
@@ -1754,7 +1757,59 @@ test('the tasks header shows done against the total', () => {
   assert.equal(backlog.trimEnd().endsWith('1/4'), true);
   assert.ok(backlog.indexOf('Feature requests') < barAt(backlog));
   assert.ok(barAt(backlog) < backlog.lastIndexOf('1/4'));
+  assert.ok(!backlog.includes('█'));
+  assert.ok(!backlog.includes('░'));
   assert.match(body, /0\/1/);
+  const row = block.lines.find((line) =>
+    line.some((part) => `${part.text}`.includes('Feature requests')),
+  );
+  const dash = row.find((part) => part.text.includes('─'));
+  const at = row.indexOf(dash);
+  assert.equal(dash.tone, 'add');
+  assert.equal(dash.bg ?? null, null);
+  assert.equal(row[at - 1].text, ' ');
+  assert.equal(row[at + 1].text.endsWith(' '), true);
+  const ratio = row.find((part) => part.text === '1/4');
+  let gapAt = row.indexOf(ratio) - 1;
+  while (gapAt > 0 && row[gapAt].text === '') gapAt -= 1;
+  assert.equal(row[gapAt].text, ' ');
+});
+
+test('dashboard tasks use short captions', () => {
+  const model = buildModel({
+    entries: [],
+    runs: [],
+    now: 1,
+    frame: 0,
+    marks: { commit: 0 },
+    store: {
+      tasks: [
+        { text: 'ship', kind: 'features', done: true },
+        { text: 'fix', kind: 'bugs', done: false },
+      ],
+    },
+  });
+  const titles = model.tasks.kinds.map((kind) => kind.title);
+  assert.deepEqual(titles, [
+    'Features',
+    'Improvements',
+    'Bug Reports',
+    'Refactoring',
+    'Research',
+    'Security',
+  ]);
+  const tile = { key: 't', title: 'tasks' };
+  const block = tasksBlock(model, 48, 8, { now: 1, frame: 0 }, tile);
+  const text = (line) => line.map((part) => part.text).join('');
+  const body = block.lines.map(text).join('\n');
+  assert.match(body, /Features/);
+  assert.equal(body.includes('Feature requests'), false);
+  assert.match(body, /Bug Reports/);
+  assert.match(body, /Refactoring/);
+  const painted = paintTile(tile, block, 50, 8, false);
+  const shown = painted.find((line) => line.includes('Features'));
+  assert.equal(shown.endsWith('1/1 '), true);
+  assert.equal(shown.endsWith('1/1  '), false);
 });
 
 test('a title aside sits on the right of the header', () => {
