@@ -32,7 +32,7 @@ const { actionFromKey, DASH_BLOCKS } = require('../lib/session/actions.js');
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
 const ansi = require('../lib/ansi.js');
-const { stripAnsi, visibleWidth } = ansi;
+const { stripAnsi, visibleWidth, THEME, BOLD, seq } = ansi;
 const { makeRepo, tempDir, removeTree } = require('./helpers.js');
 
 const wait = (ms) =>
@@ -768,6 +768,26 @@ test('Esc on the dashboard quits', async () => {
       quit += 1;
     };
     press(ui, 'escape');
+    assert.equal(quit, 1);
+  } finally {
+    await close();
+  }
+});
+
+test('the dashboard Esc button quits', async () => {
+  const { ui, close } = await openDashboard();
+  try {
+    let quit = 0;
+    ui.onQuit = () => {
+      quit += 1;
+    };
+    ui.draw();
+    const hit = ui.lastFrame.buttons.find((button) => button.id === 'back');
+    assert.ok(hit);
+    const y = ui.lastFrame.height;
+    const at = { x: hit.x0 + 1, y, btn: 0, button: 0 };
+    ui.handleEvent({ type: 'mouse', kind: 'press', press: true, ...at });
+    ui.handleEvent({ type: 'mouse', kind: 'release', press: false, ...at });
     assert.equal(quit, 1);
   } finally {
     await close();
@@ -1734,6 +1754,7 @@ test('the tasks header shows done against the total', () => {
         { id: 'research', title: 'Research', done: 0, total: 1 },
         { id: 'security', title: 'Security', done: 0, total: 0 },
       ],
+      plan: '2026-10-09-00.md',
     },
   };
   const block = tasksBlock(model, 48, 6, { now: 1, frame: 0 }, tile);
@@ -1742,13 +1763,32 @@ test('the tasks header shows done against the total', () => {
   const lines = block.lines.map(text);
   const body = lines.join('\n');
   const backlog = lines.find((line) => line.includes('Feature requests'));
+  const total = lines.at(-1);
   const barAt = (line) => line.indexOf('─');
   assert.equal(header.startsWith('tasks'), true);
-  assert.equal(header.trimEnd().endsWith('3/8'), true);
-  assert.ok(barAt(header) > 0);
-  assert.ok(barAt(header) < header.lastIndexOf('3/8'));
-  assert.ok(!header.includes('█'));
-  assert.ok(!header.includes('░'));
+  assert.equal(header.endsWith('2026-10-09-00.md'), true);
+  assert.equal(header.length, 48);
+  const name = block.titleLine.find((part) => part.text === '2026-10-09-00.md');
+  assert.equal(name.tone, 'sha');
+  assert.equal(name.bold, true);
+  const painted = paintTile(tile, block, 50, 8, true);
+  const head = painted[0];
+  const blue = `${BOLD}${seq(THEME.shaFg, THEME.dashHeadBg)}`;
+  assert.ok(head.includes(`${blue}2026-10-09-00.md`));
+  assert.equal(stripAnsi(head).endsWith('2026-10-09-00.md '), true);
+  assert.equal(header.includes('3/8'), false);
+  assert.equal(header.includes('─'), false);
+  assert.match(total, /^Total/);
+  assert.equal(total.trimEnd().endsWith('3/8'), true);
+  const caption = block.lines.at(-1).find((part) => part.text === 'Total');
+  assert.equal(caption.tone, 'add');
+  assert.equal(caption.bold, false);
+  assert.ok(barAt(total) > 0);
+  assert.ok(barAt(total) < total.lastIndexOf('3/8'));
+  assert.ok(!total.includes('█'));
+  assert.ok(!total.includes('░'));
+  const securityAt = lines.findIndex((line) => line.includes('Security'));
+  assert.equal(lines.indexOf(total), securityAt + 1);
   assert.match(body, /Bug reports/);
   assert.match(body, /1\/2/);
   assert.match(body, /Technical debt/);
@@ -1783,12 +1823,14 @@ test('dashboard tasks use short captions', () => {
     frame: 0,
     marks: { commit: 0 },
     store: {
+      reviewPath: '/repo/.plan/2026-10-09-00.md',
       tasks: [
         { text: 'ship', kind: 'features', done: true },
         { text: 'fix', kind: 'bugs', done: false },
       ],
     },
   });
+  assert.equal(model.tasks.plan, '2026-10-09-00.md');
   const titles = model.tasks.kinds.map((kind) => kind.title);
   assert.deepEqual(titles, [
     'Features',

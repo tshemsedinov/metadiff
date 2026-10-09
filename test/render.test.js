@@ -3097,7 +3097,10 @@ test('todo view paints file todo text not a diff hunk', () => {
   assert.ok(!body.includes('todo 1/1'));
   assert.ok(!body.includes('demo/tasks'));
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /^ 🢐esc {2}delete {2}space {2}ctrl\+up {2}ctrl\+down/);
+  assert.match(
+    footer,
+    /^ 🢐esc {2}plan {2}import {2}delete {2}space {2}ctrl\+up\/dn/,
+  );
   assert.match(footer, /f {2}d {2}t {2}b {2}c {2}r {2}n\s*$/);
   const rows = frame.rows.map((row) => stripAnsi(row));
   const doneAt = rows.findIndex((row) => row.includes('already done'));
