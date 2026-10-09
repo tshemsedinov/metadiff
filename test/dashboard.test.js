@@ -1077,8 +1077,11 @@ test('diff columns keep one space after the mark and fill the row', () => {
   assert.equal(visibleWidth(folder), 40);
   const trend = text(block.footer);
   assert.equal(trend.startsWith('activity '), true);
-  assert.equal(visibleWidth(trend), 39);
-  assert.equal(block.footer[0].tone, 'muted');
+  assert.equal(trend.startsWith('activity  '), false);
+  assert.equal(visibleWidth(trend), 41);
+  assert.equal(block.footer[0].tone, 'sha');
+  const trace = block.footer.find((part) => part.text === '─');
+  assert.equal(trace.tone, 'sha');
 });
 
 test('diff activity scrolls minutes left and blinks the current one', () => {
@@ -1114,7 +1117,8 @@ test('diff activity scrolls minutes left and blinks the current one', () => {
   const block = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
   const footer = text(block.footer);
   assert.equal(footer.startsWith('activity '), true);
-  assert.equal(visibleWidth(footer), 39);
+  assert.equal(footer.startsWith('activity  '), false);
+  assert.equal(visibleWidth(footer), 41);
   for (const part of block.footer.slice(1)) {
     assert.equal(visibleWidth(part.text), 1);
   }
@@ -1123,17 +1127,23 @@ test('diff activity scrolls minutes left and blinks the current one', () => {
   assert.equal(block.footer.at(-2).text, '∙');
   assert.equal(block.footer[1].text, ' ');
   assert.equal(block.footer.at(-1).text, ' ');
+  const toneOf = (glyph) =>
+    block.footer.find((part) => part.text === glyph).tone;
+  assert.equal(toneOf('◉'), 'key');
+  assert.equal(toneOf('+'), 'add');
+  assert.equal(block.footer[0].tone, 'sha');
   for (const part of block.footer) {
     assert.equal(part.bg, null);
   }
   const flash = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
   assert.equal(flash.footer.at(-2).text, '█');
-  assert.equal(flash.footer.at(-2).tone, 'blink');
-  const painted = paintTile(tile, flash, 40, 6, true);
+  assert.equal(flash.footer.at(-2).tone, 'key');
+  const painted = paintTile(tile, flash, 42, 6, true);
   const row = painted.at(-1);
   const plain = stripAnsi(row);
-  assert.equal(visibleWidth(plain), 40);
+  assert.equal(visibleWidth(plain), 42);
   assert.equal(plain.endsWith('█ '), true);
+  assert.equal(plain.endsWith('█  '), false);
   model.diffs.activity.live = false;
   const done = diffsBlock(model, 40, 6, { now, frame: 0 }, tile);
   assert.equal(done.footer.at(-2).text, 'x');
@@ -1177,6 +1187,11 @@ test('diff activity keeps a foreground-only timeline with edge gaps', () => {
   assert.ok(timeline.includes('◉'));
   assert.ok(timeline.includes('*'));
   assert.ok(timeline.includes('─'));
+  const toneOf = (glyph) =>
+    block.footer.find((part) => part.text === glyph).tone;
+  assert.equal(toneOf('◉'), 'key');
+  assert.equal(toneOf('*'), 'add');
+  assert.equal(toneOf('─'), 'sha');
   for (const part of block.footer) {
     assert.equal(part.bg, null);
   }
@@ -1216,6 +1231,10 @@ test('diff activity marks removals and pulses the current minute', () => {
   const footer = text(quiet.footer);
   assert.ok(footer.includes('!'));
   assert.ok(footer.indexOf('!') < footer.indexOf('-'));
+  const toneOf = (glyph) =>
+    quiet.footer.find((part) => part.text === glyph).tone;
+  assert.equal(toneOf('!'), 'error');
+  assert.equal(toneOf('-'), 'del');
   assert.equal(quiet.footer.at(-2).text, '∙');
   assert.equal(quiet.footer.at(-1).text, ' ');
   const low = diffsBlock(model, 40, 6, { now, frame: 1 }, tile);
