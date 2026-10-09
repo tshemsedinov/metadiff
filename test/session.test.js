@@ -1715,6 +1715,39 @@ test('tasks plan hotkey opens the combo and can start a new plan', () => {
   assert.notEqual(created, name);
 });
 
+test('import url closes when focus leaves the field', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  const begin = () => {
+    session.dispatch('tasks');
+    session.handleEvent({ type: 'key', key: 'escape' });
+    session.handleEvent({ type: 'key', key: 'i' });
+    session.pushInput('https://example.com');
+    session.draw();
+  };
+  const closed = () => {
+    assert.equal(session.view().import, null);
+    assert.notEqual(session.mode, 'import');
+    session.draw();
+    const status = stripAnsi(session.lastFrame.rows.at(-2));
+    assert.equal(status.startsWith(' url '), false);
+  };
+  begin();
+  clickAt(session, 4, session.lastFrame.height - 1);
+  assert.equal(session.mode, 'import');
+  assert.match(session.view().import.url, /example\.com/);
+  const task = session.lastFrame.taskHits.find((hit) => hit.y);
+  assert.ok(task);
+  clickAt(session, 2, task.y);
+  closed();
+  begin();
+  session.handleEvent({ type: 'key', key: 'ctrl-down' });
+  closed();
+  begin();
+  clickFooter(session, 'dashFiles');
+  assert.equal(session.pane, 'files');
+  closed();
+});
+
 test('tasks import asks for a url and applies the pull request', async () => {
   const { session } = openSession([sampleItem('a.js')], {
     loadPullRequest: async () => ({
