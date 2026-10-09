@@ -142,7 +142,7 @@ test('serializeReview groups todos then feedback with position', () => {
   assert.match(md, /status: editing/);
   assert.match(md, /# reslop review 2026-09-07-00/);
   assert.match(md, /## Agent instructions/);
-  assert.match(md, /^## Feature requests$/m);
+  assert.match(md, /^## Feature requests and Enhancements$/m);
   assert.match(md, /^## lib\/session\.js$/m);
   assert.ok(!md.includes('> lib/session.js'));
   assert.ok(!md.includes('### Todo'));
@@ -514,7 +514,7 @@ test('parseReview reads a legacy TODOs heading as technical debt', () => {
   assert.equal(loaded.tasks[0].file, 'TODOs');
   assert.equal(loaded.tasks[0].text, 'keep');
   assert.equal(loaded.tasks[0].kind, 'debt');
-  assert.match(serializeReview(loaded), /^## Technical debt$/m);
+  assert.match(serializeReview(loaded), /^## Refactoring and Technical debt$/m);
 });
 
 test('serializeReview collects todos under Backlog not file headings', () => {
@@ -529,11 +529,11 @@ test('serializeReview collects todos under Backlog not file headings', () => {
     text: 'nit',
   });
   const md = serializeReview(store);
-  assert.match(md, /^## Feature requests$/m);
+  assert.match(md, /^## Feature requests and Enhancements$/m);
   assert.match(md, /- \[ \] todo a/);
   assert.match(md, /- \[ \] todo b/);
   const fileAt = md.indexOf('## a.js');
-  const todosAt = md.indexOf('## Feature requests');
+  const todosAt = md.indexOf('## Feature requests and Enhancements');
   assert.ok(todosAt >= 0 && todosAt < fileAt);
   assert.ok(!md.slice(fileAt).includes('todo a'));
   const loaded = parseReview(md, store.reviewPath);
@@ -551,9 +551,9 @@ test('serializeReview keeps each task list under its heading', () => {
   addTask(store, 'TODOs', 'dark mode', true, 'features');
   addTask(store, 'TODOs', 'login', false, 'issues');
   const md = serializeReview(store);
-  const features = md.indexOf('## Feature requests');
-  const bugs = md.indexOf('## Bug reports');
-  const debt = md.indexOf('## Technical debt');
+  const features = md.indexOf('## Feature requests and Enhancements');
+  const bugs = md.indexOf('## Bug Reports and Fixes');
+  const debt = md.indexOf('## Refactoring and Technical debt');
   assert.ok(features >= 0 && features < bugs);
   assert.ok(bugs < debt);
   assert.match(md, /- \[ \] later/);
@@ -570,6 +570,50 @@ test('serializeReview keeps each task list under its heading', () => {
   assert.equal(kindOf('crash'), 'bugs');
   assert.equal(kindOf('dark mode'), 'features');
   assert.equal(loaded.tasks[0].file, 'TODOs');
+});
+
+test('serializeReview places improvements after feature requests', () => {
+  const store = createStore('/tmp/x.md');
+  addTask(store, 'TODOs', 'dark mode', false, 'features');
+  addTask(store, 'TODOs', 'polish', false, 'improvements');
+  addTask(store, 'TODOs', 'crash', false, 'bugs');
+  const md = serializeReview(store);
+  const features = md.indexOf('## Feature requests and Enhancements');
+  const improvements = md.indexOf('## Improvements');
+  const bugs = md.indexOf('## Bug Reports and Fixes');
+  assert.ok(features >= 0 && features < improvements);
+  assert.ok(improvements < bugs);
+});
+
+test('parseReview still reads the previous section titles', () => {
+  const md = [
+    '## Feature requests',
+    '',
+    '- [ ] shiny',
+    '',
+    '## Bug reports',
+    '',
+    '- [ ] crash',
+    '',
+    '## Technical debt',
+    '',
+    '- [ ] later',
+    '',
+    '## Research',
+    '',
+    '- [ ] try',
+    '',
+    '## Security',
+    '',
+    '- [ ] lock',
+  ].join('\n');
+  const loaded = parseReview(md, '/repo/.plan/x.md');
+  const kindOf = (text) => loaded.tasks.find((item) => item.text === text).kind;
+  assert.equal(kindOf('shiny'), 'features');
+  assert.equal(kindOf('crash'), 'bugs');
+  assert.equal(kindOf('later'), 'debt');
+  assert.equal(kindOf('try'), 'research');
+  assert.equal(kindOf('lock'), 'security');
 });
 
 test('applyImportedNotes maps comments onto feedback and todos', () => {

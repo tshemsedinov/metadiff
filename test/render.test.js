@@ -501,6 +501,11 @@ test('npm run tasks and branches omit diff totals', () => {
     const statusRow = stripAnsi(frame.rows[frame.rows.length - 2]);
     assert.equal(statusRow.includes('+'), false, pane);
     assert.equal(statusRow.includes('-'), false, pane);
+    if (pane === 'tasks') {
+      assert.match(statusRow, /tasks 0\/0\s*$/);
+      assert.equal(statusRow.includes('0/4'), false, pane);
+      continue;
+    }
     if (!quiet.has(pane)) {
       assert.match(statusRow, /0\/4/);
       assert.match(statusRow, /tasks 0\/0/);
@@ -3092,7 +3097,8 @@ test('todo view paints file todo text not a diff hunk', () => {
   assert.ok(!body.includes('todo 1/1'));
   assert.ok(!body.includes('demo/tasks'));
   const footer = frame.rows[frame.rows.length - 1];
-  assert.match(footer, /^ 🢐esc {2}delete {2}space.*files {2}diffs {2}tasks/);
+  assert.match(footer, /^ 🢐esc {2}delete {2}space {2}ctrl\+up {2}ctrl\+down/);
+  assert.match(footer, /f {2}d {2}t {2}b {2}c {2}r {2}n\s*$/);
   const rows = frame.rows.map((row) => stripAnsi(row));
   const doneAt = rows.findIndex((row) => row.includes('already done'));
   const issuesAt = rows.findIndex((row) => row.includes('Bug reports'));
@@ -3104,7 +3110,6 @@ test('todo view paints file todo text not a diff hunk', () => {
   assert.ok(!footer.includes('prev'));
   assert.ok(!footer.includes('next'));
   assert.ok(!footer.includes('quit'));
-  assert.ok(footer.includes('files'));
   assert.ok(!footer.includes('reload'));
   assert.ok(!footer.includes('add'));
   assert.ok(!footer.includes('drop'));

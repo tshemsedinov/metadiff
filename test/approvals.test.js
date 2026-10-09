@@ -197,6 +197,27 @@ test('a finished cursor agent is closed', async () => {
     push('done\n→ Add a follow-up\n');
     assert.deepEqual(writes, ['\x04']);
     assert.equal(ui.agents.jobs[0].pending, 'idle');
+    const again = [];
+    ui.agents.spawn = (cwd, launch, onData) => {
+      onData('0 files edited\n→ Add a follow-up\n');
+      return {
+        kill() {},
+        write(data) {
+          again.push(data);
+        },
+      };
+    };
+    const finished = ui.agents.jobs[0];
+    finished.status = 'exit 0';
+    finished.child = null;
+    ui.agents.closeView();
+    ui.agents.start();
+    assert.deepEqual(again, []);
+    const idle = ui.agents.jobs.find((job) => job.status === 'running');
+    idle.output = '';
+    const summary = 'Grok 4.7 256K High · 52.8% · 17 files edited';
+    ui.agents.showOutput(idle, `${summary}\n→ Add a follow-up\n`);
+    assert.deepEqual(again, ['\x04']);
   } finally {
     ui.agents.reset();
     repo.cleanup();
