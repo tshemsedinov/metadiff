@@ -193,6 +193,10 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('e', 'files'), 'code');
   assert.equal(actionFromKey('e', 'diff'), 'code');
   assert.equal(actionFromKey('m', 'diff'), 'layout');
+  assert.equal(actionFromKey('ctrl-l', 'diff'), 'lines');
+  assert.equal(actionFromKey('ctrl-l', 'unit'), 'lines');
+  assert.equal(actionFromKey('l', 'diff'), 'theme');
+  assert.equal(keys.buttonWord('lines'), 'ctrl+l');
   assert.equal(actionFromKey('p', 'dashboard'), 'pull');
   assert.equal(actionFromKey('s', 'dashboard'), 'push');
   const dashOff = disabledActions('dashboard', null);

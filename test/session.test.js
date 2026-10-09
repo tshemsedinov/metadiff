@@ -5170,6 +5170,59 @@ const press = (session, name) => {
   session.handleEvent({ type: 'key', key: name });
 };
 
+test('line numbers persist in .reslop', () => {
+  const cwd = tempDir('reslop-ui-');
+  const file = path.join(cwd, '.reslop');
+  fs.writeFileSync(
+    file,
+    `${JSON.stringify({ agents: { claude: { model: 'sonnet' } } })}\n`,
+  );
+  try {
+    const { session } = openSession([sampleItem('a.js')], { cwd });
+    assert.equal(session.lineNumbers, false);
+    press(session, 'ctrl-l');
+    const on = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(on.lineNumbers, true);
+    assert.deepEqual(on.agents.claude, { model: 'sonnet' });
+    const again = openSession([sampleItem('a.js')], { cwd });
+    assert.equal(again.session.lineNumbers, true);
+    press(again.session, 'ctrl-l');
+    const off = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(off.lineNumbers, false);
+    assert.deepEqual(off.agents.claude, { model: 'sonnet' });
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('ctrl-l toggles line numbers on a diff and while editing', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  assert.equal(session.lineNumbers, false);
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, true);
+  assert.equal(session.status, 'line numbers');
+  session.draw();
+  const shown = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(shown, / 1 - a/);
+  assert.match(shown, / 1 \+ b/);
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, false);
+  assert.equal(session.status, 'no line numbers');
+  session.pane = 'files';
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, false);
+  session.pane = 'diff';
+  session.dispatch('code');
+  const before = session.editor.text;
+  press(session, 'ctrl-l');
+  assert.equal(session.editor.text, before);
+  assert.equal(session.lineNumbers, true);
+  assert.equal(session.mode, 'compose');
+  clickFooter(session, 'lines');
+  assert.equal(session.lineNumbers, false);
+  assert.equal(session.editor.text, before);
+});
+
 test('ctrl-c quits outside an editor', () => {
   const { session } = openSession([sampleItem('a.js')]);
   press(session, 'ctrl-c');
