@@ -5292,6 +5292,63 @@ test('editors select with shift and copy cut paste', () => {
   assert.equal(session.composeKind, 'tasks');
 });
 
+test('find import and plan lines select and use the clipboard', () => {
+  const items = [
+    sampleItem('src/app.js'),
+    sampleItem('lib/find.js'),
+    sampleItem('lib/files.js'),
+  ];
+  const { session, stdout } = openSession(items);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: '/' });
+  session.pushInput('lib/f');
+  press(session, 'down');
+  assert.equal(session.reviewPath, 'lib/find.js');
+  session.pushInput('iles');
+  press(session, 'ctrl-left');
+  assert.equal(session.nav.find.editor.cursor, 4);
+  press(session, 'shift-left');
+  assert.equal(session.nav.find.editor.selectedText(), '/');
+  const dumped = stdout.dump().length;
+  press(session, 'ctrl-c');
+  assert.equal(session.done, false);
+  assert.equal(session.mode, 'find');
+  assert.match(stdout.dump().slice(dumped), /\]52;/);
+  press(session, 'left');
+  assert.equal(session.nav.find.editor.cursor, 3);
+  press(session, 'ctrl-right');
+  assert.equal(session.nav.find.editor.cursor, 9);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://example.com/a');
+  press(session, 'shift-left');
+  press(session, 'shift-left');
+  assert.equal(session.nav.import.editor.selectedText(), '/a');
+  press(session, 'ctrl-x');
+  assert.equal(session.nav.import.url, 'https://example.com');
+  const saved = clipboard.pasteText;
+  clipboard.pasteText = () => 'ZZ';
+  try {
+    press(session, 'ctrl-v');
+  } finally {
+    clipboard.pasteText = saved;
+  }
+  assert.equal(session.nav.import.url, 'https://example.comZZ');
+  assert.equal(session.mode, 'import');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'p' });
+  session.pushInput('plan');
+  press(session, 'ctrl-left');
+  assert.equal(session.composer.tasks.planPick.editor.cursor, 0);
+  press(session, 'shift-right');
+  press(session, 'shift-right');
+  assert.equal(session.composer.tasks.planPick.editor.selectedText(), 'pl');
+  press(session, 'end');
+  assert.equal(session.planOpen, true);
+});
+
 test('slash searches paths on the files and diff screens', () => {
   const items = [
     sampleItem('src/app.js'),
