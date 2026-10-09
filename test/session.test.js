@@ -1515,8 +1515,8 @@ test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /a\.js/);
   assert.match(body, /quote one/);
-  assert.match(body, /ctrl\+up/);
-  assert.match(body, /ctrl\+down/);
+  assert.match(body, /ctrl\+up\/dn/);
+  assert.equal(body.includes('ctrl+down'), false);
 });
 
 test('quoted feedback can be edited from the tasks screen', () => {
@@ -1565,7 +1565,8 @@ test('tasks status switches plan files and defaults to the last one', () => {
   const names = session.composer.tasks.planNames();
   assert.equal(names.at(-1), current);
   assert.ok(names.includes('2020-01-01-00.md'));
-  assert.match(status, /▾/);
+  assert.ok(status.includes(current));
+  assert.equal(status.includes('▾'), false);
   assert.match(status, /tasks \d+\/\d+\s*$/);
   const ratios = status.match(/\d+\/\d+/g);
   assert.deepEqual(ratios, [status.match(/tasks (\d+\/\d+)/)[1]]);
@@ -1625,7 +1626,11 @@ test('tasks plan combo filters in place and keeps the agent menu', () => {
   assert.ok(open.some((row) => row.includes(bg(THEME.noteBg))));
   const opened = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(opened, /note-11\.md/);
+  assert.match(opened, /<new plan>/);
   assert.equal(opened.includes('beta-plan'), false);
+  const current = session.composer.tasks.planName();
+  const selected = open.find((row) => row.includes(bg(THEME.checkBg)));
+  assert.ok(stripAnsi(selected).includes(current));
   session.handleEvent({ type: 'key', key: 'home' });
   session.draw();
   const top = stripAnsi(session.lastFrame.rows.join('\n'));
@@ -1635,7 +1640,7 @@ test('tasks plan combo filters in place and keeps the agent menu', () => {
   session.draw();
   const status = stripAnsi(session.lastFrame.rows.at(-2));
   const afterBranch = status.slice(status.indexOf('main') + 'main'.length);
-  assert.match(afterBranch, /^ {2}m/);
+  assert.match(afterBranch, /^ {2}Plan file: m/);
   const hit = session.lastFrame.statusHits.find(
     (entry) => entry.id === 'plan-item',
   );
@@ -1654,6 +1659,98 @@ test('tasks plan combo filters in place and keeps the agent menu', () => {
   assert.equal(lines.includes('be'), false);
   session.handleEvent({ type: 'key', key: 'enter' });
   assert.equal(session.composer.tasks.planName(), 'beta-plan.md');
+});
+
+test('tasks plan hotkey opens the combo and can start a new plan', () => {
+  const { session } = openSession([sampleItem('a.js')], { color: true });
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.draw();
+  const footer = stripAnsi(session.lastFrame.rows.at(-1));
+  assert.match(footer, /🢐esc {2}plan {2}import/);
+  assert.match(footer, /ctrl\+up\/dn/);
+  const nudge = `${BOLD}${seq(THEME.buttonHotFg, THEME.buttonBg)}up/dn`;
+  assert.ok(session.lastFrame.rows.at(-1).includes(nudge));
+  const closed = session.lastFrame.rows.at(-2);
+  const name = session.composer.tasks.planName();
+  const mark = `${BOLD}${seq(THEME.shaFg, THEME.chromeBg)}${name}`;
+  const lead = `${seq(THEME.mutedFg, THEME.chromeBg)}  Plan file: `;
+  assert.ok(closed.includes(lead));
+  assert.ok(closed.includes(mark));
+  assert.equal(closed.includes('▾'), false);
+  const hits = session.lastFrame.statusHits;
+  const place = hits.find((entry) => entry.id === 'plan');
+  assert.ok(place);
+  const mid = place.x0 + Math.floor((place.x1 - place.x0) / 2);
+  session.handleEvent({
+    type: 'mouse',
+    button: 0,
+    btn: 0,
+    kind: 'press',
+    x: mid + 1,
+    y: place.y,
+    press: true,
+  });
+  session.handleEvent({
+    type: 'mouse',
+    button: 0,
+    btn: 0,
+    kind: 'release',
+    x: mid + 1,
+    y: place.y,
+    press: false,
+  });
+  assert.equal(session.planOpen, true);
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'p' });
+  assert.equal(session.planOpen, true);
+  session.draw();
+  const menu = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(menu, /<new plan>/);
+  session.handleEvent({ type: 'key', key: 'end' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.planOpen, false);
+  const created = session.composer.tasks.planName();
+  assert.match(created, new RegExp(`^${dateStamp()}-\\d+\\.md$`));
+  assert.notEqual(created, name);
+});
+
+test('tasks import asks for a url and applies the pull request', async () => {
+  const { session } = openSession([sampleItem('a.js')], {
+    loadPullRequest: async () => ({
+      imported: {
+        feedback: [],
+        tasks: [
+          {
+            file: 'pull request',
+            text: '@bob review at github: add tests',
+            done: false,
+          },
+        ],
+      },
+    }),
+  });
+  session.dispatch('tasks');
+  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 'i' });
+  assert.equal(session.mode, 'import');
+  session.draw();
+  const asking = stripAnsi(session.lastFrame.rows.at(-2));
+  assert.match(asking, /^ url /);
+  session.pushInput('notaurl');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.status, 'bad url');
+  session.handleEvent({ type: 'key', key: 'i' });
+  session.pushInput('https://github.com/acme/demo/pull/7');
+  session.draw();
+  const typed = stripAnsi(session.lastFrame.rows.at(-2));
+  assert.match(typed, /github\.com\/acme\/demo\/pull\/7/);
+  session.handleEvent({ type: 'key', key: 'enter' });
+  await session.importPromise;
+  assert.equal(session.status, 'imported');
+  assert.equal(session.notes.tasks.length, 1);
+  assert.match(session.notes.tasks[0].text, /add tests/);
 });
 
 test('todo edits in the list not the note line', () => {
