@@ -4080,3 +4080,112 @@ test('npm output paints assertion fields as a colored table', () => {
   assert.ok(!plain.includes('│'));
   assert.ok(!plain.includes('─'));
 });
+
+test('line numbers stay off until the diff view asks for them', () => {
+  const hunk = sampleHunk([
+    { type: 'del', text: 'hello', noNl: false, blockId: 0 },
+    { type: 'add', text: 'world', noNl: false, blockId: 0 },
+  ]);
+  const item = {
+    origin: 'unstaged',
+    file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
+    hunk,
+    blockId: 0,
+  };
+  const size = { width: 160, height: 8, color: false };
+  const off = render.renderFrame(reviewView(item, { pane: 'diff' }), size);
+  const on = render.renderFrame(
+    reviewView(item, { pane: 'diff', lineNumbers: true }),
+    size,
+  );
+  const offBody = off.rows.join('\n');
+  const onBody = on.rows.join('\n');
+  assert.match(offBody, /^- hello/m);
+  assert.doesNotMatch(offBody, /^ {1}1 - hello/m);
+  assert.match(onBody, /^ {1}1 - hello/m);
+  assert.match(onBody, /^ {1}1 \+ world/m);
+  const colored = render.renderFrame(
+    reviewView(item, { pane: 'diff', lineNumbers: true }),
+    { width: 160, height: 8, color: true },
+  );
+  const numbered = colored.rows.find((row) =>
+    stripAnsi(row).includes('1 - hello'),
+  );
+  const gutter = seq(THEME.lineNoFg, THEME.lineNoBg);
+  assert.ok(numbered.includes(`${gutter} 1 `));
+  assert.ok(!numbered.startsWith(bg(THEME.delLineBg)));
+  assert.ok(off.buttons.find((hit) => hit.id === 'lines'));
+  assert.ok(on.buttons.find((hit) => hit.id === 'lines'));
+});
+
+test('side layout numbers the old file left and the new file right', () => {
+  const hunk = {
+    oldStart: 3,
+    oldCount: 1,
+    newStart: 10,
+    newCount: 1,
+    header: '@@ -3,1 +10,1 @@',
+    lines: [
+      { type: 'del', text: 'gone', noNl: false, blockId: 0 },
+      { type: 'add', text: 'fresh', noNl: false, blockId: 0 },
+    ],
+  };
+  const view = reviewView(
+    {
+      origin: 'unstaged',
+      file: { newPath: 'f.js', oldPath: 'f.js', isBinary: false },
+      hunk,
+      blockId: 0,
+    },
+    { pane: 'diff', layout: 'side', lineNumbers: true },
+  );
+  const frame = render.renderFrame(view, {
+    width: 80,
+    height: 8,
+    color: false,
+  });
+  const row = frame.rows.find((line) => line.includes('gone'));
+  const plain = stripAnsi(row);
+  const leftW = Math.floor((80 - 1) / 2);
+  assert.match(plain.slice(0, leftW), / 3 - gone/);
+  assert.match(plain.slice(leftW + 1), /10 \+ fresh/);
+});
+
+test('unit file numbers skip deleted lines', () => {
+  const current = {
+    origin: 'unstaged',
+    file: { newPath: 'a.js', oldPath: 'a.js', isBinary: false },
+    blockId: 0,
+  };
+  const view = reviewView(current, {
+    pane: 'unit',
+    reviewPath: 'a.js',
+    lineNumbers: true,
+    unitLines: [
+      {
+        type: 'del',
+        text: 'old',
+        blockId: 0,
+        item: current,
+        origin: 'unstaged',
+      },
+      {
+        type: 'add',
+        text: 'new',
+        newNo: 1,
+        blockId: 0,
+        item: current,
+        origin: 'unstaged',
+      },
+    ],
+  });
+  const frame = render.renderFrame(view, {
+    width: 160,
+    height: 8,
+    color: false,
+  });
+  const body = frame.rows.join('\n');
+  assert.match(body, /^ {3}- old/m);
+  assert.match(body, /^ 1 \+ new/m);
+  assert.ok(frame.buttons.find((hit) => hit.id === 'lines'));
+});

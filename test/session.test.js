@@ -5170,6 +5170,34 @@ const press = (session, name) => {
   session.handleEvent({ type: 'key', key: name });
 };
 
+test('ctrl-l toggles line numbers on a diff and while editing', () => {
+  const { session } = openSession([sampleItem('a.js')]);
+  assert.equal(session.lineNumbers, false);
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, true);
+  assert.equal(session.status, 'line numbers');
+  session.draw();
+  const shown = stripAnsi(session.lastFrame.rows.join('\n'));
+  assert.match(shown, / 1 - a/);
+  assert.match(shown, / 1 \+ b/);
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, false);
+  assert.equal(session.status, 'no line numbers');
+  session.pane = 'files';
+  press(session, 'ctrl-l');
+  assert.equal(session.lineNumbers, false);
+  session.pane = 'diff';
+  session.dispatch('code');
+  const before = session.editor.text;
+  press(session, 'ctrl-l');
+  assert.equal(session.editor.text, before);
+  assert.equal(session.lineNumbers, true);
+  assert.equal(session.mode, 'compose');
+  clickFooter(session, 'lines');
+  assert.equal(session.lineNumbers, false);
+  assert.equal(session.editor.text, before);
+});
+
 test('ctrl-c quits outside an editor', () => {
   const { session } = openSession([sampleItem('a.js')]);
   press(session, 'ctrl-c');
