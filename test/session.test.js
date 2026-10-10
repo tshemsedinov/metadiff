@@ -4973,6 +4973,327 @@ test('npm history shows a command when it has no script name', () => {
   assert.ok(!history.includes('……'));
 });
 
+test('a history row opens the captured log when its file is missing', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({ scripts: { test: 'reslop t -- node --test' } })}\n`,
+  );
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const failure = 'not ok 1 npm history caption\nassert.ok(failedRow)\n';
+  fs.writeFileSync(path.join(dir, '2026-10-10-test-01.log'), failure);
+  fs.writeFileSync(path.join(dir, '2026-10-10-test-01.raw'), failure);
+  const saved = {
+    reslop: 'npm-run',
+    name: 'test',
+    kind: 'script',
+    command: 'reslop t -- node --test',
+    status: 'exited',
+    exit: 1,
+    startedAt: 1000,
+    endedAt: 5000,
+    log: '2026-10-10-test-01.log',
+    raw: '2026-10-10-test-01.raw',
+    result: { tests: 950, passed: 949, failed: 1 },
+  };
+  fs.writeFileSync(
+    path.join(dir, '2026-10-10-test-01.json'),
+    `${JSON.stringify(saved)}\n`,
+  );
+  const recorded = {
+    v: 1,
+    id: 'inner',
+    command: 'node --test',
+    script: 'test',
+    startedAt: 2000,
+    endedAt: 4000,
+    status: 'failed',
+    exit: 1,
+    progress: { done: 949, failed: 1, lines: 1, expected: 0 },
+    result: { tests: 950, passed: 949, failed: 1 },
+    log: '2026-10-10-node-01.log',
+    raw: '2026-10-10-node-01.raw',
+  };
+  fs.writeFileSync(
+    path.join(dir, '2026-10-10-node-01.json'),
+    `${JSON.stringify(recorded)}\n`,
+  );
+  session.pushInput('r');
+  const rows = session.npm.sessionRows();
+  assert.equal(rows[0].name, 'test');
+  assert.equal(rows[0].mark, 'fail');
+  session.handleEvent({ type: 'key', key: 'right' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.view().npmView, true);
+  assert.match(session.npm.output, /not ok 1 npm history caption/);
+});
+
+test('the run screen follows an outside reslop t', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const file = path.join(dir, '2026-10-10-node-01.json');
+  const write = (extra) => {
+    const record = {
+      v: 1,
+      id: 'outside',
+      pid: process.pid,
+      command: 'node --test',
+      script: 'test',
+      startedAt: 5_000,
+      endedAt: 0,
+      status: 'running',
+      exit: null,
+      progress: { done: 2, failed: 1, lines: 4, expected: 10 },
+      result: null,
+      log: '2026-10-10-node-01.log',
+      raw: '2026-10-10-node-01.raw',
+      ...extra,
+    };
+    fs.writeFileSync(file, `${JSON.stringify(record)}\n`);
+  };
+  write();
+  session.pushInput('r');
+  session.dashboard.noteDisk(['.log/2026-10-10-node-01.json']);
+  let rows = session.npm.sessionRows();
+  assert.equal(rows[0].name, 'test');
+  assert.equal(rows[0].live, true);
+  assert.equal(rows[0].mark, 'run');
+  assert.equal(rows[0].done, '3');
+  assert.equal(rows[0].ok, '2');
+  assert.equal(rows[0].fail, '1');
+  assert.equal(rows[0].total, '10');
+  const shown = frameBody(session).join('\n');
+  assert.match(shown, /⠋/);
+  assert.match(shown, /test/);
+  write({
+    progress: { done: 4, failed: 1, lines: 8, expected: 10 },
+  });
+  session.dashboard.noteDisk(['.log/2026-10-10-node-01.json']);
+  rows = session.npm.sessionRows();
+  assert.equal(rows[0].done, '5');
+  assert.equal(rows[0].ok, '4');
+  assert.equal(rows[0].live, true);
+  write({
+    status: 'failed',
+    exit: 1,
+    endedAt: 8_000,
+    progress: { done: 8, failed: 2, lines: 20, expected: 10 },
+    result: { tests: 10, passed: 8, failed: 2 },
+  });
+  session.dashboard.noteDisk(['.log/2026-10-10-node-01.json']);
+  rows = session.npm.sessionRows();
+  assert.equal(rows[0].live, false);
+  assert.equal(rows[0].mark, 'fail');
+  assert.equal(rows[0].done, '10');
+  assert.equal(rows[0].ok, '8');
+  assert.equal(rows[0].fail, '2');
+  assert.equal(rows[0].total, '10');
+});
+
+test('a finished outside run drops the running line', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const file = path.join(dir, '2026-10-10-node-01.json');
+  const write = (extra) => {
+    const record = {
+      v: 1,
+      id: 'outside',
+      pid: process.pid,
+      command: 'node --test',
+      script: 'test',
+      startedAt: 5_000,
+      endedAt: 0,
+      status: 'running',
+      exit: null,
+      progress: { done: 1, failed: 0, lines: 2, expected: 1 },
+      result: null,
+      log: '2026-10-10-node-01.log',
+      raw: '2026-10-10-node-01.raw',
+      ...extra,
+    };
+    fs.writeFileSync(file, `${JSON.stringify(record)}\n`);
+  };
+  write();
+  session.pushInput('r');
+  session.dashboard.noteDisk(['.log/2026-10-10-node-01.json']);
+  fs.writeFileSync(
+    path.join(dir, '2026-10-10-node-01.log'),
+    '# test\n\nok: true\n\nexit: 0\n',
+  );
+  write({
+    status: 'passed',
+    exit: 0,
+    endedAt: 8_000,
+    result: { tests: 1, passed: 1, failed: 0 },
+  });
+  session.handleEvent({ type: 'key', key: 'right' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.view().npmView, true);
+  assert.equal(session.view().npmRunning, true);
+  let text = frameBody(session).join('\n');
+  assert.match(text, /exit: 0/);
+  assert.match(text, /running/);
+  session.tickProgress();
+  assert.equal(session.view().npmRunning, false);
+  assert.equal(session.npm.sessionRows()[0].live, false);
+  text = frameBody(session).join('\n');
+  assert.match(text, /exit: 0/);
+  assert.ok(!text.includes('running'));
+});
+
+test('chained steps of one script share a history row', () => {
+  const { session, cwd } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const record = (id, command, startedAt, endedAt, status) => ({
+    v: 1,
+    id,
+    pid: process.pid,
+    command,
+    script: 'fix',
+    startedAt,
+    endedAt,
+    status,
+    exit: status === 'running' ? null : 0,
+    progress: { done: 0, failed: 0, lines: 0, expected: 0 },
+    result: null,
+    log: `${id}.log`,
+    raw: `${id}.raw`,
+  });
+  const write = (id, command, startedAt, endedAt, status = 'passed') => {
+    fs.writeFileSync(
+      path.join(dir, `${id}.json`),
+      `${JSON.stringify(record(id, command, startedAt, endedAt, status))}\n`,
+    );
+  };
+  write('eslint', 'eslint . --fix', 1_000, 2_000);
+  write('prettier', 'prettier --write .', 2_065, 0, 'running');
+  session.pushInput('r');
+  session.dashboard.noteDisk(['.log/eslint.json', '.log/prettier.json']);
+  let rows = session.npm.sessionRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'fix');
+  assert.equal(rows[0].live, true);
+  write('prettier', 'prettier --write .', 2_065, 4_000, 'passed');
+  write('eslint-2', 'eslint . --fix', 12_000, 13_000);
+  write('prettier-2', 'prettier --write .', 13_080, 15_000);
+  session.dashboard.noteDisk(['.log/prettier.json', '.log/eslint-2.json']);
+  rows = session.npm.sessionRows();
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((row) => row.live),
+    [false, false],
+  );
+});
+
+test('npm test from the ui keeps the two reslop t runs', async () => {
+  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
+  fs.writeFileSync(
+    path.join(cwd, 'package.json'),
+    `${JSON.stringify({
+      scripts: {
+        lint: 'eslint .',
+        test: 'reslop t -- npm run -s lint && reslop t -- node --test',
+      },
+    })}\n`,
+  );
+  let close = null;
+  repo.runNpmCommand = (root, entry, onData, onClose) => {
+    close = onClose;
+    return { kill() {} };
+  };
+  session.pushInput('r');
+  const testAt = session.npm.commands.findIndex(
+    (entry) => entry.name === 'test',
+  );
+  session.nav.npmCursor = testAt;
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.npm.running, true);
+  assert.equal(session.npm.sessionRows().length, 0);
+  const dir = path.join(cwd, '.log');
+  fs.mkdirSync(dir);
+  const record = (id, command, script, startedAt, endedAt, extra) => ({
+    v: 1,
+    id,
+    pid: process.pid,
+    command,
+    script,
+    startedAt,
+    endedAt,
+    status: 'passed',
+    exit: 0,
+    progress: { done: 0, failed: 0, lines: 0, expected: 0 },
+    result: null,
+    log: `${id}.log`,
+    raw: `${id}.raw`,
+    ...extra,
+  });
+  fs.writeFileSync(
+    path.join(dir, 'lint.json'),
+    `${JSON.stringify(
+      record('lint', 'npm run -s lint', 'test', 1000, 3000),
+    )}\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, 'tests.json'),
+    `${JSON.stringify(
+      record('tests', 'node --test', 'test', 4000, 9000, {
+        result: { tests: 4, passed: 4, failed: 0 },
+      }),
+    )}\n`,
+  );
+  session.dashboard.noteDisk(['.log/lint.json', '.log/tests.json']);
+  const rows = session.npm.sessionRows();
+  assert.deepEqual(
+    rows.map((row) => row.name),
+    ['test', 'lint'],
+  );
+  assert.equal(rows[0].done, '4');
+  assert.equal(rows[1].total, 'exit 0');
+  close({ status: 0, text: 'ok\n' });
+  const names = fs.readdirSync(dir);
+  assert.equal(
+    names.some((name) => name.includes('npm-run') || name.startsWith('2026')),
+    false,
+  );
+  const lintAt = session.npm.commands.findIndex(
+    (entry) => entry.name === 'lint',
+  );
+  session.nav.npmCursor = lintAt;
+  let closed = null;
+  repo.runNpmCommand = (root, entry, onData, onClose) => {
+    closed = onClose;
+    return { kill() {} };
+  };
+  session.handleEvent({ type: 'key', key: 'enter' });
+  const live = session.npm.sessionRows().filter((row) => row.live);
+  assert.equal(live.length, 1);
+  assert.equal(live[0].name, 'lint');
+  closed({ status: 0, text: '' });
+  let saved = [];
+  for (let i = 0; i < 20; i++) {
+    saved = fs.readdirSync(dir).filter((name) => name.endsWith('.json'));
+    if (saved.length >= 3) break;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
+  assert.equal(saved.length, 3);
+});
+
 test('npm history counts tests and stays on the run screen', () => {
   const { session, cwd, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',

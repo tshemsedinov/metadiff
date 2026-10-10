@@ -3926,20 +3926,22 @@ test('npm history caption, columns, and scrollbar', () => {
   const bodyH = frame.bodyH;
   const body = frame.rows.slice(1, 1 + bodyH).map((row) => stripAnsi(row));
   const leftW = 80 - Math.floor(80 * 0.7);
-  const titles = body[0].slice(leftW);
+  assert.equal(body[0].slice(leftW).trim(), '');
+  const titles = body[1].slice(leftW);
   assert.match(titles, /command +done +ok +fail +total +duration +time/);
-  assert.equal(body[1].slice(leftW).trim(), '');
-  const history = body[2].slice(leftW);
+  assert.equal(body[2].slice(leftW).trim(), '');
+  const history = body[3].slice(leftW);
   const statusAt = history.indexOf('✔');
   const nameAt = history.indexOf('test');
+  assert.equal(statusAt, titles.indexOf('command'));
   const doneAt = history.indexOf('4');
   const elapsedAt = history.indexOf('3s');
   const whenAt = history.indexOf('14:05');
   assert.ok(statusAt >= 0 && statusAt < nameAt);
   assert.ok(nameAt < doneAt && doneAt < elapsedAt && elapsedAt < whenAt);
   assert.match(history, /✔ +test +4 +4 +0 +4 +3s +14:05/);
-  assert.match(body[3].slice(leftW), /✖ +lint/);
-  assert.match(body[3].slice(leftW), /exit 1/);
+  assert.match(body[4].slice(leftW), /✖ +lint/);
+  assert.match(body[4].slice(leftW), /exit 1/);
   assert.ok(!history.includes('exit'));
   assert.equal(frame.scrollBar, null);
   const live = render.renderFrame(
@@ -3955,8 +3957,8 @@ test('npm history caption, columns, and scrollbar', () => {
   const liveBody = live.rows
     .slice(1, 1 + live.bodyH)
     .map((row) => stripAnsi(row));
-  assert.equal(liveBody[1].slice(leftW).trim(), '');
-  assert.match(liveBody[2], /⠋/);
+  assert.equal(liveBody[0].slice(leftW).trim(), '');
+  assert.match(liveBody[3], /⠋/);
   const many = [];
   for (let i = 0; i < 20; i++) many.push(run('test'));
   const scrolled = render.renderFrame(
@@ -3975,22 +3977,22 @@ test('npm history caption, columns, and scrollbar', () => {
   const narrowBody = narrow.rows
     .slice(1, 1 + narrow.bodyH)
     .map((row) => stripAnsi(row));
-  assert.match(narrowBody[2], /…/);
-  assert.ok(!narrowBody[2].includes('……'));
+  assert.match(narrowBody[3], /…/);
+  assert.ok(!narrowBody[3].includes('……'));
   const lift = (rgb) =>
     rgb.map((value) => Math.round(value + (255 - value) * 0.45));
   const picked = render.renderFrame(
     { ...view, npmFocus: 'runs', npmRunCursor: 0 },
     { width: 80, height: 12, color: true },
   );
-  const pickedRow = picked.rows[3];
+  const pickedRow = picked.rows[4];
   assert.ok(pickedRow.includes(fg(lift(THEME.addLineFg))));
   assert.ok(!pickedRow.includes(fg(THEME.buttonHotFg)));
   const failed = render.renderFrame(
     { ...view, npmFocus: 'runs', npmRunCursor: 1 },
     { width: 80, height: 12, color: true },
   );
-  const failedRow = failed.rows[4];
+  const failedRow = failed.rows[5];
   assert.ok(failedRow.includes(fg(lift(THEME.errorFg))));
 });
 
