@@ -1054,6 +1054,10 @@ test('the files share bar stays on a narrow tile', () => {
   const linesLabel = block.titleLine.find((part) => part.text === 'lines');
   assert.equal(sizeLabel.tone, 'caption');
   assert.equal(linesLabel.tone, 'caption');
+  const shareLabel = block.titleLine.find((part) => part.text === 'share');
+  assert.equal(shareLabel.tone, 'caption');
+  assert.equal(header.endsWith('share'), true);
+  assert.equal(end(header, 'share'), visibleWidth(folder));
   assert.match(folder, /📁 lib/);
   assert.equal(folder.includes('📁  '), false);
   assert.equal(ext.indexOf('*.js'), folder.indexOf('lib'));
@@ -1437,7 +1441,7 @@ test('the npm tile lists packages under the header counts', () => {
     }
     return '';
   };
-  assert.equal(tone('name'), '');
+  assert.equal(tone('name'), 'muted');
   assert.equal(tone('size'), 'muted');
   assert.equal(tone('big'), 'dep');
   assert.equal(tone('small'), 'dev');
@@ -1556,7 +1560,8 @@ test('the npm tile shows current, wanted, and latest', () => {
     const part = line.find((item) => item.text === value);
     return part ? part.tone : '';
   };
-  assert.equal(labels.includes('name'), false);
+  assert.ok(labels.startsWith('name'));
+  assert.equal(tone(heading, 'name'), 'muted');
   assert.ok(labels.includes('current'));
   assert.ok(labels.includes('wanted'));
   assert.ok(labels.includes('latest'));
