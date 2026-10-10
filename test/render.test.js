@@ -3915,10 +3915,13 @@ test('secondary screens lead the hint line with 🢐esc', () => {
   assert.ok(!plain({ pane: 'repos' }).includes('files'));
   const output = footerOf({ pane: 'npm', npmView: true });
   assert.match(stripAnsi(output.rows.at(-1)), /^ 🢐esc {2}/);
+  assert.match(stripAnsi(output.rows.at(-1)), /verbose {2}stop {2}re-run/);
   const running = footerOf({ pane: 'npm', npmView: true, npmRunning: true });
   assert.match(stripAnsi(running.rows.at(-1)), /^ 🢐esc {2}/);
-  assert.equal(output.buttons[0].id, 'npmStop');
-  const stops = output.buttons.filter((hit) => hit.id === 'npmStop');
+  assert.equal(output.buttons[0].id, 'back');
+  const idleStops = output.buttons.filter((hit) => hit.id === 'npmStop');
+  assert.equal(idleStops.length, 0);
+  const stops = running.buttons.filter((hit) => hit.id === 'npmStop');
   assert.equal(stops.length, 1);
   const colored = footerOf({ pane: 'branches' }, true);
   const row = colored.rows.at(-1);
