@@ -2399,12 +2399,23 @@ test('quit warns before terminating a running test or agent', () => {
   const { session } = openSession([sampleItem('a.js')]);
   let testsKilled = false;
   let agentsKilled = false;
-  session.npm.running = true;
-  session.npm.child = {
-    kill() {
-      testsKilled = true;
+  session.npm.runs.push({
+    id: 1,
+    name: 'test',
+    kind: 'script',
+    status: 'running',
+    stopping: false,
+    raw: '',
+    output: '',
+    startedAt: Date.now(),
+    endedAt: 0,
+    exit: '',
+    child: {
+      kill() {
+        testsKilled = true;
+      },
     },
-  };
+  });
   session.agents.jobs.push({
     status: 'running',
     child: {
@@ -4710,7 +4721,7 @@ const frameBody = (session) => {
   return rows.map((row) => stripAnsi(row));
 };
 
-test('esc stops a running npm command and waits to leave', () => {
+test('esc leaves a running npm command in the background', () => {
   const { session, cwd, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
@@ -4740,20 +4751,33 @@ test('esc stops a running npm command and waits to leave', () => {
   const footer = () => stripAnsi(session.lastFrame.rows.at(-1));
   const hitIds = () => session.lastFrame.buttons.map((hit) => hit.id);
   assert.match(footer(), /^ 🢐esc {2}/);
-  assert.match(footer(), / re-run/);
+  assert.match(footer(), /verbose {2}stop {2}re-run/);
   assert.ok(!footer().includes('edit'));
   assert.ok(!footer().includes('new'));
+  assert.equal(hitIds()[0], 'back');
   assert.ok(hitIds().includes('npmStop'));
-  assert.ok(!hitIds().includes('npmRerun'));
+  assert.ok(hitIds().includes('npmRerun'));
   session.handleEvent({ type: 'key', key: 'r' });
-  assert.equal(starts, 1);
+  assert.equal(starts, 2);
   assert.equal(session.view().npmRunning, true);
+  assert.equal(session.npm.runs.length, 2);
   session.handleEvent({ type: 'key', key: 'escape' });
+  assert.equal(killed, false);
+  assert.equal(session.view().npmView, false);
+  assert.equal(session.npm.running, true);
+  assert.equal(session.status, '');
+  let text = frameBody(session).join('\n');
+  assert.match(text, /test/);
+  assert.equal(text.match(/running/g).length, 2);
+  session.handleEvent({ type: 'key', key: 'right' });
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.view().npmView, true);
+  session.handleEvent({ type: 'key', key: 's' });
   assert.equal(killed, true);
   assert.equal(session.view().npmView, true);
   assert.equal(session.view().npmRunning, false);
   assert.equal(session.status, 'terminated');
-  let text = frameBody(session).join('\n');
+  text = frameBody(session).join('\n');
   assert.match(text, /hello/);
   assert.match(text, /terminated/);
   push('hello\nmore\n');
@@ -4771,9 +4795,11 @@ test('esc stops a running npm command and waits to leave', () => {
   assert.ok(!text.includes('exit null'));
   session.draw();
   assert.match(footer(), /🢐esc/);
+  assert.match(footer(), /stop/);
   assert.ok(!footer().includes('⊗'));
   let hits = hitIds();
-  assert.ok(hits.includes('npmStop'));
+  assert.equal(hits[0], 'back');
+  assert.ok(!hits.includes('npmStop'));
   assert.ok(hits.includes('npmRerun'));
   assert.ok(!hits.includes('npmEdit'));
   const runs = [];
@@ -4789,15 +4815,19 @@ test('esc stops a running npm command and waits to leave', () => {
   session.handleEvent({ type: 'key', key: 'r' });
   assert.deepEqual(runs, ['test']);
   assert.equal(session.view().npmRunning, true);
-  session.handleEvent({ type: 'key', key: 'escape' });
+  session.handleEvent({ type: 'key', key: 's' });
   assert.equal(session.view().npmView, true);
   assert.equal(session.status, 'terminated');
   session.draw();
   hits = hitIds();
-  assert.ok(hits.includes('npmStop'));
+  assert.ok(!hits.includes('npmStop'));
+  assert.ok(hits.includes('npmRerun'));
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.view().npmView, false);
   assert.equal(session.pane, 'npm');
+  text = frameBody(session).join('\n');
+  assert.match(text, /running/);
+  assert.match(text, /stopped/);
 });
 
 test('npm output scrolls with the editor hotkeys', () => {
