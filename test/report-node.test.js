@@ -100,6 +100,7 @@ for (const reporter of ['tap', 'spec']) {
       const controller = new npm.NpmController(ui);
       controller.commands = [{ name: 'test', kind: 'script' }];
       await controller.run();
+      controller.openView(controller.runs.at(-1).id);
       const output = renderReport(doc);
       assert.equal(controller.output, output);
       assert.notEqual(controller.output, preview);
@@ -108,7 +109,8 @@ for (const reporter of ['tap', 'spec']) {
       const logs = fs.readdirSync(logDir);
       const reduced = logs.find((name) => name.endsWith('.log'));
       const rawName = logs.find((name) => name.endsWith('.raw'));
-      assert.equal(logs.length, 2);
+      assert.equal(logs.length, 3);
+      assert.ok(logs.some((name) => name.endsWith('.json')));
       const md = renderDocument(doc, rawName);
       const logText = md
         .split('\n')

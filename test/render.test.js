@@ -3839,15 +3839,15 @@ test('npm bin names are blue and package scripts stay white', () => {
     counts: {},
   };
   const frame = render.renderFrame(view, {
-    width: 60,
+    width: 100,
     height: 10,
     color: true,
   });
   const rows = frame.rows.map((row) => stripAnsi(row));
   const script = frame.rows[rows.findIndex((row) => row.includes('test'))];
   const bin = frame.rows[rows.findIndex((row) => row.includes('eslint'))];
-  const blue = seq(THEME.shaFg, THEME.ctxBg);
-  const white = `${BOLD}${seq(THEME.buttonHotFg, THEME.buttonBg)}`;
+  const blue = seq(THEME.shaFg, THEME.buttonBg);
+  const white = `${BOLD}${seq(THEME.buttonHotFg, THEME.checkBg)}`;
   assert.ok(script.includes(`${white}test`));
   assert.ok(!script.includes(fg(THEME.shaFg)));
   assert.ok(bin.includes(`${blue}eslint`));
@@ -3868,7 +3868,7 @@ test('npm list aligns names and commands on the left', () => {
     counts: {},
   };
   const frame = render.renderFrame(view, {
-    width: 60,
+    width: 100,
     height: 12,
     color: false,
   });
@@ -3883,6 +3883,115 @@ test('npm list aligns names and commands on the left', () => {
   assert.equal(lint.indexOf('eslint .'), cmdAt);
   assert.equal(bin.indexOf('bin'), cmdAt);
   assert.equal(cmdAt, nameAt + 'leftpad'.length + 2);
+});
+
+test('npm history caption, columns, and scrollbar', () => {
+  const run = (name, extra = {}) => ({
+    name,
+    mark: 'pass',
+    done: '',
+    ok: '',
+    fail: '',
+    total: 'exit 0',
+    exitLabel: true,
+    elapsed: '3s',
+    when: '14:05',
+    ...extra,
+  });
+  const view = {
+    pane: 'npm',
+    npmCommands: [{ name: 'test', command: 'node --test', kind: 'script' }],
+    npmCursor: 0,
+    npmRuns: [
+      run('test', {
+        done: '4',
+        ok: '4',
+        fail: '0',
+        total: '4',
+        exitLabel: false,
+        okN: 4,
+        failN: 0,
+      }),
+      run('lint', { mark: 'fail', total: 'exit 1' }),
+    ],
+    repoName: 'demo',
+    status: '',
+    counts: {},
+  };
+  const frame = render.renderFrame(view, {
+    width: 80,
+    height: 12,
+    color: false,
+  });
+  const bodyH = frame.bodyH;
+  const body = frame.rows.slice(1, 1 + bodyH).map((row) => stripAnsi(row));
+  const leftW = 80 - Math.floor(80 * 0.7);
+  const titles = body[0].slice(leftW);
+  assert.match(titles, /command +done +ok +fail +total +duration +time/);
+  assert.equal(body[1].slice(leftW).trim(), '');
+  const history = body[2].slice(leftW);
+  const statusAt = history.indexOf('✔');
+  const nameAt = history.indexOf('test');
+  const doneAt = history.indexOf('4');
+  const elapsedAt = history.indexOf('3s');
+  const whenAt = history.indexOf('14:05');
+  assert.ok(statusAt >= 0 && statusAt < nameAt);
+  assert.ok(nameAt < doneAt && doneAt < elapsedAt && elapsedAt < whenAt);
+  assert.match(history, /✔ +test +4 +4 +0 +4 +3s +14:05/);
+  assert.match(body[3].slice(leftW), /✖ +lint/);
+  assert.match(body[3].slice(leftW), /exit 1/);
+  assert.ok(!history.includes('exit'));
+  assert.equal(frame.scrollBar, null);
+  const live = render.renderFrame(
+    {
+      ...view,
+      npmRuns: [
+        run('test', { live: true, mark: 'run', total: '', exitLabel: false }),
+      ],
+      progressFrame: 0,
+    },
+    { width: 80, height: 12, color: false },
+  );
+  const liveBody = live.rows
+    .slice(1, 1 + live.bodyH)
+    .map((row) => stripAnsi(row));
+  assert.equal(liveBody[1].slice(leftW).trim(), '');
+  assert.match(liveBody[2], /⠋/);
+  const many = [];
+  for (let i = 0; i < 20; i++) many.push(run('test'));
+  const scrolled = render.renderFrame(
+    { ...view, npmRuns: many },
+    { width: 80, height: 12, color: false },
+  );
+  assert.equal(scrolled.scrollBar.count, 20);
+  assert.ok(scrolled.scrollBar.rows < 20);
+  const narrow = render.renderFrame(
+    {
+      ...view,
+      npmRuns: [run('very-long-command-name')],
+    },
+    { width: 50, height: 12, color: false },
+  );
+  const narrowBody = narrow.rows
+    .slice(1, 1 + narrow.bodyH)
+    .map((row) => stripAnsi(row));
+  assert.match(narrowBody[2], /…/);
+  assert.ok(!narrowBody[2].includes('……'));
+  const lift = (rgb) =>
+    rgb.map((value) => Math.round(value + (255 - value) * 0.45));
+  const picked = render.renderFrame(
+    { ...view, npmFocus: 'runs', npmRunCursor: 0 },
+    { width: 80, height: 12, color: true },
+  );
+  const pickedRow = picked.rows[3];
+  assert.ok(pickedRow.includes(fg(lift(THEME.addLineFg))));
+  assert.ok(!pickedRow.includes(fg(THEME.buttonHotFg)));
+  const failed = render.renderFrame(
+    { ...view, npmFocus: 'runs', npmRunCursor: 1 },
+    { width: 80, height: 12, color: true },
+  );
+  const failedRow = failed.rows[4];
+  assert.ok(failedRow.includes(fg(lift(THEME.errorFg))));
 });
 
 test('secondary screens lead the hint line with 🢐esc', () => {

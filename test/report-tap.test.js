@@ -298,6 +298,7 @@ test('TUI groups and saves TAP without a version header', async () => {
     const controller = new NpmController(ui);
     controller.commands = [{ name: 'test', kind: 'script' }];
     await controller.run();
+    controller.openView(controller.runs.at(-1).id);
     assert.match(controller.output, /× 2/);
     assert.ok(!controller.output.includes('## '));
     assert.ok(!controller.output.includes('node:'));
@@ -305,7 +306,8 @@ test('TUI groups and saves TAP without a version header', async () => {
     const names = fs.readdirSync(directory);
     const reduced = names.find((name) => name.endsWith('.log'));
     const rawName = names.find((name) => name.endsWith('.raw'));
-    assert.equal(names.length, 2);
+    assert.equal(names.length, 3);
+    assert.ok(names.some((name) => name.endsWith('.json')));
     const log = fs.readFileSync(path.join(directory, reduced), 'utf8');
     assert.match(log, /count: 2/);
     assert.match(log, new RegExp(rawName.replace(/[.]/g, '\\.')));

@@ -10,7 +10,7 @@ const { stripAnsi } = require('../lib/ansi.js');
 const { tempDir } = require('./helpers.js');
 
 const { listCommands, reduceOutput, logFileName } = npm;
-const { nextLogFile, saveLogs } = npm;
+const { nextLogFile, saveLogs, readSavedRuns, readLogPair } = npm;
 const { staleLogFiles, removeStaleLogs } = npm;
 const { saveScript, removeScript, reorderScript } = npm;
 const { commandEnv, startNpm } = npm;
@@ -223,6 +223,55 @@ test('log names are dated and numbered', async () => {
   await saveLogs(colored, '\x1b[31mError\x1b[0m\n', 'hello  \n  at app \n');
   assert.equal(read(colored.name), 'Error\n');
   assert.equal(read(colored.rawName), 'hello\n  at app\n');
+});
+
+test('saved npm runs reload from log records and older logs', async () => {
+  const root = tempDir('reslop-npm-log-');
+  const dir = path.join(root, '.log');
+  const now = new Date(2026, 8, 22, 15, 4, 0);
+  const slot = nextLogFile(root, 'test', now);
+  const run = {
+    name: 'test',
+    kind: 'script',
+    command: 'node --test',
+    status: 'exited',
+    exit: 0,
+    startedAt: now.getTime() - 4000,
+    endedAt: now.getTime(),
+  };
+  await saveLogs(slot, 'hello\nexit 0\n', 'hello\n', run);
+  fs.writeFileSync(path.join(dir, '2026-09-22-lint-01.log'), 'boom\nexit 1\n');
+  fs.writeFileSync(path.join(dir, '2026-09-22-lint-01.raw'), 'boom raw\n');
+  fs.writeFileSync(
+    path.join(dir, '2026-09-22-test-unit-01.log'),
+    'stopped\nterminated\n',
+  );
+  fs.writeFileSync(path.join(dir, '2026-09-22-agent-01.log'), 'agent\n');
+  fs.writeFileSync(
+    path.join(dir, '2026-09-22-agent-01.json'),
+    '{"cliId":"cursor"}\n',
+  );
+  const commands = [
+    { name: 'test', command: 'node --test', kind: 'script' },
+    { name: 'lint', command: 'eslint .', kind: 'script' },
+    { name: 'test:unit', command: 'node --test test', kind: 'script' },
+  ];
+  const saved = readSavedRuns(root, commands);
+  assert.equal(saved.length, 3);
+  const lint = saved.find((item) => item.name === 'lint');
+  const unit = saved.find((item) => item.name === 'test:unit');
+  const testRun = saved.find((item) => item.name === 'test');
+  assert.equal(lint.exit, 1);
+  assert.equal(lint.command, 'eslint .');
+  assert.equal(lint.rawName, '2026-09-22-lint-01.raw');
+  assert.equal(unit.status, 'stopped');
+  assert.equal(unit.command, 'node --test test');
+  assert.equal(testRun.exit, 0);
+  assert.equal(testRun.startedAt, run.startedAt);
+  const text = readLogPair(root, testRun.logName, testRun.rawName);
+  assert.match(text.output, /hello/);
+  assert.equal(text.raw, 'hello\n');
+  assert.ok(!saved.some((item) => item.name === 'agent'));
 });
 
 test('save remove and reorder scripts', () => {
