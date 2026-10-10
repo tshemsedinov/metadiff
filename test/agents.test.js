@@ -164,16 +164,32 @@ test('buildLaunch builds command for agy with model effort and prompt', () => {
   assert.deepEqual(withModel.args, [
     '--dangerously-skip-permissions',
     '--model',
-    'gemini-3.8-flash',
+    'gemini-3.8-flash-high',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(
+    withModel.command,
+    'agy --dangerously-skip-permissions --model gemini-3.8-flash-high ' +
+      '-p /tmp/plan.md',
+  );
+
+  const withDefaultEffort = buildLaunch(
+    row,
+    { model: 'default', effort: 'high', extra: '' },
+    '/tmp/plan.md',
+  );
+  assert.equal(withDefaultEffort.ok, true);
+  assert.deepEqual(withDefaultEffort.args, [
+    '--dangerously-skip-permissions',
     '--effort',
     'high',
     '-p',
     planPrompt('/tmp/plan.md'),
   ]);
   assert.equal(
-    withModel.command,
-    'agy --dangerously-skip-permissions --model gemini-3.8-flash ' +
-      '--effort high -p /tmp/plan.md',
+    withDefaultEffort.command,
+    'agy --dangerously-skip-permissions --effort high -p /tmp/plan.md',
   );
 
   const sessionId = '11111111-2222-3333-4444-555555555555';
@@ -281,6 +297,16 @@ test('agy lists models and parses model names', async () => {
     'gemini-3.8-flash-medium',
     'claude-sonnet-4-6',
   ]);
+});
+
+test('agy fallback models match CLI offerings and exclude xhigh/max', () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  assert.deepEqual(agy.efforts, ['default', 'low', 'medium', 'high']);
+  assert.equal(agy.efforts.includes('xhigh'), false);
+  assert.equal(agy.efforts.includes('max'), false);
+  assert.ok(agy.models.includes('gemini-3.8-flash-high'));
+  assert.ok(agy.models.includes('gpt-oss-120b-medium'));
 });
 
 const openUi = () => {
