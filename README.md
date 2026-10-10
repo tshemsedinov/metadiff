@@ -50,9 +50,7 @@ Requires Node.js `>=18.15.0`.
 - `reslop https://github.com/metarhia/metacom/pull/555` GitHub/GitLab PR/MR
 - `reslop https://github.com/metarhia/metacom/issues/550` import GitHub/GitLab issue
 - `reslop https://github.com/metarhia/metacom/issues` import all issues
-- `reslop -n` start a new review even if the latest is still editing
 - `reslop -r` read-only mode
-- `reslop -light` light color theme (default dark)
 - `reslop t -- <program> [args]` run one program and print a reduced report
 
 Prefix each program in an npm script with `reslop t --`. Keep `&&` between those wraps, so each program is captured on its own and a failing step does not start the next one:
