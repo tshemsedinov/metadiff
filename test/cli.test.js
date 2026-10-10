@@ -52,28 +52,15 @@ test('AC12 clean repo prints nothing to review', async () => {
   }
 });
 
-test('parseArgv accepts -n and -r', () => {
-  assert.equal(parseArgv([]).newReview, false);
+test('parseArgv accepts -r and rejects removed switches', () => {
   assert.equal(parseArgv([]).readOnly, false);
-  assert.equal(parseArgv(['-n']).newReview, true);
   assert.equal(parseArgv(['-r']).readOnly, true);
-  assert.deepEqual(parseArgv(['-n', 'lib']).paths, ['lib']);
-  assert.equal(parseArgv(['-n', 'lib']).newReview, true);
-  assert.equal(parseArgv(['-n', '-r']).newReview, true);
-  assert.equal(parseArgv(['-n', '-r']).readOnly, true);
-  const unknown = ['--new', '--help', '-h', '--version', '-v'];
+  assert.deepEqual(parseArgv(['-r', 'lib']).paths, ['lib']);
+  const unknown = ['-n', '-light', '--new', '--help', '-h', '--version', '-v'];
   for (const flag of unknown) {
     const message = `unknown option ${flag}`;
     assert.throws(() => parseArgv([flag]), new RegExp(message));
   }
-});
-
-test('parseArgv reads -light', () => {
-  assert.equal(parseArgv([]).theme, 'dark');
-  assert.equal(parseArgv(['-light']).theme, 'light');
-  assert.equal(parseArgv(['-n', '-light']).theme, 'light');
-  assert.deepEqual(parseArgv(['-light', 'lib']).paths, ['lib']);
-  assert.equal(parseArgv(['-light', 'lib']).newReview, false);
 });
 
 test('unknown option exits 1', async () => {
@@ -86,7 +73,7 @@ test('unknown option exits 1', async () => {
   assert.match(err, /unknown option/);
   const usage = new RegExp(
     [
-      'Usage: reslop \\[-n\\] \\[-r\\] \\[-light\\]',
+      'Usage: reslop \\[-r\\]',
       '\\[path \\| commit \\| pr-url \\| mr-url \\| issue-url\\]',
     ].join(' '),
   );

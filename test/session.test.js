@@ -5215,15 +5215,50 @@ test('line numbers persist in .reslop', () => {
     assert.equal(session.lineNumbers, false);
     press(session, 'ctrl-l');
     const on = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.equal(on.lineNumbers, true);
+    assert.equal(on.editor.lineNumbers, true);
+    assert.equal(on.lineNumbers, undefined);
     assert.deepEqual(on.agents.claude, { model: 'sonnet' });
     const again = openSession([sampleItem('a.js')], { cwd });
     assert.equal(again.session.lineNumbers, true);
     press(again.session, 'ctrl-l');
     const off = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.equal(off.lineNumbers, false);
+    assert.equal(off.editor.lineNumbers, false);
+    assert.equal(off.lineNumbers, undefined);
     assert.deepEqual(off.agents.claude, { model: 'sonnet' });
   } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('editor general and commits settings persist in .reslop', () => {
+  const cwd = tempDir('reslop-ui-');
+  const file = path.join(cwd, '.reslop');
+  const legacy = { lineNumbers: true, agents: { claude: { model: 'sonnet' } } };
+  fs.writeFileSync(file, `${JSON.stringify(legacy)}\n`);
+  try {
+    const { session } = openSession([sampleItem('a.js')], { cwd });
+    assert.equal(session.lineNumbers, true);
+    assert.equal(session.layout, 'unified');
+    assert.equal(themeName(), 'dark');
+    press(session, 'm');
+    press(session, 'l');
+    session.pushInput('c');
+    press(session, 'v');
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(saved.lineNumbers, undefined);
+    assert.equal(saved.editor.lineNumbers, true);
+    assert.equal(saved.editor.mode, 'mixed');
+    assert.equal(saved.general.theme, 'light');
+    assert.equal(saved.commits.view, 'full');
+    assert.deepEqual(saved.agents.claude, { model: 'sonnet' });
+    setTheme('dark');
+    const again = openSession([sampleItem('a.js')], { cwd });
+    assert.equal(again.session.lineNumbers, true);
+    assert.equal(again.session.layout, 'mixed');
+    assert.equal(again.session.commits.commitView, 'full');
+    assert.equal(themeName(), 'light');
+  } finally {
+    setTheme('dark');
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
