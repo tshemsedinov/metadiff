@@ -2264,3 +2264,143 @@ test('stat pairs become label and value table rows', () => {
   assert.equal(rows[0].length, 4);
   assert.equal(rows[1].length, 2);
 });
+
+const lineText = (line) => line.map((part) => part.text).join('');
+
+const messageAt = (rows, message) =>
+  rows.findIndex((row) => row.includes(message));
+
+const assertCentered = (rows, message) => {
+  const body = rows.slice(1);
+  const at = messageAt(body, message);
+  assert.ok(at >= 0, message);
+  assert.equal(at, Math.floor((body.length - 1) / 2), message);
+  const start = body[at].indexOf(message);
+  const after = body[at].length - start - message.length;
+  assert.ok(Math.abs(start - after) <= 1, message);
+};
+
+test('empty dashboard panels center their message', () => {
+  const ctx = { now: 1, frame: 0 };
+  const paint = (block, tile) => paintTile(tile, block, 42, 6, false);
+  const diffTile = { key: 'd', title: 'diffs' };
+  const diff = diffsBlock(
+    { diffs: { files: 0, dirs: [], exts: [], activity: { minutes: [] } } },
+    40,
+    5,
+    ctx,
+    diffTile,
+  );
+  assert.equal(lineText(diff.lines[0]), 'working tree clean');
+  assert.equal(diff.lines[0][0].tone, 'muted');
+  assertCentered(paint(diff, diffTile), 'working tree clean');
+
+  const fileTile = { key: 'f', title: 'files' };
+  const files = filesBlock(
+    {
+      files: {
+        ready: true,
+        total: { files: 0, bytes: 0, lines: 0 },
+        dirs: [],
+        exts: [],
+      },
+    },
+    40,
+    5,
+    ctx,
+    fileTile,
+  );
+  assertCentered(paint(files, fileTile), 'no files');
+
+  const taskTile = { key: 't', title: 'tasks' };
+  const tasks = tasksBlock(
+    { tasks: { done: 0, total: 0, kinds: [], plan: '2026-10-10-00.md' } },
+    40,
+    5,
+    ctx,
+    taskTile,
+  );
+  assert.match(lineText(tasks.titleLine), /2026-10-10-00\.md/);
+  assertCentered(paint(tasks, taskTile), 'no tasks');
+
+  const branchTile = { key: 'b', title: 'branches' };
+  const branches = branchesBlock(
+    {
+      branches: {
+        ready: true,
+        list: [],
+        rebase: null,
+        switches: [],
+        hot: new Map(),
+      },
+    },
+    40,
+    5,
+    ctx,
+    branchTile,
+  );
+  assert.match(lineText(branches.titleLine), /^branches/);
+  assertCentered(paint(branches, branchTile), 'no branches');
+
+  const commitTile = { key: 'c', title: 'commits' };
+  const commits = commitsBlock(
+    {
+      commits: {
+        ready: true,
+        info: { total: 0, recent: [] },
+        rebase: null,
+        changedAt: 0,
+      },
+    },
+    40,
+    5,
+    ctx,
+    commitTile,
+  );
+  assertCentered(paint(commits, commitTile), 'no commits');
+
+  const runTile = { key: 'r', title: 'run' };
+  const idleRun = runsBlock({ busy: '', runs: [] }, 40, 5, ctx, runTile);
+  const idleLines = idleRun.lines.map(lineText);
+  assert.deepEqual(idleLines, ['idle', 'reslop t -- <command>']);
+  const runRows = paint(idleRun, runTile).slice(1);
+  assert.equal(messageAt(runRows, 'idle'), 1);
+  assert.equal(messageAt(runRows, 'reslop t -- <command>'), 2);
+  const idle = runRows[1];
+  const idleAt = idle.indexOf('idle');
+  assert.ok(Math.abs(idleAt - (idle.length - idleAt - 4)) <= 1);
+
+  const npmTile = { key: 'n', title: 'npm' };
+  const npm = npmBlock(
+    {
+      npm: {
+        ready: true,
+        hasManifest: true,
+        deps: 0,
+        dev: 0,
+        modules: { count: 0, bytes: 0, packages: [] },
+        audit: 0,
+        outdated: 0,
+        running: '',
+      },
+    },
+    40,
+    5,
+    ctx,
+    npmTile,
+  );
+  assertCentered(paint(npm, npmTile), 'no packages');
+
+  const agentTile = { key: 'a', title: 'agents' };
+  const agents = agentsBlock(
+    { agents: { ready: true, running: 0, items: [] } },
+    40,
+    5,
+    ctx,
+    agentTile,
+  );
+  assertCentered(paint(agents, agentTile), 'no agents');
+
+  const scan = filesBlock({ files: { ready: false } }, 40, 5, ctx, fileTile);
+  assertCentered(paint(scan, fileTile), 'scanning…');
+});
