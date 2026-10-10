@@ -6,7 +6,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { Session } = require('../lib/session/session.js');
-const { addTask } = require('../lib/review/review.js');
 const { restoredIndex, alignLoadedItems } = require('../lib/session/items.js');
 const watch = require('../lib/dashboard/watch.js');
 const { ignoredRel, isOwnDirEvent, unchangedSince } = watch;
@@ -519,7 +518,7 @@ test('review file change merges into the open todo list', () => {
   session.dispatch('tasks');
   session.pushInput('alpha');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTask(session.notes, 'TODOs', 'beta');
+  session.notes.addTask('TODOs', 'beta');
   const file = session.notes.reviewPath;
   const md = fs.readFileSync(file, 'utf8');
   const next = md.replace('- [ ] alpha\n', '- [ ] alpha\n- [ ] gamma\n');
@@ -535,7 +534,7 @@ test('external todo edits replace the line instead of stacking', () => {
   session.dispatch('tasks');
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTask(session.notes, 'TODOs', 'beta');
+  session.notes.addTask('TODOs', 'beta');
   const edited = session.notes.tasks[0].id;
   const file = session.notes.reviewPath;
   const writeLine = (text) => {

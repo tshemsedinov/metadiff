@@ -21,11 +21,7 @@ const { stripAnsi } = ansi;
 const { actionFromKey } = require('../lib/input/actions.js');
 const { onEscape } = require('../lib/session/files-pane.js');
 const { run, loadSession, parseArgv } = require('../lib/cli.js');
-const {
-  createStore,
-  addTask,
-  flushReview,
-} = require('../lib/review/review.js');
+const { ReviewStore, flushReview } = require('../lib/review/review.js');
 const { RunRecorder } = require('../lib/runs/runs.js');
 const { sink, tempDir, removeTree } = require('./helpers.js');
 
@@ -314,9 +310,11 @@ test('opening a folder of repositories starts on repo tiles', async () => {
     initRepo(alpha);
     initRepo(beta);
     fs.appendFileSync(path.join(alpha, 'app.js'), 'next\n');
-    const store = createStore(path.join(alpha, '.plan', '2026-10-02-01.md'));
-    addTask(store, 'TODOs', 'ship tiles', false, 'backlog');
-    addTask(store, 'TODOs', 'check diffs', false, 'issues');
+    const store = new ReviewStore(
+      path.join(alpha, '.plan', '2026-10-02-01.md'),
+    );
+    store.addTask('TODOs', 'ship tiles', false, 'backlog');
+    store.addTask('TODOs', 'check diffs', false, 'issues');
     flushReview(store, true);
     const recorded = new RunRecorder(alpha, 'npm test');
     recorded.finish(0, { tests: 2, failed: 0 });

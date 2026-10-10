@@ -6,10 +6,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const term = require('../lib/term/screen.js');
-const { createScreen, screenWrite, styledText, pendingKind } = term;
-const { pendingHint, answerBytes, requestTitle } = term;
-const { permissionTokens, rememberedTokens } = term;
+const { Screen } = require('../lib/term/screen.js');
+const approvals = require('../lib/agents/approvals.js');
+const { pendingKind, pendingHint, answerBytes, requestTitle } = approvals;
+const { permissionTokens, rememberedTokens } = approvals;
 const allow = require('../lib/agents/allow.js');
 const { PLAN_ALLOWS, ensureAllows, cursorConfigPath } = allow;
 const { startAgent } = require('../lib/agents/agents.js');
@@ -19,13 +19,14 @@ const { makeRepo, uiSink, removeTree } = require('./helpers.js');
 const { stripAnsi } = require('../lib/term/ansi.js');
 
 test('terminal screen shows an approval request', () => {
-  const screen = createScreen(48, 8);
+  const screen = new Screen(48, 8);
   const frame =
     '\x1b[2J\x1b[HWrite to this file?\r\n' +
     'in .plan/2026-10-08-00.md\r\n' +
     'Add Write(.plan/2026-10-08-00.md) to allowlist?\r\n' +
     'Waiting for decision (y/n/p)...';
-  const text = screenWrite(screen, frame);
+  screen.write(frame);
+  const text = screen.plain();
   assert.match(text, /Write to this file\?/);
   assert.match(text, /\.plan\/2026-10-08-00\.md/);
   assert.equal(pendingKind(text), 'decision');
@@ -53,13 +54,13 @@ test('terminal screen shows an approval request', () => {
 });
 
 test('styled terminal text keeps color and scrolled lines', () => {
-  const screen = createScreen(8, 2);
-  screenWrite(screen, '\x1b[31mred\x1b[0m\r\nmore\r\nthird');
-  const styled = styledText(screen);
+  const screen = new Screen(8, 2);
+  screen.write('\x1b[31mred\x1b[0m\r\nmore\r\nthird');
+  const styled = screen.styled();
   assert.ok(styled.includes('\x1b[31mred'));
   assert.match(styled, /more/);
   assert.match(styled, /third/);
-  const plain = screenWrite(screen, '');
+  const plain = screen.plain();
   assert.equal(plain.includes('\x1b'), false);
 });
 

@@ -10,7 +10,7 @@ const { OpsRunner } = require('../lib/session/ops.js');
 const { hitAction } = require('../lib/input/keys.js');
 const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
 const review = require('../lib/review/review.js');
-const { createStore, addTask, setFeedback, serializeReview } = review;
+const { ReviewStore, serializeReview } = review;
 const { parseReview } = review;
 const ansi = require('../lib/term/ansi.js');
 const { stripAnsi, THEME, BOLD, seq, bg } = ansi;
@@ -1373,7 +1373,7 @@ test('todos screen ignores commit and todo hotkeys', () => {
 test('todo list scrolls the focused row into view', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 12;
-  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
   session.tasksFocus = 0;
   session.draw();
@@ -1410,7 +1410,7 @@ test('todo list scrolls the focused row into view', () => {
 test('scrolling back to the top shows the first header and blank line', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 12;
-  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
   session.tasksFocus = 0;
   for (let i = 0; i < 25; i++) session.dispatch('scrollDown');
@@ -1428,7 +1428,7 @@ test('scrolling back to the top shows the first header and blank line', () => {
 test('tasks list shows a blank line after the blocks at the scroll end', () => {
   const { session, stdout } = openSession([sampleItem('a.js')]);
   stdout.rows = 12;
-  for (let i = 0; i < 30; i++) addTask(session.notes, 'a.js', `item ${i}`);
+  for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
   session.draw();
   const statusAt = session.lastFrame.rows.length - 2;
@@ -1471,14 +1471,14 @@ test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
   session.handleEvent({ type: 'key', key: 'ctrl-down' });
   const moved = session.notes.tasks.find((task) => task.text === 'first');
   assert.equal(moved.kind, 'improvements');
-  setFeedback(session.notes, 'a.js:1:1:0', {
+  session.notes.setFeedback('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
     blockId: 0,
     text: 'quote one',
   });
-  setFeedback(session.notes, 'a.js:2:2:0', {
+  session.notes.setFeedback('a.js:2:2:0', {
     file: 'a.js',
     oldStart: 2,
     newStart: 2,
@@ -1525,7 +1525,7 @@ test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
 
 test('quoted feedback can be edited from the tasks screen', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  setFeedback(session.notes, 'a.js:1:1:0', {
+  session.notes.setFeedback('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -2453,8 +2453,8 @@ test('initReview resumes latest editing file', () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
-  const draft = createStore(reviewPath);
-  addTask(draft, 'a.js', 'rewrite loop');
+  const draft = new ReviewStore(reviewPath);
+  draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], { cwd });
@@ -2471,9 +2471,9 @@ test('initReview starts a new file when latest is ready', () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
-  const draft = createStore(reviewPath);
+  const draft = new ReviewStore(reviewPath);
   draft.status = 'ready';
-  addTask(draft, 'a.js', 'rewrite loop');
+  draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], { cwd });
@@ -2488,8 +2488,8 @@ test('newReview starts a new file even if latest is editing', () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
-  const draft = createStore(reviewPath);
-  addTask(draft, 'a.js', 'rewrite loop');
+  const draft = new ReviewStore(reviewPath);
+  draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const { session } = openSession([sampleItem('a.js')], {
@@ -3216,8 +3216,8 @@ test('load applies imported GitHub notes on a new review', () => {
 test('load skips imported GitHub notes when resuming a review', () => {
   const cwd = tempDir('reslop-ui-');
   const reviewPath = path.join(cwd, REVIEW_DIR, `${dateStamp()}-00.md`);
-  const draft = createStore(reviewPath);
-  addTask(draft, 'a.js', 'rewrite loop');
+  const draft = new ReviewStore(reviewPath);
+  draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
   const item = sampleItem('lib/parser.js', 'pr');
