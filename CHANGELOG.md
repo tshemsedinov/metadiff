@@ -2,6 +2,7 @@
 
 ## [Unreleased][unreleased]
 
+- Support Antigravity (AGY) CLI agents
 - Execute review results and plan in cli agents
 - Detect available agents and choose its model, effort, context
 - Save agent settings `.reslop`
