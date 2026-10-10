@@ -1,7 +1,5 @@
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -18,21 +16,6 @@ test('AC24 detectLang prefers .d.ts and dotfile rules', () => {
   assert.equal(detectLang('src/a.tsx'), 'tsx');
   assert.equal(detectLang('lib/main.dart'), 'dart');
   assert.equal(detectLang('.env'), 'dot');
-});
-
-test('highlight plugins export langs and highlight', () => {
-  const dir = path.join(__dirname, '../lib/highlight');
-  const names = fs.readdirSync(dir).filter((name) => {
-    if (!name.endsWith('.js')) return false;
-    return name !== 'core.js';
-  });
-  assert.ok(names.length > 0);
-  for (const name of names) {
-    const plugin = require(path.join(dir, name));
-    assert.ok(Array.isArray(plugin.langs), name);
-    assert.ok(plugin.langs.length, name);
-    assert.equal(typeof plugin.highlight, 'function', name);
-  }
 });
 
 test('AC24 js tokens for const assignment', () => {

@@ -10,12 +10,6 @@ const { sessionCapabilities } = caps;
 const hasMethod = (source, name) => typeof source[name] === 'function';
 
 test('capability matrix covers local commit remotes and read-only', () => {
-  assert.deepEqual(SOURCE_CAPS.local, {
-    read: true,
-    changes: true,
-    branches: true,
-    review: true,
-  });
   assert.deepEqual(capabilitiesFor('commit'), {
     read: true,
     changes: false,

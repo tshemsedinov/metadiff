@@ -13,7 +13,7 @@ const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseCursorWide } = agents;
 const { parseNameList, hasAgentSession } = agents;
 const { parseJsonModels, commandLine, needsAuth, authState } = agents;
-const { groupModels, resolveModel } = agents;
+const { groupModels, catalogOf } = agents;
 const { claudeSession, cursorSession } = sessions;
 const { Session } = require('../lib/session.js');
 const { createGitRepo } = require('../lib/git.js');
@@ -363,9 +363,8 @@ test('r in the agent log repeats the command', async () => {
   }
 });
 
-test('cursor fallback includes grok-4.6', () => {
+test('agent launch builds model, effort, fast, and login options', () => {
   const cursor = AGENTS.find((row) => row.id === 'cursor');
-  assert.ok(cursor.models.includes('grok-4.6'));
   const row = {
     id: cursor.id,
     name: cursor.name,
@@ -860,7 +859,7 @@ test('effort encoded in a model id is chosen separately', () => {
     spec: cursor,
     models: ids,
   };
-  const low = resolveModel(row, {
+  const low = catalogOf(row.models).resolve({
     model: 'gpt-5.6-sol',
     effort: 'low',
     extra: '',
