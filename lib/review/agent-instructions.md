@@ -1,0 +1,9 @@
+- Execute reviews with `status` `ready, partial, editing`
+- Do not start or change `done` review files
+- Work through unchecked items. After finishing one, mark it `[x]`
+- Mark `[x]` only near the end, after code changes are done and tests pass
+- For `code` items, replace added lines at that location
+- If not `editing`, set `status` to `partial` if some remain, or `done` if all are `[x]`
+- Do not redo items already marked `[x]`
+- Run the full check with `npm t`
+- Run specific test files with `reslop t -- node --test <files>`

@@ -1,0 +1,29 @@
+{
+  "decisionTitles": [
+    "Run this command outside the sandbox?",
+    "Run this command?",
+    "Run this MCP tool?",
+    "Delete this file?",
+    "Write to this file?",
+    "Read this file?",
+    "Allow this web search?",
+    "Allow this web fetch?",
+    "Proceed with this edit?",
+    "Approve mode switch",
+    "Waiting for decision"
+  ],
+  "planAllows": [
+    "Write(.plan/**)",
+    "Write(.plan/**/*.md)",
+    "Write(**/.plan/**)",
+    "Write(**/.plan/**/*.md)",
+    "Shell(npm)",
+    "Shell(npm test)",
+    "Shell(npm t)",
+    "Shell(npx)",
+    "Shell(node)",
+    "Shell(node --test)",
+    "Shell(reslop)",
+    "Shell(reslop t)"
+  ]
+}

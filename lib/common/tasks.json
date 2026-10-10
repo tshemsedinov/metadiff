@@ -1,0 +1,27 @@
+{
+  "label": "Project Tasks: Feature requests, Improvements, Bug reports, Refactoring, Research, Security",
+  "kinds": [
+    {
+      "id": "features",
+      "title": "Feature requests and Enhancements",
+      "short": "Features"
+    },
+    { "id": "improvements", "title": "Improvements", "short": "Improvements" },
+    { "id": "bugs", "title": "Bug Reports and Fixes", "short": "Bug Reports" },
+    {
+      "id": "debt",
+      "title": "Refactoring and Technical debt",
+      "short": "Refactoring"
+    },
+    {
+      "id": "research",
+      "title": "Research and Experiments",
+      "short": "Research"
+    },
+    {
+      "id": "security",
+      "title": "Security and Compliance",
+      "short": "Security"
+    }
+  ]
+}
