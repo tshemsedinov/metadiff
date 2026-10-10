@@ -49,12 +49,13 @@ test('findBin returns the first executable on PATH', () => {
   }
 });
 
-test('detectAgents finds claude opencode cursor and codex clis', () => {
+test('detectAgents finds claude opencode cursor codex and agy clis', () => {
   const { dir, bins, env } = fakePath(
     'claude',
     'opencode',
     'cursor-agent',
     'codex',
+    'agy',
   );
   try {
     const list = detectAgents(env);
@@ -67,6 +68,8 @@ test('detectAgents finds claude opencode cursor and codex clis', () => {
     assert.equal(list[2].bin, bins['cursor-agent']);
     assert.equal(list[3].id, 'codex');
     assert.equal(list[3].bin, bins.codex);
+    assert.equal(list[4].id, 'agy');
+    assert.equal(list[4].bin, bins.agy);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -127,6 +130,75 @@ test('buildLaunch passes the review plan model and extra flags', () => {
   assert.equal(rel.prompt, planPrompt('.plan/a.md'));
   const relCmd = 'claude --model sonnet --effort high --foo bar .plan/a.md';
   assert.equal(rel.command, relCmd);
+});
+
+test('buildLaunch builds command for agy with model effort and prompt', () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  const row = {
+    id: agy.id,
+    name: agy.name,
+    bin: '/usr/bin/agy',
+    spec: agy,
+    models: agy.models,
+  };
+  const plain = buildLaunch(row, emptyChoice(row), '/tmp/plan.md');
+  assert.equal(plain.ok, true);
+  assert.equal(plain.cmd, '/usr/bin/agy');
+  assert.deepEqual(plain.args, ['-p', planPrompt('/tmp/plan.md')]);
+  assert.equal(plain.command, 'agy -p /tmp/plan.md');
+
+  const withModel = buildLaunch(
+    row,
+    { model: 'gemini-3.8-flash', effort: 'high', extra: '' },
+    '/tmp/plan.md',
+  );
+  assert.equal(withModel.ok, true);
+  assert.deepEqual(withModel.args, [
+    '--model',
+    'gemini-3.8-flash',
+    '--effort',
+    'high',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(
+    withModel.command,
+    'agy --model gemini-3.8-flash --effort high -p /tmp/plan.md',
+  );
+
+  const sessionId = '11111111-2222-3333-4444-555555555555';
+  const continued = buildLaunch(
+    row,
+    emptyChoice(row),
+    '/tmp/plan.md',
+    '/tmp',
+    sessionId,
+  );
+  assert.equal(continued.ok, true);
+  assert.deepEqual(continued.args, [
+    '--conversation',
+    sessionId,
+    '-p',
+    planPrompt('plan.md'),
+  ]);
+  assert.equal(continued.session, sessionId);
+});
+
+test('agy lists models and parses model names', async () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  const sample =
+    'Fetching available models...\n' +
+    'gemini-3.8-flash-high     Gemini 3.8 Flash (High)\n' +
+    'gemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)\n' +
+    'claude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)\n';
+  const names = agy.parseModels(sample);
+  assert.deepEqual(names, [
+    'gemini-3.8-flash-high',
+    'gemini-3.8-flash-medium',
+    'claude-sonnet-4-6',
+  ]);
 });
 
 const openUi = () => {
