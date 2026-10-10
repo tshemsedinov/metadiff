@@ -3,9 +3,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const keys = require('../lib/keys.js');
+const keys = require('../lib/input/keys.js');
 const { decodeChunk, hitAction } = keys;
-const actions = require('../lib/session/actions.js');
+const actions = require('../lib/input/actions.js');
 const { FILES_DISABLED, FILES_HIDDEN } = actions;
 const { FILES_TASKS_DISABLED, FILES_GIT_DISABLED } = actions;
 const { DIFF_DISABLED, TASKS_DISABLED, BRANCHES_DISABLED } = actions;

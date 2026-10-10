@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const { Composer } = require('../lib/session/compose.js');
 const { Navigation } = require('../lib/session/navigation.js');
-const { createStore } = require('../lib/review.js');
+const { createStore } = require('../lib/review/review.js');
 
 const setup = (extra = {}) => {
   const notes = extra.notes ?? createStore('/tmp/review.md');

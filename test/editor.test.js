@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { Editor } = require('../lib/editor.js');
+const { Editor } = require('../lib/input/editor.js');
 
 test('insert and backspace at cursor', () => {
   const editor = new Editor();

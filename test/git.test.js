@@ -7,15 +7,15 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const git = require('../lib/git.js');
+const git = require('../lib/git/git.js');
 const { load, addItem, unstageItem, revertItem } = git;
 const { commitChanges, hasStaged, lastMessage, createGitRepo } = git;
 const { currentBranch, listBranches, checkoutBranch } = git;
 const { createBranch, dropBranch, pullChanges } = git;
 const { listCommits, dropCommit, applyFixup } = git;
 const { pushChanges, editItem } = git;
-const { runProc } = require('../lib/utilities.js');
-const { Session } = require('../lib/session.js');
+const { runProc } = require('../lib/common/utilities.js');
+const { Session } = require('../lib/session/session.js');
 const { blockAddText } = require('../lib/diff/diff.js');
 const { makeRepo, sink } = require('./helpers.js');
 
@@ -1370,12 +1370,12 @@ test('file edit save stages the whole file', () => {
   }
 });
 
-for (const first of ['git', 'git-branches', 'git-deps']) {
+for (const first of ['git', 'branches', 'deps']) {
   test(`Git repository works when ${first} is imported first`, () => {
     const script = `
       const assert = require('node:assert/strict');
-      require('./lib/' + process.argv[1] + '.js');
-      const repo = require('./lib/git.js').createGitRepo();
+      require('./lib/git/' + process.argv[1] + '.js');
+      const repo = require('./lib/git/git.js').createGitRepo();
       for (const name of ['load', 'add', 'revertFile', 'commit', 'rebase']) {
         assert.equal(typeof repo[name], 'function', name);
       }

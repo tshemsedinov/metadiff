@@ -2,7 +2,7 @@
 'use strict';
 
 const { run, errorMessage } = require('../lib/cli.js');
-const { LEAVE_TERM } = require('../lib/session.js');
+const { LEAVE_TERM } = require('../lib/session/session.js');
 
 const fail = (reason) => {
   try {

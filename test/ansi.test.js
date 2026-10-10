@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const ansi = require('../lib/ansi.js');
+const ansi = require('../lib/term/ansi.js');
 
 const { visibleWidth, codeFg, CODE_FG, THEME, PALETTES, fg } = ansi;
 const { trimVisible } = ansi;

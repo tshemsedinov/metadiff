@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const review = require('../lib/review.js');
+const review = require('../lib/review/review.js');
 const { ReviewController } = require('../lib/session/review.js');
 const { allocateReviewPath, rankedTemplates } = review;
 const { prefixTemplates, upsertTemplate, createStore } = review;

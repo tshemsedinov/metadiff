@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const gitlab = require('../lib/gitlab.js');
+const gitlab = require('../lib/source/gitlab.js');
 const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 const { parseGitlabMrUrl, parseGitlabIssueUrl, gitlabToken } = gitlab;
 const { parseGitlabIssueListUrl } = gitlab;

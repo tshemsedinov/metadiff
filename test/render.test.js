@@ -7,9 +7,9 @@ const assert = require('node:assert/strict');
 
 const { displayLines } = require('../lib/diff/diff.js');
 const render = require('../lib/render/render.js');
-const { REPO_TASKS_LABEL } = require('../lib/files.js');
-const wrap = require('../lib/wrap.js');
-const ansi = require('../lib/ansi.js');
+const { REPO_TASKS_LABEL } = require('../lib/common/files.js');
+const wrap = require('../lib/term/wrap.js');
+const ansi = require('../lib/term/ansi.js');
 const { THEME, CODE_FG, fg, bg, stripAnsi, BOLD, seq } = ansi;
 const { ESC, RESET, EL, visibleWidth } = ansi;
 
@@ -4133,7 +4133,7 @@ test('npm output drops the command background', () => {
 });
 
 test('npm output paints assertion fields as a colored table', () => {
-  const npmCommands = require('../lib/npm-commands.js');
+  const npmCommands = require('../lib/runs/commands.js');
   const { reduceOutput } = npmCommands;
   const mark = String.fromCharCode(39);
   const field = (name, value) => `  ${name}: ${mark}${value}${mark}`;

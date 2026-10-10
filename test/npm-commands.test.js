@@ -5,8 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const npm = require('../lib/npm-commands.js');
-const { stripAnsi } = require('../lib/ansi.js');
+const npm = require('../lib/runs/commands.js');
+const { stripAnsi } = require('../lib/term/ansi.js');
 const { tempDir } = require('./helpers.js');
 
 const { listCommands, reduceOutput, logFileName } = npm;

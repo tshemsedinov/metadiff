@@ -6,17 +6,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const term = require('../lib/term-screen.js');
+const term = require('../lib/term/screen.js');
 const { createScreen, screenWrite, styledText, pendingKind } = term;
 const { pendingHint, answerBytes, requestTitle } = term;
 const { permissionTokens, rememberedTokens } = term;
-const allow = require('../lib/agent-allow.js');
+const allow = require('../lib/agents/allow.js');
 const { PLAN_ALLOWS, ensureAllows, cursorConfigPath } = allow;
-const { startAgent } = require('../lib/agents.js');
-const { Session } = require('../lib/session.js');
-const { createGitRepo } = require('../lib/git.js');
+const { startAgent } = require('../lib/agents/agents.js');
+const { Session } = require('../lib/session/session.js');
+const { createGitRepo } = require('../lib/git/git.js');
 const { makeRepo, uiSink, removeTree } = require('./helpers.js');
-const { stripAnsi } = require('../lib/ansi.js');
+const { stripAnsi } = require('../lib/term/ansi.js');
 
 test('terminal screen shows an approval request', () => {
   const screen = createScreen(48, 8);

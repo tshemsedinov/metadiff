@@ -3,8 +3,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const select = require('../lib/select.js');
-const { ESC, stripAnsi, paint, THEME, fg, bg, seq } = require('../lib/ansi.js');
+const select = require('../lib/term/select.js');
+const {
+  ESC,
+  stripAnsi,
+  paint,
+  THEME,
+  fg,
+  bg,
+  seq,
+} = require('../lib/term/ansi.js');
 
 test('extractText copies a same-row range', () => {
   const rows = ['abcdef', 'ghijkl'];

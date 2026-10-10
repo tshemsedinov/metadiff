@@ -5,8 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { tempDir } = require('./helpers.js');
-const { buildDocument } = require('../lib/report-parse.js');
-const { renderDocument } = require('../lib/report-render.js');
+const { buildDocument } = require('../lib/report/parse.js');
+const { renderDocument } = require('../lib/report/render.js');
 
 const parsed = (lines, root = '/repo') => {
   const doc = buildDocument(lines.join('\n'), '', root, 1, 'test');
@@ -282,7 +282,7 @@ test('TUI groups and saves TAP without a version header', async () => {
     ]
       .join('\n')
       .replaceAll('/repo', root);
-    const { NpmController } = require('../lib/session/npm.js');
+    const { NpmController } = require('../lib/session/npm/npm.js');
     const ui = {
       top: root,
       nav: { npmCursor: 0 },

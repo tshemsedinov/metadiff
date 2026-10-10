@@ -3,8 +3,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const github = require('../lib/github.js');
-const { filterChangeFiles } = require('../lib/remote.js');
+const github = require('../lib/source/github.js');
+const { filterChangeFiles } = require('../lib/source/remote.js');
 const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 const { parseGithubPrUrl, parseGithubIssueUrl, githubToken } = github;
 const { parseGithubIssueListUrl } = github;

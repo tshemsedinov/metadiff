@@ -3,7 +3,7 @@
 const os = require('node:os');
 const path = require('node:path');
 
-const { IS_WIN } = require('../lib/utilities.js');
+const { IS_WIN } = require('../lib/common/utilities.js');
 
 const MARK_BEGIN = '# >>> reslop >>>';
 const MARK_END = '# <<< reslop <<<';

@@ -6,10 +6,9 @@ const { EventEmitter } = require('node:events');
 const { setTimeout: sleep } = require('node:timers/promises');
 
 const { sink } = require('./helpers.js');
-const { watchResize } = require('../lib/utilities.js');
+const { watchResize } = require('../lib/common/utilities.js');
 const terminal = require('../lib/session/terminal.js');
-const { Terminal, ENTER_TERM, LEAVE_TERM } = terminal;
-const { Progress } = require('../lib/session/progress.js');
+const { Terminal, Progress, ENTER_TERM, LEAVE_TERM } = terminal;
 
 const fakeStdin = () => {
   const stdin = new EventEmitter();

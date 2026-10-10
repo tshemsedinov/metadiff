@@ -3,8 +3,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { detectLang } = require('../lib/detect.js');
-const { tokenize, overlayTokens, tokensText } = require('../lib/highlight.js');
+const { detectLang } = require('../lib/highlight/highlight.js');
+const {
+  tokenize,
+  overlayTokens,
+  tokensText,
+} = require('../lib/highlight/highlight.js');
 
 const stylesOf = (tokens, text) =>
   tokens.filter((t) => t.text === text).map((t) => t.style);

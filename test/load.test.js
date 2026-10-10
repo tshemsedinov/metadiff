@@ -4,8 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { LoadCoordinator, tagLoaded } = require('../lib/session/load.js');
-const { isAbort } = require('../lib/utilities.js');
-const { Session } = require('../lib/session.js');
+const { isAbort } = require('../lib/common/utilities.js');
+const { Session } = require('../lib/session/session.js');
 const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
 
 const sampleItem = (name) => ({

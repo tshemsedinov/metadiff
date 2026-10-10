@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const remote = require('../lib/remote.js');
+const remote = require('../lib/source/remote.js');
 const { RemoteClient, parseLinkNext, parseNextPage, noteFromLocation } = remote;
 const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
 

@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const caps = require('../lib/capabilities.js');
+const caps = require('../lib/source/capabilities.js');
 const { SOURCE_CAPS, capabilitiesFor, attachCapabilities } = caps;
 const { sessionCapabilities } = caps;
 

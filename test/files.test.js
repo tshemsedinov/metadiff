@@ -3,8 +3,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const files = require('../lib/files.js');
-const { fileEntries, fileStatus, itemPath, relativeAge, shortAge } = files;
+const files = require('../lib/common/files.js');
+const { fileEntries, fileStatus, itemPath } = files;
+const { relativeAge, shortAge } = require('../lib/common/format.js');
 const { TASKS_FILE, REPO_TASKS_LABEL, isTasksEntry, isTaskItem } = files;
 const { fileTotals, isTotalEntry, TOTAL_LABEL } = files;
 

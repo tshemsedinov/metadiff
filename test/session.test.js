@@ -5,21 +5,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { Session } = require('../lib/session.js');
+const { Session } = require('../lib/session/session.js');
 const { OpsRunner } = require('../lib/session/ops.js');
-const { hitAction } = require('../lib/keys.js');
+const { hitAction } = require('../lib/input/keys.js');
 const { uiSink, sampleHunk, tempDir } = require('./helpers.js');
-const review = require('../lib/review.js');
+const review = require('../lib/review/review.js');
 const { createStore, addTask, setFeedback, serializeReview } = review;
 const { parseReview } = review;
-const ansi = require('../lib/ansi.js');
+const ansi = require('../lib/term/ansi.js');
 const { stripAnsi, THEME, BOLD, seq, bg } = ansi;
-const { logViewRows } = require('../lib/render/npm.js');
+const { logViewRows } = require('../lib/render/log.js');
 const { setTheme, themeName } = ansi;
-const { REVIEW_DIR } = require('../lib/files.js');
+const { REVIEW_DIR } = require('../lib/common/files.js');
 
 const taskRows = (lines) => [...lines, '[ ] ', '[ ] ', '[ ] ', '[ ] ', '[ ] '];
-const clipboard = require('../lib/clipboard.js');
+const clipboard = require('../lib/term/clipboard.js');
 
 const pad2 = (n) => `${n}`.padStart(2, '0');
 

@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const agents = require('../lib/agents.js');
-const sessions = require('../lib/agent-sessions.js');
+const agents = require('../lib/agents/agents.js');
+const sessions = require('../lib/agents/sessions.js');
 const { detectAgents, findBin, splitArgs, planPrompt } = agents;
 const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseCursorWide } = agents;
@@ -15,14 +15,14 @@ const { parseNameList, hasAgentSession } = agents;
 const { parseJsonModels, commandLine, needsAuth, authState } = agents;
 const { groupModels, catalogOf } = agents;
 const { claudeSession, cursorSession } = sessions;
-const { Session } = require('../lib/session.js');
-const { createGitRepo } = require('../lib/git.js');
+const { Session } = require('../lib/session/session.js');
+const { createGitRepo } = require('../lib/git/git.js');
 const { makeRepo, uiSink } = require('./helpers.js');
 const render = require('../lib/render/render.js');
 const { renderFrame } = render;
-const { stripAnsi, THEME, bg, RESET, BOLD } = require('../lib/ansi.js');
-const { actionFromKey } = require('../lib/session/actions.js');
-const { runStats } = require('../lib/session/agent-jobs.js');
+const { stripAnsi, THEME, bg, RESET, BOLD } = require('../lib/term/ansi.js');
+const { actionFromKey } = require('../lib/input/actions.js');
+const { runStats } = require('../lib/session/agents/jobs.js');
 
 const makeBin = (dir, name) => {
   const file = path.join(dir, name);

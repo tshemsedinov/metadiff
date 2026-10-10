@@ -3,7 +3,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { selectChangeSource, createLoadedSource } = require('../lib/source.js');
+const {
+  selectChangeSource,
+  createLoadedSource,
+} = require('../lib/source/source.js');
 
 test('selectChangeSource recognizes a GitHub pull request URL', () => {
   const url = 'https://github.com/acme/app/pull/123';

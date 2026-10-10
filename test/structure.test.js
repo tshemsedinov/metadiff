@@ -7,7 +7,9 @@ const assert = require('node:assert/strict');
 
 const { Linter } = require('eslint');
 
-const SESSION_FILE = path.resolve(__dirname, '../lib/session.js');
+const LIB_DIR = path.resolve(__dirname, '../lib');
+const SESSION_DIR = path.join(LIB_DIR, 'session');
+const SESSION_FILE = path.join(SESSION_DIR, 'session.js');
 
 const resolveRelative = (fromFile, spec) => {
   if (typeof spec !== 'string' || !spec.startsWith('.')) return null;
@@ -117,8 +119,8 @@ const checkDirectory = (directory, messages) => {
       'max-lines-per-function': FUNCTION_RULE,
       'local/session-class-lines': ['error', 500],
     };
-    const sessionDir = path.join(path.dirname(SESSION_FILE), 'session');
-    if (filename.startsWith(`${sessionDir}${path.sep}`)) {
+    const inSession = filename.startsWith(`${SESSION_DIR}${path.sep}`);
+    if (inSession && filename !== SESSION_FILE) {
       rules['local/no-session-require'] = 'error';
     }
     const code = fs.readFileSync(filename, 'utf8');
@@ -130,6 +132,6 @@ const checkDirectory = (directory, messages) => {
 
 test('lib files satisfy the structural limits and dependency direction', () => {
   const messages = [];
-  checkDirectory(path.dirname(SESSION_FILE), messages);
+  checkDirectory(LIB_DIR, messages);
   assert.deepEqual(messages, []);
 });

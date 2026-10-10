@@ -5,10 +5,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { Session } = require('../lib/session.js');
-const { addTask } = require('../lib/review.js');
+const { Session } = require('../lib/session/session.js');
+const { addTask } = require('../lib/review/review.js');
 const { restoredIndex, alignLoadedItems } = require('../lib/session/items.js');
-const watch = require('../lib/session/watch.js');
+const watch = require('../lib/dashboard/watch.js');
 const { ignoredRel, isOwnDirEvent, unchangedSince } = watch;
 const { DiskWatcher, DEBOUNCE_MS } = watch;
 const { uiSink, tempDir } = require('./helpers.js');

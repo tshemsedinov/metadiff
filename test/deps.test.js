@@ -3,20 +3,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const deps = require('../lib/deps.js');
-const { diffSections, mergeResolved } = require('../lib/deps-diff.js');
-const manifest = require('../lib/manifest.js');
+const deps = require('../lib/deps/deps.js');
+const { diffSections, mergeResolved } = require('../lib/deps/diff.js');
+const manifest = require('../lib/deps/manifest.js');
 const { parseDiff, itemsFromFiles } = require('../lib/diff/diff.js');
-const git = require('../lib/git.js');
-const gitDeps = require('../lib/git-deps.js');
+const git = require('../lib/git/git.js');
+const gitDeps = require('../lib/git/deps.js');
 const { proposedNpmPlan } = gitDeps;
 const render = require('../lib/render/render.js');
-const { Session } = require('../lib/session.js');
+const { Session } = require('../lib/session/session.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { realpathSync } = fs;
 const { makeRepo, sink } = require('./helpers.js');
-const { stripAnsi, THEME, bg } = require('../lib/ansi.js');
+const { stripAnsi, THEME, bg } = require('../lib/term/ansi.js');
 const { load, loadExtras, addItem, unstageItem, revertItem } = git;
 const { foldDepItems, collectUsedNames, parseAuditReport } = deps;
 const { parseOutdatedReport, proposeDepItems, mergeProposedItems } = deps;

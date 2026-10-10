@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { run, parseArgv, resolveScope, loadSession } = require('../lib/cli.js');
-const { createGitRepo } = require('../lib/git.js');
+const { createGitRepo } = require('../lib/git/git.js');
 const { makeRepo, sink, sampleHunk } = require('./helpers.js');
 
 const fakeProc = (cwd, extra = {}) => {
