@@ -22,7 +22,7 @@ const render = require('../lib/render/render.js');
 const { renderFrame } = render;
 const { stripAnsi, THEME, bg, RESET, BOLD } = require('../lib/ansi.js');
 const { actionFromKey } = require('../lib/session/actions.js');
-const { runStats } = require('../lib/session/agent-jobs.js');
+const { AgentJob, runStats } = require('../lib/session/agent-jobs.js');
 
 const makeBin = (dir, name) => {
   const file = path.join(dir, name);
@@ -145,8 +145,15 @@ test('buildLaunch builds command for agy with model effort and prompt', () => {
   const plain = buildLaunch(row, emptyChoice(row), '/tmp/plan.md');
   assert.equal(plain.ok, true);
   assert.equal(plain.cmd, '/usr/bin/agy');
-  assert.deepEqual(plain.args, ['-p', planPrompt('/tmp/plan.md')]);
-  assert.equal(plain.command, 'agy -p /tmp/plan.md');
+  assert.deepEqual(plain.args, [
+    '--dangerously-skip-permissions',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(
+    plain.command,
+    'agy --dangerously-skip-permissions -p /tmp/plan.md',
+  );
 
   const withModel = buildLaunch(
     row,
@@ -155,6 +162,7 @@ test('buildLaunch builds command for agy with model effort and prompt', () => {
   );
   assert.equal(withModel.ok, true);
   assert.deepEqual(withModel.args, [
+    '--dangerously-skip-permissions',
     '--model',
     'gemini-3.8-flash',
     '--effort',
@@ -164,7 +172,8 @@ test('buildLaunch builds command for agy with model effort and prompt', () => {
   ]);
   assert.equal(
     withModel.command,
-    'agy --model gemini-3.8-flash --effort high -p /tmp/plan.md',
+    'agy --dangerously-skip-permissions --model gemini-3.8-flash ' +
+      '--effort high -p /tmp/plan.md',
   );
 
   const sessionId = '11111111-2222-3333-4444-555555555555';
@@ -179,10 +188,83 @@ test('buildLaunch builds command for agy with model effort and prompt', () => {
   assert.deepEqual(continued.args, [
     '--conversation',
     sessionId,
+    '--dangerously-skip-permissions',
     '-p',
     planPrompt('plan.md'),
   ]);
   assert.equal(continued.session, sessionId);
+});
+
+test('buildLaunch keeps the AGY permission flag isolated', () => {
+  for (const spec of AGENTS) {
+    if (spec.id === 'agy') continue;
+    const row = {
+      id: spec.id,
+      name: spec.name,
+      bin: `/usr/bin/${spec.bins[0]}`,
+      spec,
+      models: spec.models,
+    };
+    const launch = buildLaunch(row, emptyChoice(row), '/tmp/plan.md');
+    assert.equal(launch.ok, true);
+    assert.equal(
+      launch.args.includes('--dangerously-skip-permissions'),
+      false,
+      spec.id,
+    );
+    const continued = buildLaunch(
+      row,
+      emptyChoice(row),
+      '/tmp/plan.md',
+      '/tmp',
+      'test-session-id',
+    );
+    assert.equal(continued.ok, true);
+    assert.equal(
+      continued.args.includes('--dangerously-skip-permissions'),
+      false,
+      `${spec.id} continued`,
+    );
+  }
+});
+
+test('agent run treats empty exit zero output as failure', () => {
+  const job = AgentJob.launch(
+    1,
+    {
+      id: 'agy',
+      name: 'agy',
+      cmd: '/usr/bin/agy',
+      args: [],
+      command: 'agy',
+      plan: '/tmp/plan.md',
+      kind: 'run',
+    },
+    'default',
+  );
+  job.finish({ status: 0, text: '  \n' });
+  assert.equal(job.status, 'exit 1');
+  assert.equal(job.exit, 1);
+  assert.match(job.output, /exited without output/i);
+});
+
+test('agent run treats permission denial at exit zero as failure', () => {
+  const job = AgentJob.launch(
+    1,
+    {
+      id: 'agy',
+      name: 'agy',
+      cmd: '/usr/bin/agy',
+      args: [],
+      command: 'agy',
+      plan: '/tmp/plan.md',
+      kind: 'run',
+    },
+    'default',
+  );
+  job.finish({ status: 0, text: 'Error: permission denied\n' });
+  assert.equal(job.status, 'exit 1');
+  assert.equal(job.exit, 1);
 });
 
 test('agy lists models and parses model names', async () => {
