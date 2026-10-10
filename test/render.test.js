@@ -574,7 +574,7 @@ test('long operations paint an infinite progress bar', () => {
   assert.ok(Math.abs(leftGap - rightGap) <= 1);
 });
 
-test('quit prompt paints f and c yellow on grey copy', () => {
+test('quit prompt warns that tests will be terminated', () => {
   const hunk = sampleHunk([
     { type: 'add', text: 'x', noNl: false, blockId: 0 },
   ]);
@@ -585,7 +585,7 @@ test('quit prompt paints f and c yellow on grey copy', () => {
       hunk,
       blockId: 0,
     },
-    { mode: 'confirmQuit' },
+    { mode: 'confirmQuit', quitWarning: ' exit will terminate tests' },
   );
   const colored = render.renderFrame(view, {
     width: 80,
@@ -594,13 +594,9 @@ test('quit prompt paints f and c yellow on grey copy', () => {
   });
   const statusRow = colored.rows[colored.rows.length - 2];
   const plain = stripAnsi(statusRow);
-  assert.equal(plain.startsWith(' finish as ready  continue next time'), true);
-  assert.ok(plain.includes('finish as ready'));
-  assert.ok(plain.includes('continue next time'));
-  assert.ok(!plain.includes('discard'));
-  assert.ok(!plain.includes('Finish'));
-  assert.ok(!plain.includes('Continue'));
-  assert.ok(!plain.includes('pending'));
+  assert.equal(plain.startsWith(' exit will terminate tests y/n'), true);
+  assert.ok(!plain.includes('finish as ready'));
+  assert.ok(!plain.includes('continue next time'));
   assert.ok(statusRow.includes(fg(THEME.warnFg)));
   assert.ok(statusRow.includes(fg(THEME.mutedFg)));
   assert.ok(statusRow.includes(bg(THEME.chromeBg)));
@@ -610,13 +606,13 @@ test('quit prompt paints f and c yellow on grey copy', () => {
   assert.equal(statusRow.split(warn).length - 1, 2);
   const hits = colored.statusHits;
   assert.equal(hits.length, 2);
-  assert.equal(hits[0].id, 'f');
-  assert.equal(hits[1].id, 'c');
+  assert.equal(hits[0].id, 'y');
+  assert.equal(hits[1].id, 'n');
   assert.equal(hits[0].y, colored.rows.length - 1);
-  const finish = plain.slice(hits[0].x0, hits[0].x1).trim();
-  const cont = plain.slice(hits[1].x0, hits[1].x1).trim();
-  assert.equal(finish, 'finish as ready');
-  assert.equal(cont, 'continue next time');
+  const yes = plain.slice(hits[0].x0, hits[0].x1).trim();
+  const no = plain.slice(hits[1].x0, hits[1].x1).trim();
+  assert.equal(yes, 'y');
+  assert.equal(no, '/n');
 });
 
 test('commit pane brief mode lists subject hash branch and age', () => {

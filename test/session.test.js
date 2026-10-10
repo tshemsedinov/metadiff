@@ -794,7 +794,7 @@ test('escape from diff opens the file list, then quits', () => {
   assert.equal(session.done, true);
 });
 
-test('escape from files with notes asks to finish or continue', () => {
+test('escape from files with notes quits and keeps the status', () => {
   const { session } = openSession([sampleItem('a.js')]);
   session.dispatch('feedback');
   session.pushInput('nits');
@@ -802,12 +802,11 @@ test('escape from files with notes asks to finish or continue', () => {
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
   assert.equal(session.done, false);
+  session.notes.status = 'partial';
   session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.done, false);
-  assert.equal(session.mode, 'confirmQuit');
-  session.pushInput('c');
   assert.equal(session.done, true);
-  assert.equal(session.notes.status, 'editing');
+  assert.equal(session.mode, 'review');
+  assert.equal(session.notes.status, 'partial');
 });
 
 test('starts on the file list', () => {
@@ -2380,51 +2379,58 @@ test('todo save recovers if the stub was dropped', () => {
   assert.equal(session.current().origin, 'task');
 });
 
-test('quit with notes asks f to finish or c to continue', () => {
+test('quit with notes keeps the review status', () => {
   const item = sampleItem('a.js');
   const { session } = openSession([item]);
   session.dispatch('feedback');
   session.pushInput('nits');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
+  session.notes.status = 'ready';
+  session.notes.dirty = true;
   session.dispatch('quit');
-  assert.equal(session.done, false);
-  assert.equal(session.mode, 'confirmQuit');
-  session.handleEvent({ type: 'key', key: 'escape' });
-  assert.equal(session.done, false);
-  assert.equal(session.mode, 'review');
-  session.dispatch('quit');
-  session.pushInput('f');
   assert.equal(session.done, true);
+  assert.equal(session.mode, 'review');
   const md = fs.readFileSync(session.notes.reviewPath, 'utf8');
   assert.match(md, /nits/);
   assert.match(md, /status: ready/);
 });
 
-test('click quit prompt continues next time', () => {
+test('quit warns before terminating a running test or agent', () => {
   const { session } = openSession([sampleItem('a.js')]);
-  session.dispatch('feedback');
-  session.pushInput('nits');
-  session.handleEvent({ type: 'key', key: 'ctrl-s' });
+  let testsKilled = false;
+  let agentsKilled = false;
+  session.npm.running = true;
+  session.npm.child = {
+    kill() {
+      testsKilled = true;
+    },
+  };
+  session.agents.jobs.push({
+    status: 'running',
+    child: {
+      kill() {
+        agentsKilled = true;
+      },
+    },
+  });
+  session.notes.status = 'editing';
   session.dispatch('quit');
+  assert.equal(session.done, false);
   assert.equal(session.mode, 'confirmQuit');
-  clickStatusChoice(session, 'c');
-  assert.equal(session.done, true);
-  assert.equal(session.notes.status, 'editing');
-});
-
-test('quit continue keeps editing so the next run can resume', () => {
-  const item = sampleItem('a.js');
-  const { session } = openSession([item]);
-  session.dispatch('feedback');
-  session.pushInput('nits');
-  session.handleEvent({ type: 'key', key: 'ctrl-s' });
+  session.draw();
+  const asking = stripAnsi(session.lastFrame.rows.at(-2));
+  assert.match(asking, /exit will terminate tests and agents/);
+  assert.match(asking, /y\/n/);
+  session.pushInput('n');
+  assert.equal(session.done, false);
+  assert.equal(session.mode, 'review');
+  assert.equal(testsKilled, false);
   session.dispatch('quit');
-  session.pushInput('c');
+  clickStatusChoice(session, 'y');
   assert.equal(session.done, true);
+  assert.equal(testsKilled, true);
+  assert.equal(agentsKilled, true);
   assert.equal(session.notes.status, 'editing');
-  const md = fs.readFileSync(session.notes.reviewPath, 'utf8');
-  assert.match(md, /status: editing/);
-  assert.match(md, /nits/);
 });
 
 test('initReview resumes latest editing file', () => {
