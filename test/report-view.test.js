@@ -162,6 +162,7 @@ test(prettyView, async () => {
     const controller = new NpmController(ui);
     controller.commands = [{ name: 'test', kind: 'script' }];
     controller.run();
+    controller.openView(controller.runs.at(-1).id);
     controller.toggleVerbose();
     await finish({ text: raw, status: 1 });
     assert.equal(controller.output.trimEnd(), raw);
@@ -169,7 +170,8 @@ test(prettyView, async () => {
     const names = fs.readdirSync(directory);
     const reduced = names.find((name) => name.endsWith('.log'));
     const rawName = names.find((name) => name.endsWith('.raw'));
-    assert.equal(names.length, 2);
+    assert.equal(names.length, 3);
+    assert.ok(names.some((name) => name.endsWith('.json')));
     const log = fs.readFileSync(path.join(directory, reduced), 'utf8');
     assert.match(log, /## comparison 1/);
     assert.match(log, new RegExp(rawName.replace(/[.]/g, '\\.')));
