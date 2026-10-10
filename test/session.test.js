@@ -111,6 +111,7 @@ const mockRepo = (initial, top) => {
   const commits = [];
   const commitDrops = [];
   const applyFixups = [];
+  const updates = [];
   const rewords = [];
   const pulls = [];
   const pushes = [];
@@ -159,6 +160,7 @@ const mockRepo = (initial, top) => {
     extraFiles,
     commitDrops,
     applyFixups,
+    updates,
     rewords,
     load: () => ({ top, items: [...items], branch: 'main' }),
     add: (top, item) => {
@@ -204,6 +206,9 @@ const mockRepo = (initial, top) => {
     applyFixup: (top, sha) => {
       applyFixups.push(sha);
       commitList = commitList.filter((entry) => entry.sha !== sha);
+    },
+    updateCommit: (top, sha) => {
+      updates.push(sha);
     },
     commitMessage: (top, sha) => {
       const entry = commitList.find((item) => item.sha === sha);
@@ -4150,7 +4155,7 @@ test('insert creates a branch, or commits, amends, or fixups', () => {
   const headLine = stripAnsi(commits.session.lastFrame.rows.at(-2));
   assert.match(headLine, /what do you want to do\?/);
   assert.match(headLine, /esc cancel/);
-  assert.match(headLine, /commit {2}amend {2}fixup/);
+  assert.match(headLine, /update {2}commit {2}amend {2}fixup/);
   commits.session.handleEvent({ type: 'key', key: 'c' });
   assert.equal(commits.session.commitKind, 'commit');
   commits.session.composer.closeCompose();
@@ -4169,7 +4174,7 @@ test('insert creates a branch, or commits, amends, or fixups', () => {
   commits.session.draw();
   const older = stripAnsi(commits.session.lastFrame.rows.at(-2));
   assert.match(older, /esc cancel/);
-  assert.match(older, /commit {2}amend {2}fixup/);
+  assert.match(older, /update {2}commit {2}amend {2}fixup/);
   commits.session.handleEvent({ type: 'key', key: 'c' });
   assert.equal(commits.session.commitKind, 'commit');
   assert.equal(commits.session.commitCursor, 0);
@@ -4186,6 +4191,36 @@ test('insert creates a branch, or commits, amends, or fixups', () => {
   commits.session.handleEvent({ type: 'key', key: 'f' });
   assert.equal(commits.session.commitCursor, 2);
   assert.equal(commits.session.commitKind, 'fixup');
+});
+
+test('insert update keeps the selected commit and takes staged changes', () => {
+  const head = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const older = 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+    startPane: 'files',
+  });
+  session.pushInput('c');
+  session.dispatch('next');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  assert.equal(session.mode, 'confirmCommit');
+  session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(session.mode, 'review');
+  assert.equal(session.status, 'updated');
+  assert.deepEqual(repo.updates, [head]);
+  session.dispatch('next');
+  session.handleEvent({ type: 'key', key: 'insert' });
+  session.handleEvent({ type: 'key', key: 'u' });
+  assert.deepEqual(repo.updates, [head, older]);
+  session.handleEvent({ type: 'key', key: 'insert' });
+  clickStatusChoice(session, 'u');
+  assert.deepEqual(repo.updates, [head, older, older]);
+  const bare = openSession([sampleItem('a.js')], { startPane: 'files' });
+  bare.session.pushInput('c');
+  bare.session.dispatch('next');
+  bare.session.handleEvent({ type: 'key', key: 'insert' });
+  bare.session.handleEvent({ type: 'key', key: 'enter' });
+  assert.equal(bare.session.status, 'nothing to commit');
+  assert.deepEqual(bare.repo.updates, []);
 });
 
 test('new branch action asks for a name', () => {
