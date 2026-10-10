@@ -569,11 +569,11 @@ test('RESLOP_OUTPUT selects raw and rejects unknown', async () => {
     const rawLogs = savedLogs(dir);
     assert.equal(
       rawLogs.some((name) => name.endsWith('.log')),
-      false,
+      true,
     );
     assert.equal(
       rawLogs.some((name) => name.endsWith('.raw')),
-      false,
+      true,
     );
     const pretty = fakeProc(dir, {
       argv: ['node', 'reslop', 't', '--', 'node', '-e', 'process.exit(0)'],
@@ -601,6 +601,7 @@ test('raw mode records test counts and passes the output through', async () => {
     'console.log("ℹ tests 1")',
     'console.log("ℹ pass 1")',
     'console.log("ℹ fail 0")',
+    'console.log("RESLOP_CAPTURE=" + (process.env.RESLOP_CAPTURE || ""))',
   ].join(';');
   try {
     const proc = fakeProc(dir, {
@@ -609,15 +610,14 @@ test('raw mode records test counts and passes the output through', async () => {
     });
     assert.equal(await run(proc), 0);
     assert.match(proc.stdoutText(), /✔ one/);
+    assert.match(proc.stdoutText(), /RESLOP_CAPTURE=1/);
     const names = savedLogs(dir);
-    assert.equal(
-      names.some((name) => name.endsWith('.log')),
-      false,
-    );
-    assert.equal(
-      names.some((name) => name.endsWith('.raw')),
-      false,
-    );
+    const reduced = names.find((name) => name.endsWith('.log'));
+    const rawName = names.find((name) => name.endsWith('.raw'));
+    assert.ok(reduced);
+    assert.ok(rawName);
+    const rawText = fs.readFileSync(path.join(dir, '.log', rawName), 'utf8');
+    assert.match(rawText, /✔ one/);
     const [record] = readRuns(dir);
     assert.equal(record.progress.done, 1);
     assert.equal(record.result.tests, 1);

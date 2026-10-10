@@ -66,6 +66,7 @@ test('command labels use the program base name', () => {
   assert.equal(commandLabel('/usr/bin/node', ['--test']), 'node --test');
   assert.ok(isRunsRel('.log/.runs/1-2.json'));
   assert.ok(isRunsRel('.log/.runs'));
+  assert.ok(isRunsRel('.log/2026-10-10-node-01.log'));
   assert.ok(!isRunsRel('.log/other.md'));
 });
 
@@ -712,6 +713,52 @@ test('the dashboard shows a run by script name', async () => {
     run.finish(0, null);
     const finished = () => ui.dashboard.view().runs.length > 0;
     assert.ok(await waitUntil(finished));
+  } finally {
+    await close();
+  }
+});
+
+test('the dashboard run panel shows a newly started command', async () => {
+  const { ui, close } = await openDashboard();
+  try {
+    assert.ok(await waitUntil(() => /first commit/.test(frameText(ui))));
+    const now = Date.now();
+    ui.npm.runs.push({
+      id: 1,
+      name: 'test',
+      kind: 'script',
+      command: 'node --test',
+      label: 'npm run test',
+      status: 'running',
+      exit: '',
+      startedAt: now,
+      endedAt: 0,
+      progress: { done: 2, failed: 1, expected: 6 },
+      result: null,
+    });
+    const listed = ui.dashboard.view().runs.find((run) => run.name === 'test');
+    assert.equal(listed.status, 'running');
+    assert.equal(listed.done, 2);
+    assert.equal(listed.failed, 1);
+    ui.npm.runs.push({
+      id: 2,
+      name: 'lint',
+      kind: 'script',
+      command: 'eslint .',
+      label: 'npm run lint',
+      status: 'running',
+      exit: '',
+      startedAt: now + 5,
+      endedAt: 0,
+      progress: null,
+      result: null,
+    });
+    const names = ui.dashboard.view().runs.map((run) => run.name);
+    assert.equal(names[0], 'lint');
+    assert.ok(names.includes('test'));
+    const text = frameText(ui);
+    assert.match(text, /lint/);
+    assert.match(text, /test/);
   } finally {
     await close();
   }
@@ -1912,6 +1959,15 @@ test('run rows show completed, passed and failed counts', () => {
     result: null,
   });
   assert.equal(metricText(live), '4|3|1|12');
+  const session = runMetrics({
+    status: 'running',
+    source: 'reslop',
+    done: 2,
+    failed: 1,
+    expected: 6,
+    result: null,
+  });
+  assert.equal(metricText(session), '3|2|1|6');
   const failed = runMetrics({
     status: 'failed',
     source: 'reslop t',
@@ -2068,6 +2124,48 @@ test('chained npm script steps share one run row', () => {
   assert.equal(first.endedAt, 3000);
   assert.equal(first.result.errors, 1);
   assert.equal(first.result.warnings, 2);
+});
+
+test('a new npm run refreshes the dashboard row', () => {
+  const disk = runRecord('node --test', 'test', 5000, 0, {
+    status: 'running',
+  });
+  disk.progress = { done: 1, failed: 0, lines: 1, expected: 4 };
+  const live = {
+    label: 'npm run test',
+    name: 'test',
+    running: true,
+    exit: '',
+    startedAt: 4900,
+    endedAt: 0,
+    progress: { done: 3, failed: 1, expected: 4 },
+    result: null,
+  };
+  const started = {
+    label: 'npm run lint',
+    name: 'lint',
+    running: true,
+    exit: '',
+    startedAt: 9000,
+    endedAt: 0,
+    progress: null,
+    result: null,
+  };
+  const list = mergeRuns([disk], [live, started]);
+  assert.deepEqual(
+    list.map((run) => run.name),
+    ['lint', 'test'],
+  );
+  assert.equal(list[1].done, 3);
+  assert.equal(list[1].failed, 1);
+  assert.equal(list[1].status, 'running');
+  const saved = runRecord('node --test', 'test', 5000, 8000, {
+    result: { tests: 4, passed: 3, failed: 1 },
+  });
+  const finished = { ...live, running: false, exit: 1, endedAt: 8000 };
+  const kept = mergeRuns([saved], [finished, started]);
+  assert.equal(kept.find((run) => run.name === 'test').source, 'reslop t');
+  assert.equal(kept.find((run) => run.name === 'test').result.tests, 4);
 });
 
 test('diff groups keep staged lines apart from the total', () => {
