@@ -24,7 +24,7 @@ Review → Plan → Repair → Verify
 - Stage, unstage, or revert each contiguous block of diff lines
 - Auto-reload local diffs when files change, keeping the current screen
 - Import GitHub PR and GitLab MR review comments into the local plan for AI
-- Commits list: brief and full, view a commit's diff, commit, amend, apply, edit, fixup, and delete
+- Commits list: brief and full, view a commit's diff, commit, update, amend, apply, edit, fixup, and delete
 - Branches: checkout, create, rebase, delete, pull, and push
 - npm scripts and bins: run, edit, and reorder; double-click to run; clean logs older than 5 days
 - Reduced test and lint output for agents: failures and a short summary, not passing noise

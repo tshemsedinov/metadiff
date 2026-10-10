@@ -570,6 +570,44 @@ test('hasStaged is false until files are added', () => {
   }
 });
 
+test('updateCommit folds staged changes into the selected commit', async () => {
+  for (const method of ['updateCommit', 'updateCommitAsync']) {
+    const repo = makeRepo();
+    try {
+      repo.write('a.txt', 'one\n');
+      repo.git(['add', 'a.txt']);
+      repo.git(['commit', '-m', 'one']);
+      repo.write('b.txt', 'two\n');
+      repo.git(['add', 'b.txt']);
+      repo.git(['commit', '-m', 'two\n\nbody']);
+      const head = listCommits(repo.dir)[0].sha;
+      repo.write('b.txt', 'two-more\n');
+      repo.git(['add', 'b.txt']);
+      await git[method](repo.dir, head);
+      const after = listCommits(repo.dir);
+      assert.deepEqual(
+        after.map((entry) => entry.subject),
+        ['two', 'one'],
+      );
+      assert.equal(repo.read('b.txt'), 'two-more\n');
+      assert.equal(git.commitMessage(repo.dir, after[0].sha), 'two\n\nbody');
+      repo.write('a.txt', 'one-more\n');
+      repo.git(['add', 'a.txt']);
+      await git[method](repo.dir, after[1].sha);
+      const folded = listCommits(repo.dir);
+      assert.deepEqual(
+        folded.map((entry) => entry.subject),
+        ['two', 'one'],
+      );
+      assert.equal(repo.read('a.txt'), 'one-more\n');
+      assert.equal(repo.read('b.txt'), 'two-more\n');
+      assert.equal(git.commitMessage(repo.dir, folded[1].sha), 'one');
+    } finally {
+      repo.cleanup();
+    }
+  }
+});
+
 test('commitChanges fixup writes the given message', () => {
   const repo = makeRepo();
   try {

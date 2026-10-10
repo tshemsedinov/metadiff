@@ -1692,7 +1692,7 @@ test('insert on a commit asks what to do on the status line', () => {
   };
   const head = prompt('confirmCommit');
   assert.match(head, /^ what do you want to do\? {2}esc cancel/);
-  assert.match(head, /commit {2}amend {2}fixup/);
+  assert.match(head, /update {2}commit {2}amend {2}fixup/);
   const colored = render.renderFrame(
     {
       pane: 'commits',
@@ -1711,7 +1711,7 @@ test('insert on a commit asks what to do on the status line', () => {
     .split(warn)
     .slice(1)
     .map((part) => stripAnsi(part.split(RESET)[0]));
-  assert.deepEqual(yellow, ['esc', 'c', 'a', 'f']);
+  assert.deepEqual(yellow, ['esc', 'u', 'c', 'a', 'f']);
 });
 
 test('header and file list keep a right-side gap', () => {
