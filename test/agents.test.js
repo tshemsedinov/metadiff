@@ -1330,6 +1330,75 @@ test('agents screen lists sessions for the selected cli', async () => {
   }
 });
 
+test('a new agent session is its own run with status', async () => {
+  const { dir, env } = fakePath('claude');
+  const { ui, repo, stdout } = openUi();
+  try {
+    const reviewDir = path.join(repo.dir, '.plan');
+    fs.mkdirSync(reviewDir, { recursive: true });
+    const name = '2020-01-01-00.md';
+    const file = path.join(reviewDir, name);
+    const body = [
+      '---',
+      'status: ready',
+      '---',
+      '',
+      '> a.js',
+      '',
+      '- [x] rewrite loop',
+      '- [ ] still open',
+      '',
+    ];
+    fs.writeFileSync(file, `${body.join('\n')}\n`);
+    ui.review.store.reviewPath = '';
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    ui.agents.planPath = file;
+    ui.agents.spawn = () => ({ kill() {} });
+    ui.agents.start();
+    assert.equal(ui.agents.viewing, true);
+    ui.agents.closeView();
+    const rows = ui.agents.sessionRows();
+    assert.equal(rows[0].name, '<new session>');
+    assert.equal(rows[0].fresh, true);
+    assert.equal(rows[0].status, undefined);
+    assert.equal(rows[1].status, 'running');
+    assert.match(rows[1].elapsed, /^\d+:\d{2}$/);
+    assert.equal(rows[1].progress, '1/2');
+    assert.equal(rows[1].fresh, undefined);
+    assert.equal(rows[1].session, undefined);
+    assert.notEqual(rows[1].name, '<new session>');
+    stdout.columns = 160;
+    ui.draw();
+    const lines = stripAnsi(ui.lastFrame.rows.join('\n')).split('\n');
+    const fresh = lines.find((line) => line.includes('<new session>'));
+    const live = lines.find((line) => line.includes('running'));
+    assert.ok(fresh);
+    assert.equal(fresh.includes('running'), false);
+    assert.ok(live);
+    assert.match(live, /1\/2/);
+    const sessionId = '2fa698ba-9a19-4a84-8134-5a7cd9ec2c56';
+    ui.agents.jobs[0].session = sessionId;
+    const next = ui.agents.sessionRows();
+    const starters = next.filter((row) => row.name === '<new session>');
+    const active = next.filter((row) => row.status === 'running');
+    assert.equal(starters.length, 1);
+    assert.equal(active.length, 1);
+    assert.equal(active[0].id, sessionId);
+    ui.agents.focusRuns();
+    ui.agents.move(1);
+    ui.agents.start();
+    assert.equal(ui.agents.viewing, true);
+    assert.equal(ui.agents.viewId, ui.agents.jobs[0].id);
+    assert.equal(ui.agents.jobs.length, 1);
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('agents panels scroll past one screen', async () => {
   const { dir, env } = fakePath('claude');
   const { ui, repo } = openUi();
