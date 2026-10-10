@@ -22,7 +22,7 @@ const render = require('../lib/render/render.js');
 const { renderFrame } = render;
 const { stripAnsi, THEME, bg, RESET, BOLD } = require('../lib/ansi.js');
 const { actionFromKey } = require('../lib/session/actions.js');
-const { runStats } = require('../lib/session/agent-jobs.js');
+const { AgentJob, runStats } = require('../lib/session/agent-jobs.js');
 
 const makeBin = (dir, name) => {
   const file = path.join(dir, name);
@@ -49,12 +49,13 @@ test('findBin returns the first executable on PATH', () => {
   }
 });
 
-test('detectAgents finds claude opencode cursor and codex clis', () => {
+test('detectAgents finds claude opencode cursor codex and agy clis', () => {
   const { dir, bins, env } = fakePath(
     'claude',
     'opencode',
     'cursor-agent',
     'codex',
+    'agy',
   );
   try {
     const list = detectAgents(env);
@@ -67,6 +68,8 @@ test('detectAgents finds claude opencode cursor and codex clis', () => {
     assert.equal(list[2].bin, bins['cursor-agent']);
     assert.equal(list[3].id, 'codex');
     assert.equal(list[3].bin, bins.codex);
+    assert.equal(list[4].id, 'agy');
+    assert.equal(list[4].bin, bins.agy);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -127,6 +130,211 @@ test('buildLaunch passes the review plan model and extra flags', () => {
   assert.equal(rel.prompt, planPrompt('.plan/a.md'));
   const relCmd = 'claude --model sonnet --effort high --foo bar .plan/a.md';
   assert.equal(rel.command, relCmd);
+});
+
+test('buildLaunch builds command for agy with model effort and prompt', () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  const row = {
+    id: agy.id,
+    name: agy.name,
+    bin: '/usr/bin/agy',
+    spec: agy,
+    models: agy.models,
+  };
+  const plain = buildLaunch(row, emptyChoice(row), '/tmp/plan.md');
+  assert.equal(plain.ok, true);
+  assert.equal(plain.cmd, '/usr/bin/agy');
+  assert.deepEqual(plain.args, ['-p', planPrompt('/tmp/plan.md')]);
+  assert.equal(plain.command, 'agy -p /tmp/plan.md');
+
+  const withModel = buildLaunch(
+    row,
+    { model: 'gemini-3.8-flash', effort: 'high', extra: '' },
+    '/tmp/plan.md',
+  );
+  assert.equal(withModel.ok, true);
+  assert.deepEqual(withModel.args, [
+    '--model',
+    'gemini-3.8-flash-high',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(
+    withModel.command,
+    'agy --model gemini-3.8-flash-high -p /tmp/plan.md',
+  );
+
+  const withDefaultEffort = buildLaunch(
+    row,
+    { model: 'default', effort: 'high', extra: '' },
+    '/tmp/plan.md',
+  );
+  assert.equal(withDefaultEffort.ok, true);
+  assert.deepEqual(withDefaultEffort.args, [
+    '--effort',
+    'high',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(withDefaultEffort.command, 'agy --effort high -p /tmp/plan.md');
+
+  const sessionId = '11111111-2222-3333-4444-555555555555';
+  const continued = buildLaunch(
+    row,
+    emptyChoice(row),
+    '/tmp/plan.md',
+    '/tmp',
+    sessionId,
+  );
+  assert.equal(continued.ok, true);
+  assert.deepEqual(continued.args, [
+    '--conversation',
+    sessionId,
+    '-p',
+    planPrompt('plan.md'),
+  ]);
+  assert.equal(continued.session, sessionId);
+
+  const optIn = buildLaunch(
+    row,
+    {
+      model: 'gemini-3.8-flash',
+      effort: 'high',
+      extra: '--dangerously-skip-permissions',
+    },
+    '/tmp/plan.md',
+  );
+  assert.equal(optIn.ok, true);
+  assert.deepEqual(optIn.args, [
+    '--model',
+    'gemini-3.8-flash-high',
+    '--dangerously-skip-permissions',
+    '-p',
+    planPrompt('/tmp/plan.md'),
+  ]);
+  assert.equal(
+    optIn.command,
+    'agy --model gemini-3.8-flash-high ' +
+      '--dangerously-skip-permissions -p /tmp/plan.md',
+  );
+
+  const optInContinued = buildLaunch(
+    row,
+    {
+      ...emptyChoice(row),
+      extra: '--dangerously-skip-permissions',
+    },
+    '/tmp/plan.md',
+    '/tmp',
+    sessionId,
+  );
+  assert.equal(optInContinued.ok, true);
+  assert.deepEqual(optInContinued.args, [
+    '--conversation',
+    sessionId,
+    '--dangerously-skip-permissions',
+    '-p',
+    planPrompt('plan.md'),
+  ]);
+  assert.equal(optInContinued.session, sessionId);
+});
+
+test('buildLaunch keeps the AGY permission flag isolated', () => {
+  for (const spec of AGENTS) {
+    const row = {
+      id: spec.id,
+      name: spec.name,
+      bin: `/usr/bin/${spec.bins[0]}`,
+      spec,
+      models: spec.models,
+    };
+    const launch = buildLaunch(row, emptyChoice(row), '/tmp/plan.md');
+    assert.equal(launch.ok, true);
+    assert.equal(
+      launch.args.includes('--dangerously-skip-permissions'),
+      false,
+      spec.id,
+    );
+    const continued = buildLaunch(
+      row,
+      emptyChoice(row),
+      '/tmp/plan.md',
+      '/tmp',
+      'test-session-id',
+    );
+    assert.equal(continued.ok, true);
+    assert.equal(
+      continued.args.includes('--dangerously-skip-permissions'),
+      false,
+      `${spec.id} continued`,
+    );
+  }
+});
+
+test('agent run treats empty exit zero output as failure', () => {
+  const job = AgentJob.launch(
+    1,
+    {
+      id: 'agy',
+      name: 'agy',
+      cmd: '/usr/bin/agy',
+      args: [],
+      command: 'agy',
+      plan: '/tmp/plan.md',
+      kind: 'run',
+    },
+    'default',
+  );
+  job.finish({ status: 0, text: '  \n' });
+  assert.equal(job.status, 'exit 1');
+  assert.equal(job.exit, 1);
+  assert.match(job.output, /exited without output/i);
+});
+
+test('agent run treats permission denial at exit zero as failure', () => {
+  const job = AgentJob.launch(
+    1,
+    {
+      id: 'agy',
+      name: 'agy',
+      cmd: '/usr/bin/agy',
+      args: [],
+      command: 'agy',
+      plan: '/tmp/plan.md',
+      kind: 'run',
+    },
+    'default',
+  );
+  job.finish({ status: 0, text: 'Error: permission denied\n' });
+  assert.equal(job.status, 'exit 1');
+  assert.equal(job.exit, 1);
+});
+
+test('agy lists models and parses model names', async () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  const sample =
+    'Fetching available models...\n' +
+    'gemini-3.8-flash-high     Gemini 3.8 Flash (High)\n' +
+    'gemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)\n' +
+    'claude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)\n';
+  const names = agy.parseModels(sample);
+  assert.deepEqual(names, [
+    'gemini-3.8-flash-high',
+    'gemini-3.8-flash-medium',
+    'claude-sonnet-4-6',
+  ]);
+});
+
+test('agy fallback models match CLI offerings and exclude xhigh/max', () => {
+  const agy = AGENTS.find((item) => item.id === 'agy');
+  assert.ok(agy);
+  assert.deepEqual(agy.efforts, ['default', 'low', 'medium', 'high']);
+  assert.equal(agy.efforts.includes('xhigh'), false);
+  assert.equal(agy.efforts.includes('max'), false);
+  assert.ok(agy.models.includes('gemini-3.8-flash-high'));
+  assert.ok(agy.models.includes('gpt-oss-120b-medium'));
 });
 
 const openUi = () => {
@@ -1194,6 +1402,44 @@ test('agents screen remembers model and effort in .reslop', async () => {
     ui.agents.refresh(env);
     assert.equal(ui.agents.choice('claude').model, 'sonnet');
     assert.equal(ui.agents.choice('claude').effort, 'medium');
+  } finally {
+    ui.agents.reset();
+    repo.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agents screen remembers extra arguments in .reslop', async () => {
+  const { dir, env } = fakePath('agy');
+  const { ui, repo } = openUi();
+  try {
+    const file = path.join(repo.dir, '.reslop');
+    const initial = {
+      agents: {
+        agy: {
+          extra: '--dangerously-skip-permissions',
+          model: 'gemini-3.8-flash',
+        },
+      },
+    };
+    fs.writeFileSync(file, `${JSON.stringify(initial, null, 2)}\n`);
+    ui.agents.listModels = async () => [];
+    ui.agents.refresh(env);
+    await ui.agents.open();
+    assert.equal(
+      ui.agents.choice('agy').extra,
+      '--dangerously-skip-permissions',
+    );
+    ui.handleEvent({ type: 'key', key: 'e' });
+    ui.handleEvent({ type: 'key', key: 'enter' });
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(saved.agents.agy.extra, '--dangerously-skip-permissions');
+    ui.agents.choices = new Map();
+    ui.agents.refresh(env);
+    assert.equal(
+      ui.agents.choice('agy').extra,
+      '--dangerously-skip-permissions',
+    );
   } finally {
     ui.agents.reset();
     repo.cleanup();
