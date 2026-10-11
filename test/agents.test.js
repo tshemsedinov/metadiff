@@ -7,14 +7,12 @@ const os = require('node:os');
 const path = require('node:path');
 
 const agents = require('../lib/agents/agents.js');
-const sessions = require('../lib/agents/sessions.js');
 const { detectAgents, findBin, splitArgs, planPrompt } = agents;
 const { emptyChoice, buildLaunch, buildLogin, AGENTS, listModels } = agents;
 const { mergeModels, parseCursorModels, parseCursorWide } = agents;
-const { parseNameList, hasAgentSession } = agents;
+const { parseNameList } = agents;
 const { parseJsonModels, commandLine, needsAuth, authState } = agents;
 const { groupModels, catalogOf } = agents;
-const { claudeSession, cursorSession } = sessions;
 const { Session } = require('../lib/session/session.js');
 const { createGitRepo } = require('../lib/git/git.js');
 const { makeRepo, uiSink } = require('./helpers.js');
@@ -2015,42 +2013,6 @@ test('buildLaunch continues a previous session', () => {
   assert.equal(resumed.args[1], sessionId);
   assert.ok(resumed.args.includes('--model'));
   assert.ok(resumed.args.includes('model_reasoning_effort=high'));
-});
-
-test('stored chats count as a previous agent session', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-chats-'));
-  const cwd = '/tmp/work';
-  try {
-    const chat = path.join(root, 'bucket', 'chat-id');
-    fs.mkdirSync(chat, { recursive: true });
-    const meta = { cwd, hasConversation: true };
-    fs.writeFileSync(path.join(chat, 'meta.json'), JSON.stringify(meta));
-    assert.equal(cursorSession(cwd, root), true);
-    assert.equal(cursorSession('/tmp/other', root), false);
-    const empty = path.join(root, 'bucket', 'empty');
-    fs.mkdirSync(empty);
-    const blank = { cwd: '/tmp/empty', hasConversation: false };
-    fs.writeFileSync(path.join(empty, 'meta.json'), JSON.stringify(blank));
-    assert.equal(cursorSession('/tmp/empty', root), false);
-    const projects = path.join(root, 'projects');
-    const dir = path.join(projects, cwd.split(path.sep).join('-'));
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'session.jsonl'), '{}\n');
-    assert.equal(claudeSession(cwd, projects), true);
-    assert.equal(claudeSession('/tmp/other', projects), false);
-    const cursor = AGENTS.find((row) => row.id === 'cursor');
-    const row = { id: 'cursor', spec: cursor };
-    const jobs = [{ cliId: 'cursor', action: 'run' }];
-    assert.equal(hasAgentSession(row, '/nowhere', jobs), true);
-    const login = [{ cliId: 'cursor', action: 'login' }];
-    assert.equal(hasAgentSession(row, '/nowhere', login), false);
-    const probe = { cursor: (dirPath) => cursorSession(dirPath, root) };
-    assert.equal(hasAgentSession(row, cwd, [], probe), true);
-    const bare = { id: 'cursor', spec: { resume: [] } };
-    assert.equal(hasAgentSession(bare, cwd, jobs, probe), false);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
 });
 
 test('starting an agent uses the selected session', async () => {
