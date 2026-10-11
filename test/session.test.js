@@ -6031,3 +6031,25 @@ test('slash searches paths on the files and diff screens', () => {
   assert.equal(session.mode, 'review');
   assert.equal(session.view().find, null);
 });
+
+test('commit view reads a file from git once, not on every frame', () => {
+  const { fileText } = require('../lib/session/unit.js');
+  let calls = 0;
+  const repo = {
+    fileText: (top, rel, rev) => {
+      calls += 1;
+      return `${rev}:${rel}`;
+    },
+  };
+  const ui = { repo, top: '/repo', rev: 'abc123' };
+  assert.equal(fileText(ui, 'a.js'), 'abc123:a.js');
+  assert.equal(fileText(ui, 'a.js'), 'abc123:a.js');
+  assert.equal(calls, 1);
+  assert.equal(fileText(ui, 'b.js'), 'abc123:b.js');
+  assert.equal(fileText({ ...ui, rev: 'def456' }, 'b.js'), 'def456:b.js');
+  assert.equal(calls, 3);
+  const worktree = { repo, top: '/repo', rev: '' };
+  fileText(worktree, 'a.js');
+  fileText(worktree, 'a.js');
+  assert.equal(calls, 5);
+});
