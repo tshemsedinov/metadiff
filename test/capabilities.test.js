@@ -66,5 +66,4 @@ test('sessionCapabilities follows rev change source and -r', () => {
 test('the local git repo can amend a commit', () => {
   const repo = createGitRepo();
   assert.ok(hasMethod(repo, 'updateCommit'));
-  assert.ok(hasMethod(repo, 'updateCommitAsync'));
 });

@@ -398,7 +398,7 @@ test('diff screen dims a on staged and u on unstaged', () => {
   assert.equal(unstaged.session.status, '');
 });
 
-test('add and unstage keep block order', () => {
+test('add and unstage keep block order', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
@@ -411,6 +411,7 @@ test('add and unstage keep block order', () => {
   };
   session.index = 1;
   session.dispatch('add');
+  await session.ops.idle();
   assert.equal(loads, 0);
   assert.equal(repo.added.length, 1);
   assert.deepEqual(
@@ -429,6 +430,7 @@ test('add and unstage keep block order', () => {
   assert.equal(session.items[1].origin, 'staged');
   assert.equal(session.current().file.newPath, 'b.js');
   session.dispatch('unstage');
+  await session.ops.idle();
   assert.equal(loads, 0);
   assert.equal(session.items[1].origin, 'unstaged');
   assert.deepEqual(
@@ -437,11 +439,12 @@ test('add and unstage keep block order', () => {
   );
 });
 
-test('AC28 unstage drops index keeps worktree', () => {
+test('AC28 unstage drops index keeps worktree', async () => {
   const staged = sampleItem('s.js', 'staged');
   const other = sampleItem('a.js');
   const { session, repo } = openSession([staged, other]);
   session.dispatch('unstage');
+  await session.ops.idle();
   assert.equal(repo.unstageCalls.length, 1);
   assert.equal(session.status, 'unstaged');
 });
@@ -548,32 +551,41 @@ test('-r blocks add unstage revert and still takes feedback', () => {
   assert.equal(note.text, 'keep this');
 });
 
-test('AC9 hotkeys dispatch add revert next prev quit', () => {
+test('AC9 hotkeys dispatch add revert next prev quit', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
   const { session, repo } = openSession([a, b, c]);
   assert.equal(session.layout, 'unified');
   session.pushInput('j');
+  await session.ops.idle();
   assert.equal(session.current().file.newPath, 'b.js');
   session.pushInput('k');
+  await session.ops.idle();
   assert.equal(session.current().file.newPath, 'a.js');
   session.pushInput('a');
+  await session.ops.idle();
   assert.equal(repo.added.length, 1);
   assert.equal(repo.added[0].file.newPath, 'a.js');
   session.pushInput('d');
+  await session.ops.idle();
   assert.equal(repo.reverted.length, 1);
   session.pushInput('m');
+  await session.ops.idle();
   assert.equal(session.layout, 'mixed');
   assert.equal(session.status, 'mixed');
   session.pushInput('m');
+  await session.ops.idle();
   assert.equal(session.layout, 'side');
   assert.equal(session.status, 'side-by-side');
   session.pushInput('m');
+  await session.ops.idle();
   assert.equal(session.layout, 'unified');
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   session.handleEvent({ type: 'key', key: 'ctrl-c' });
+  await session.ops.idle();
   assert.equal(session.done, true);
 });
 
@@ -708,7 +720,7 @@ test('home end and page keys jump the files list', () => {
   assert.equal(session.fileCursor, 0);
 });
 
-test('AC10 footer Add hitbox dispatches add', () => {
+test('AC10 footer Add hitbox dispatches add', async () => {
   const item = sampleItem('c.js');
   const { session, repo } = openSession([item]);
   session.draw();
@@ -724,6 +736,7 @@ test('AC10 footer Add hitbox dispatches add', () => {
     y: session.lastFrame.height,
     press: true,
   });
+  await session.ops.idle();
   session.handleEvent({
     type: 'mouse',
     button: 0,
@@ -733,6 +746,7 @@ test('AC10 footer Add hitbox dispatches add', () => {
     y: session.lastFrame.height,
     press: false,
   });
+  await session.ops.idle();
   assert.equal(repo.added.length, 1);
 });
 
@@ -889,7 +903,7 @@ test('files pane add on last file keeps the cursor', () => {
   assert.equal(session.items[2].origin, 'unstaged');
 });
 
-test('files pane add unstage revert apply to the whole file', () => {
+test('files pane add unstage revert apply to the whole file', async () => {
   const first = sampleItem('a.js');
   const second = sampleItem('a.js');
   second.blockId = 1;
@@ -905,6 +919,7 @@ test('files pane add unstage revert apply to the whole file', () => {
     startPane: 'files',
   });
   session.dispatch('add');
+  await session.ops.idle();
   assert.equal(repo.added.length, 2);
   assert.equal(repo.added[0].file.newPath, 'a.js');
   assert.equal(repo.added[1].file.newPath, 'a.js');
@@ -913,13 +928,17 @@ test('files pane add unstage revert apply to the whole file', () => {
   assert.equal(session.items[2].origin, 'unstaged');
   assert.equal(session.fileCursor, 1);
   session.dispatch('prev');
+  await session.ops.idle();
   session.dispatch('unstage');
+  await session.ops.idle();
   assert.equal(repo.unstageCalls.length, 2);
   assert.equal(session.items[0].origin, 'unstaged');
   assert.equal(session.items[1].origin, 'unstaged');
   assert.equal(session.fileCursor, 1);
   session.dispatch('prev');
+  await session.ops.idle();
   session.dispatch('revert');
+  await session.ops.idle();
   assert.equal(repo.reverted.length, 2);
   assert.equal(repo.reverted[0].file.newPath, 'a.js');
   assert.equal(repo.reverted[1].file.newPath, 'a.js');
@@ -2503,30 +2522,37 @@ test('newReview starts a new file even if latest is editing', () => {
   assert.equal(session.notes.tasks.length, 0);
 });
 
-test('files pane c lists commits and c commits the message', () => {
+test('files pane c lists commits and c commits the message', async () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   assert.equal(session.pane, 'commits');
   assert.equal(session.mode, 'review');
   assert.equal(session.commitCursor, 0);
   assert.equal(session.view().commits[0].subject, 'uncommitted changes');
   assert.equal(session.view().commits[1].subject, 'land the change');
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   assert.equal(repo.commits.length, 0);
   session.pushInput('c');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'commit');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.mode, 'compose');
   assert.equal(session.status, 'empty commit message');
   assert.equal(repo.commits.length, 0);
   session.pushInput('land the change');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'committed');
   assert.equal(repo.commits.length, 1);
@@ -2534,15 +2560,17 @@ test('files pane c lists commits and c commits the message', () => {
   assert.equal(repo.commits[0].message, 'land the change');
 });
 
-test('dashboard p pulls and s pushes', () => {
+test('dashboard p pulls and s pushes', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'dashboard',
   });
   session.pushInput('p');
+  await session.ops.idle();
   assert.equal(repo.pulls.length, 1);
   assert.equal(session.status, 'pulled');
   assert.equal(session.pane, 'dashboard');
   session.pushInput('s');
+  await session.ops.idle();
   assert.equal(repo.pushes.length, 1);
   assert.equal(session.status, 'pushed');
 });
@@ -2785,7 +2813,7 @@ test('editing a commit ignores clicks and scrolls on other commits', () => {
   assert.equal(session.mode, 'compose');
 });
 
-test('brief reword edits the first line and keeps the body', () => {
+test('brief reword edits the first line and keeps the body', async () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
@@ -2799,12 +2827,16 @@ test('brief reword edits the first line and keeps the body', () => {
     },
   ]);
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.pushInput('e');
+  await session.ops.idle();
   assert.equal(session.editor.text, 'land the change');
   assert.equal(session.editor.cursor, 'land the change'.length);
   session.editor.replace('ship it');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.status, 'reworded');
   assert.deepEqual(repo.rewords, [
     {
@@ -2814,19 +2846,24 @@ test('brief reword edits the first line and keeps the body', () => {
   ]);
 });
 
-test('brief amend edits the first line and keeps the body', () => {
+test('brief amend edits the first line and keeps the body', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.lastMessage = () => 'land the change\n\nexplain the change';
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'a' });
+  await session.ops.idle();
   assert.equal(session.editor.text, 'land the change');
   assert.equal(session.editor.cursor, 'land the change'.length);
   session.editor.replace('ship it');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.status, 'amended');
   assert.equal(repo.commits[0].kind, 'amend');
   assert.equal(repo.commits[0].message, 'ship it\n\nexplain the change');
@@ -2860,38 +2897,48 @@ test('full mode reword edits the whole message', () => {
   ]);
 });
 
-test('commits pane a amends with the previous message', () => {
+test('commits pane a amends with the previous message', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'a' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 1);
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'amend');
   assert.equal(session.editor.text, 'previous message');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.status, 'amended');
   assert.equal(repo.commits[0].kind, 'amend');
   assert.equal(repo.commits[0].message, 'previous message');
 });
 
-test('commits pane r rewords the selected commit', () => {
+test('commits pane r rewords the selected commit', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.pushInput('e');
+  await session.ops.idle();
   assert.equal(session.commitCursor, 2);
   assert.equal(session.composeKind, 'commit');
   assert.equal(session.commitKind, 'reword');
   assert.equal(session.editor.text, 'init');
   session.editor.replace('rewritten init');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.status, 'reworded');
   assert.deepEqual(repo.rewords, [
     {
@@ -2902,11 +2949,12 @@ test('commits pane r rewords the selected commit', () => {
   assert.equal(session.view().commits[2].subject, 'rewritten init');
 });
 
-test('commits pane a applies a selected fixup', () => {
+test('commits pane a applies a selected fixup', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   repo.setCommits([
     {
       sha: 'fff0000fffffffffffffffffffffffffffffff',
@@ -2925,9 +2973,11 @@ test('commits pane a applies a selected fixup', () => {
   ]);
   session.commits.refresh();
   session.dispatch('next');
+  await session.ops.idle();
   session.draw();
   assert.ok(session.lastFrame.buttons.find((hit) => hit.id === 'apply'));
   session.pushInput('p');
+  await session.ops.idle();
   assert.deepEqual(repo.applyFixups, [
     'fff0000fffffffffffffffffffffffffffffff',
   ]);
@@ -2936,11 +2986,12 @@ test('commits pane a applies a selected fixup', () => {
   assert.equal(session.composeKind, null);
 });
 
-test('click apply footer squashes the selected fixup', () => {
+test('click apply footer squashes the selected fixup', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   repo.setCommits([
     {
       sha: 'fff0000fffffffffffffffffffffffffffffff',
@@ -2959,24 +3010,32 @@ test('click apply footer squashes the selected fixup', () => {
   ]);
   session.commits.refresh();
   session.dispatch('next');
+  await session.ops.idle();
   clickFooter(session, 'apply');
+  await session.ops.idle();
   assert.deepEqual(repo.applyFixups, [
     'fff0000fffffffffffffffffffffffffffffff',
   ]);
   assert.equal(session.status, 'applied');
 });
 
-test('c on an older commit writes a fixup', () => {
+test('c on an older commit writes a fixup', async () => {
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'f' });
+  await session.ops.idle();
   assert.equal(session.editor.text, 'fixup! init');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.status, 'fixup');
   assert.equal(repo.commits[0].kind, 'fixup');
   assert.equal(repo.commits[0].message, 'fixup! init');
@@ -3070,24 +3129,32 @@ test('commits pane lists newest first', () => {
   assert.equal(session.rev, 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
 });
 
-test('commits pane delete asks to delete the selected commit', () => {
+test('commits pane delete asks to delete the selected commit', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   assert.equal(session.mode, 'confirmDrop');
   assert.equal(session.view().dropName, 'aaa1111');
   session.pushInput('n');
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.commitDrops.length, 0);
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.commitDrops.length, 0);
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   session.pushInput('y');
+  await session.ops.idle();
   assert.deepEqual(repo.commitDrops, [
     'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   ]);
@@ -3121,14 +3188,16 @@ test('double click commit row opens its diff', () => {
   assert.equal(session.rev, 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
 });
 
-test('files pane a and d stay add and revert', () => {
+test('files pane a and d stay add and revert', async () => {
   const added = openSession([sampleItem('a.js')], { startPane: 'files' });
   added.session.handleEvent({ type: 'key', key: 'down' });
   added.session.pushInput('a');
+  await added.session.ops.idle();
   assert.equal(added.repo.added.length, 1);
   const reverted = openSession([sampleItem('a.js')], { startPane: 'files' });
   reverted.session.handleEvent({ type: 'key', key: 'down' });
   reverted.session.pushInput('d');
+  await reverted.session.ops.idle();
   assert.equal(reverted.repo.reverted.length, 1);
 });
 
@@ -3570,61 +3639,78 @@ test('list screens hint 🢐esc and the button goes back', () => {
   assert.equal(session.pane, 'files');
 });
 
-test('files pane b lists branches and enter checks out', () => {
+test('files pane b lists branches and enter checks out', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const { session, repo } = openSession([a, b], { startPane: 'files' });
   assert.equal(session.branch, 'main');
   session.pushInput('b');
+  await session.ops.idle();
   assert.equal(session.pane, 'branches');
   assert.equal(session.branchCursor, 0);
   session.handleEvent({ type: 'key', key: 'right' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, 0);
   session.handleEvent({ type: 'key', key: 'left' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, 0);
   session.handleEvent({ type: 'key', key: 'down' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, 1);
   session.handleEvent({ type: 'key', key: 'up' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, 0);
   session.pushInput('j');
+  await session.ops.idle();
   assert.equal(session.branchCursor, 1);
   session.handleEvent({ type: 'key', key: 'home' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, 0);
   session.handleEvent({ type: 'key', key: 'end' });
+  await session.ops.idle();
   assert.equal(session.branchCursor, session.branches.length - 1);
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.deepEqual(repo.checkouts, ['feat']);
   assert.equal(session.pane, 'branches');
   assert.equal(session.branchCursor, session.branches.length - 1);
   assert.match(session.status, /checked out feat/);
 });
 
-test('branch list p pulls and s pushes', () => {
+test('branch list p pulls and s pushes', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const { session, repo } = openSession([a, b], { startPane: 'files' });
   session.pushInput('b');
+  await session.ops.idle();
   assert.equal(repo.listed.length, 1);
   session.pushInput('p');
+  await session.ops.idle();
   assert.equal(repo.pulls.length, 1);
   assert.equal(repo.listed.length, 2);
   assert.equal(session.status, 'pulled');
   assert.equal(session.pane, 'branches');
   session.pushInput('s');
+  await session.ops.idle();
   assert.equal(repo.pushes.length, 1);
   assert.equal(repo.listed.length, 3);
   assert.equal(session.status, 'pushed');
   session.handleEvent({ type: 'key', key: 'down' });
+  await session.ops.idle();
   session.pushInput('p');
+  await session.ops.idle();
   assert.equal(repo.pulls.length, 2);
   session.pushInput('s');
+  await session.ops.idle();
   assert.equal(repo.pushes.length, 2);
   session.handleEvent({ type: 'key', key: 'up' });
+  await session.ops.idle();
   session.pushInput('p');
+  await session.ops.idle();
   assert.equal(repo.pulls.length, 3);
 });
 
-test('rejected push asks f to force or escape to cancel', () => {
+test('rejected push asks f to force or escape to cancel', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
@@ -3638,16 +3724,22 @@ test('rejected push asks f to force or escape to cancel', () => {
     throw error;
   };
   session.pushInput('b');
+  await session.ops.idle();
   session.pushInput('s');
+  await session.ops.idle();
   assert.equal(session.mode, 'confirmPush');
   assert.equal(repo.pushes.length, 0);
   session.pushInput('x');
+  await session.ops.idle();
   assert.equal(session.mode, 'confirmPush');
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.pushes.length, 0);
   session.pushInput('s');
+  await session.ops.idle();
   session.pushInput('f');
+  await session.ops.idle();
   assert.deepEqual(repo.pushes, [true]);
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'force pushed');
@@ -3681,7 +3773,7 @@ test('pull shows progress until git finishes', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
-  session.repo.pullAsync = () => pending;
+  session.repo.pull = () => pending;
   session.pushInput('b');
   session.pushInput('p');
   assert.equal(repo.pulls.length, 0);
@@ -3714,7 +3806,7 @@ test('npm i shows progress until install finishes', async () => {
     change: { propose: true, name: 'lodash' },
     files: ['package.json'],
   };
-  session.repo.addAsync = () => pending;
+  session.repo.add = () => pending;
   session.dispatch('add');
   assert.equal(session.current().origin, 'staged');
   assert.equal(session.busy, 'npm i');
@@ -3742,12 +3834,10 @@ test('stage moves on while npm install is still running', async () => {
   const { session, repo } = openSession([proposed, other]);
   session.uiOpen = true;
   let installs = 0;
-  session.repo.addAsync = () => {
-    installs += 1;
-    return pending;
-  };
   session.repo.add = (top, item) => {
-    repo.added.push(item);
+    if (item.dep) installs += 1;
+    else repo.added.push(item);
+    return item.dep ? pending : undefined;
   };
   session.dispatch('add');
   assert.equal(session.items[0].origin, 'staged');
@@ -3817,7 +3907,7 @@ test('checkout shows progress until git finishes', async () => {
     startPane: 'files',
   });
   session.uiOpen = true;
-  session.repo.checkoutAsync = async (top, name) => {
+  session.repo.checkout = async (top, name) => {
     await pending;
     repo.checkouts.push(name);
   };
@@ -3846,7 +3936,7 @@ test('commit shows progress until git finishes', async () => {
     startPane: 'files',
   });
   session.uiOpen = true;
-  session.repo.commitAsync = async (top, kind, message) => {
+  session.repo.commit = async (top, kind, message) => {
     await pending;
     repo.commits.push({ top, kind, message });
   };
@@ -3866,11 +3956,13 @@ test('commit shows progress until git finishes', async () => {
   assert.equal(session.busy, '');
 });
 
-test('files pane u unstages', () => {
+test('files pane u unstages', async () => {
   const item = sampleItem('a.js', 'staged');
   const { session, repo } = openSession([item], { startPane: 'files' });
   session.dispatch('next');
+  await session.ops.idle();
   session.pushInput('u');
+  await session.ops.idle();
   assert.equal(repo.unstageCalls.length, 1);
   assert.equal(session.status, 'unstaged');
 });
@@ -3937,15 +4029,18 @@ test('unit view shows the file with current block marks', () => {
   assert.equal(session.scroll, 5);
 });
 
-test('unit view marks every block in the current hunk', () => {
+test('unit view marks every block in the current hunk', async () => {
   const [first, second] = hunkPair('a.js');
   const { session, repo } = openSession([first, second], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'A\nmid\nC\n';
   session.dispatch('file');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.dispatch('open');
+  await session.ops.idle();
   session.draw();
   const body = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(body, /- a/);
@@ -3953,6 +4048,7 @@ test('unit view marks every block in the current hunk', () => {
   assert.match(body, /- c/);
   assert.match(body, /\+ C/);
   session.dispatch('add');
+  await session.ops.idle();
   assert.equal(repo.added.length, 2);
   assert.equal(session.items[0].origin, 'staged');
   assert.equal(session.items[1].origin, 'staged');
@@ -4193,25 +4289,33 @@ test('insert creates a branch, or commits, amends, or fixups', () => {
   assert.equal(commits.session.commitKind, 'fixup');
 });
 
-test('insert update keeps the selected commit and takes staged changes', () => {
+test('insert update keeps the commit and takes staged changes', async () => {
   const head = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const older = 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
   const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   assert.equal(session.mode, 'confirmCommit');
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'updated');
   assert.deepEqual(repo.updates, [head]);
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'u' });
+  await session.ops.idle();
   assert.deepEqual(repo.updates, [head, older]);
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   clickStatusChoice(session, 'u');
   assert.deepEqual(repo.updates, [head, older, older]);
   const bare = openSession([sampleItem('a.js')], { startPane: 'files' });
@@ -4223,17 +4327,21 @@ test('insert update keeps the selected commit and takes staged changes', () => {
   assert.deepEqual(bare.repo.updates, []);
 });
 
-test('new branch action asks for a name', () => {
+test('new branch action asks for a name', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
+  await session.ops.idle();
   session.dispatch('newBranch');
+  await session.ops.idle();
   assert.equal(session.pane, 'branches');
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'branch');
   session.pushInput('topic');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.deepEqual(repo.created, ['topic']);
   assert.equal(repo.listed.length, 2);
   assert.equal(session.pane, 'files');
@@ -4241,42 +4349,55 @@ test('new branch action asks for a name', () => {
   assert.match(session.status, /created topic/);
 });
 
-test('branch list r rebases current onto selected', () => {
+test('branch list r rebases current onto selected', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
+  await session.ops.idle();
   session.pushInput('e');
+  await session.ops.idle();
   assert.equal(repo.rebases.length, 0);
   session.dispatch('next');
+  await session.ops.idle();
   session.pushInput('e');
+  await session.ops.idle();
   assert.deepEqual(repo.rebases, ['feat']);
   assert.equal(repo.listed.length, 2);
   assert.match(session.status, /rebased onto feat/);
   assert.equal(session.pane, 'branches');
 });
 
-test('branch list delete asks to delete the selected branch', () => {
+test('branch list delete asks to delete the selected branch', async () => {
   const { session, repo } = openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   assert.equal(session.mode, 'confirmDrop');
   assert.equal(session.dropName, 'feat');
   session.pushInput('n');
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.mode, 'review');
   assert.equal(repo.drops.length, 0);
   session.handleEvent({ type: 'key', key: 'delete' });
+  await session.ops.idle();
   session.pushInput('y');
+  await session.ops.idle();
   assert.deepEqual(repo.drops, ['feat']);
   assert.match(session.status, /dropped feat/);
   assert.equal(session.pane, 'branches');
@@ -4345,7 +4466,7 @@ test('ops runner releases busy if after throws', async () => {
   assert.equal(runner.busy, '');
 });
 
-test('partial file add reloads after a later hunk fails', () => {
+test('partial file add reloads after a later hunk fails', async () => {
   const first = sampleItem('a.js');
   const second = sampleItem('a.js');
   second.blockId = 1;
@@ -4385,6 +4506,7 @@ test('partial file add reloads after a later hunk fails', () => {
   });
   const before = loads;
   session.dispatch('add');
+  await session.ops.idle();
   assert.equal(session.status, 'patch failed');
   assert.ok(loads > before);
   assert.equal(session.items[0].origin, 'staged');
