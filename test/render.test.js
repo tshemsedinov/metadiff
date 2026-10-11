@@ -4360,3 +4360,49 @@ test('only failures paint the status message in the error color', () => {
   const failures = ['copy failed', 'update failed', 'not logged in', 'boom'];
   for (const status of failures) assert.equal(isError(status), true, status);
 });
+
+test('the unit pane paints only the rows on screen', () => {
+  const { paintBodyUnit } = require('../lib/render/unit.js');
+  const unitLines = [];
+  for (let i = 0; i < 500; i++) {
+    const text = `const line${i} = ${i};`;
+    unitLines.push({
+      type: 'ctx',
+      text,
+      blockId: null,
+      item: null,
+      origin: '',
+    });
+  }
+  const view = {
+    pane: 'unit',
+    item: null,
+    reviewPath: 'a.js',
+    unitLine: 0,
+    unitLines,
+    index: 0,
+    total: 1,
+    scroll: 200,
+    status: '',
+    counts: { staged: 0, unstaged: 0, untracked: 0 },
+    repoName: 'demo',
+  };
+  const painted = paintBodyUnit(view, 60, false);
+  assert.equal(Array.isArray(painted.body), false);
+  assert.equal(painted.body.length, 500);
+  const paint = painted.body.paint;
+  assert.equal(typeof paint, 'function');
+  const row = paint(199);
+  assert.ok(stripAnsi(row).includes('const line199 = 199;'));
+  const frame = render.renderFrame(view, {
+    width: 60,
+    height: 12,
+    color: false,
+  });
+  const rows = frame.rows.map((line) => stripAnsi(line));
+  const shown = rows.filter((line) => /const line\d+ = \d+;/.test(line));
+  assert.equal(shown.length, frame.bodyH);
+  assert.ok(shown[0].includes('const line199 = 199;'));
+  assert.ok(shown.at(-1).includes(`const line${199 + frame.bodyH - 1} =`));
+  assert.equal(frame.scrollMax, 501 - frame.bodyH);
+});
