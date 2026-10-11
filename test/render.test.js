@@ -4331,3 +4331,32 @@ test('unit file numbers skip deleted lines', () => {
   assert.match(body, /^ 1 \+ new/m);
   assert.ok(frame.buttons.find((hit) => hit.id === 'lines'));
 });
+
+test('only failures paint the status message in the error color', () => {
+  const { paintStatusLine } = require('../lib/render/status.js');
+  const view = { pane: 'diff', files: [], counts: {} };
+  const isError = (status) =>
+    paintStatusLine(view, status, 80, true).includes(ansi.fg(THEME.errorFg));
+  const notices = [
+    'updating',
+    'rewording',
+    'running',
+    'terminated',
+    'verbose',
+    'filtered',
+    'fast on',
+    'fast off',
+    'logged in',
+    'logging in',
+    'ignored',
+    'already ignored',
+    'brief',
+    'full',
+    'installed left-pad',
+    'updated left-pad',
+    'staged',
+  ];
+  for (const status of notices) assert.equal(isError(status), false, status);
+  const failures = ['copy failed', 'update failed', 'not logged in', 'boom'];
+  for (const status of failures) assert.equal(isError(status), true, status);
+});

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const caps = require('../lib/source/capabilities.js');
 const { SOURCE_CAPS, capabilitiesFor, attachCapabilities } = caps;
 const { sessionCapabilities } = caps;
+const { createGitRepo } = require('../lib/git/git.js');
 
 const hasMethod = (source, name) => typeof source[name] === 'function';
 
@@ -60,4 +61,10 @@ test('sessionCapabilities follows rev change source and -r', () => {
     readOnly: true,
   });
   assert.equal(fromRepo.changes, false);
+});
+
+test('the local git repo can amend a commit', () => {
+  const repo = createGitRepo();
+  assert.ok(hasMethod(repo, 'updateCommit'));
+  assert.ok(hasMethod(repo, 'updateCommitAsync'));
 });

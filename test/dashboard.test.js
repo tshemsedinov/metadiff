@@ -2379,3 +2379,13 @@ test('empty dashboard panels center their message', () => {
   const scan = filesBlock({ files: { ready: false } }, 40, 5, ctx, fileTile);
   assertCentered(paint(scan, fileTile), 'scanning…');
 });
+
+test('diff groups show the age of the newest file', () => {
+  const groups = groupChanges([
+    { path: 'lib/a.js', date: '2h ago' },
+    { path: 'lib/b.js', date: '5m ago' },
+    { path: 'lib/c.js', date: '3 days ago' },
+  ]);
+  assert.equal(groups.dirs[0].date, '5m ago');
+  assert.equal(groups.exts[0].date, '5m ago');
+});
