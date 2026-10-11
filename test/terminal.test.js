@@ -6,7 +6,7 @@ const { EventEmitter } = require('node:events');
 const { setTimeout: sleep } = require('node:timers/promises');
 
 const { sink } = require('./helpers.js');
-const { watchResize } = require('../lib/common/utilities.js');
+const { watchResize } = require('../lib/session/terminal.js');
 const terminal = require('../lib/session/terminal.js');
 const { Terminal, Progress, ENTER_TERM, LEAVE_TERM } = terminal;
 

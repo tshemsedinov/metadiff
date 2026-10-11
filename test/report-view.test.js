@@ -12,7 +12,7 @@ const { paintBodyNpm } = require('../lib/render/npm.js');
 const { logViewRows, expandLogLines } = require('../lib/render/log.js');
 const ansi = require('../lib/term/ansi.js');
 const { stripAnsi, visibleWidth, fg, THEME, CODE_FG } = ansi;
-const { TABLE_KEY, formatTable } = require('../lib/runs/commands.js');
+const { TABLE_KEY, formatTable } = require('../lib/runs/output.js');
 
 const failure = (number) => [
   `not ok ${number} - comparison ${number}`,

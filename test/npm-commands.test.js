@@ -9,11 +9,24 @@ const npm = require('../lib/runs/commands.js');
 const { stripAnsi } = require('../lib/term/ansi.js');
 const { tempDir } = require('./helpers.js');
 
-const { listCommands, reduceOutput, logFileName } = npm;
-const { nextLogFile, saveLogs, readSavedRuns, readLogPair } = npm;
-const { staleLogFiles, removeStaleLogs } = npm;
-const { saveScript, removeScript, reorderScript } = npm;
-const { commandEnv, startNpm } = npm;
+const {
+  listCommands,
+  saveScript,
+  removeScript,
+  reorderScript,
+} = require('../lib/runs/scripts.js');
+const { reduceOutput } = require('../lib/runs/output.js');
+const {
+  logFileName,
+  nextLogFile,
+  saveLogs,
+  readSavedRuns,
+  readLogPair,
+  staleLogFiles,
+  removeStaleLogs,
+} = require('../lib/runs/logs.js');
+const { commandEnv } = require('../lib/runs/process.js');
+const { startNpm } = npm;
 
 const writeJson = (file, body) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -4133,8 +4133,7 @@ test('npm output drops the command background', () => {
 });
 
 test('npm output paints assertion fields as a colored table', () => {
-  const npmCommands = require('../lib/runs/commands.js');
-  const { reduceOutput } = npmCommands;
+  const { reduceOutput } = require('../lib/runs/output.js');
   const mark = String.fromCharCode(39);
   const field = (name, value) => `  ${name}: ${mark}${value}${mark}`;
   const raw = [

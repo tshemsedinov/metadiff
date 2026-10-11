@@ -172,8 +172,8 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('delete', 'commits'), 'drop');
   assert.equal(actionFromKey('c', 'commits'), 'dashCommits');
   assert.equal(actionFromKey('insert', 'commits'), 'newCommit');
-  assert.equal(keys.buttonWord('newBranch'), 'insert');
-  assert.equal(keys.actionLetter('newCommit'), 'ins');
+  assert.equal(actions.buttonWord('newBranch'), 'insert');
+  assert.equal(actions.actionLetter('newCommit'), 'ins');
   assert.equal(actionFromKey('s', 'commits'), 'push');
   assert.equal(actionFromKey('v', 'commits'), 'view');
   assert.equal(actionFromKey('m', 'commits'), 'layout');
@@ -196,7 +196,7 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('ctrl-l', 'diff'), 'lines');
   assert.equal(actionFromKey('ctrl-l', 'unit'), 'lines');
   assert.equal(actionFromKey('l', 'diff'), 'theme');
-  assert.equal(keys.buttonWord('lines'), 'ctrl+l');
+  assert.equal(actions.buttonWord('lines'), 'ctrl+l');
   assert.equal(actionFromKey('p', 'dashboard'), 'pull');
   assert.equal(actionFromKey('s', 'dashboard'), 'push');
   const dashOff = disabledActions('dashboard', null);
@@ -204,9 +204,9 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(dashOff.includes('push'), false);
   assert.equal(actionFromKey('f1', 'diff'), null);
   assert.equal(actionFromKey('f12'), null);
-  assert.equal(keys.actionLetter('feedback'), 'q');
-  assert.equal(keys.buttonWord('feedback'), 'quote');
-  assert.equal(keys.buttonWord('npmNew'), 'insert');
+  assert.equal(actions.actionLetter('feedback'), 'q');
+  assert.equal(actions.buttonWord('feedback'), 'quote');
+  assert.equal(actions.buttonWord('npmNew'), 'insert');
   assert.equal(actionFromKey('n', 'npm'), 'dashNpm');
   assert.equal(actionFromKey('d', 'npm'), 'dashDiffs');
   assert.equal(actionFromKey('delete', 'npm'), 'npmDrop');
@@ -215,8 +215,8 @@ test('actionFromKey maps aliases and ignores unbound keys', () => {
   assert.equal(actionFromKey('delete', 'packages'), 'packageDrop');
   assert.equal(actionFromKey('w', 'packages'), 'packageWanted');
   assert.equal(actionFromKey('l', 'packages'), 'packageLatest');
-  assert.equal(keys.buttonWord('packageWanted'), 'wanted');
-  assert.equal(keys.buttonWord('packageLatest'), 'latest');
+  assert.equal(actions.buttonWord('packageWanted'), 'wanted');
+  assert.equal(actions.buttonWord('packageLatest'), 'latest');
   assert.equal(actionFromKey('c', 'npm'), 'dashCommits');
   assert.equal(actionFromKey('delete', 'tasks'), 'drop');
   assert.equal(actionFromKey('j', 'files'), 'next');
@@ -450,15 +450,15 @@ test('disabledActions hides add unstage drop ignore on files todos', () => {
   assert.equal(emptyOff.includes('reword'), true);
   assert.equal(emptyOff.includes('commit'), false);
   const fixup = { sha: 'aaa', subject: 'fixup! init', canCommit: true };
-  const fixupDim = keys.commitGitDisabled(fixup);
+  const fixupDim = actions.commitGitDisabled(fixup);
   assert.equal(fixupDim.includes('apply'), false);
-  const headDim = keys.commitGitDisabled(head);
+  const headDim = actions.commitGitDisabled(head);
   assert.equal(headDim.includes('apply'), true);
   assert.equal(headDim.includes('newCommit'), false);
   const quietPending = { pending: true, sha: '', canCommit: false };
   const quietOlder = { sha: 'bbb', canCommit: false };
-  const pendingDim = keys.commitGitDisabled(quietPending);
-  const olderDim = keys.commitGitDisabled(quietOlder);
+  const pendingDim = actions.commitGitDisabled(quietPending);
+  const olderDim = actions.commitGitDisabled(quietOlder);
   assert.equal(pendingDim.includes('newCommit'), false);
   assert.equal(olderDim.includes('newCommit'), false);
   const commitLayout = layoutButtons(160, {
