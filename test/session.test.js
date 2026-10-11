@@ -1600,7 +1600,7 @@ test('tasks status switches plan files and defaults to the last one', () => {
     y: hit.y,
     press: false,
   });
-  assert.equal(session.planOpen, false);
+  assert.equal(session.composer.tasks.planOpen, false);
   assert.match(session.composer.tasks.planName(), /2020-01-01-00\.md/);
   assert.equal(session.notes.tasks[0].text, 'from older');
 });
@@ -1704,16 +1704,16 @@ test('tasks plan hotkey opens the combo and can start a new plan', () => {
     y: place.y,
     press: false,
   });
-  assert.equal(session.planOpen, true);
+  assert.equal(session.composer.tasks.planOpen, true);
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: 'p' });
-  assert.equal(session.planOpen, true);
+  assert.equal(session.composer.tasks.planOpen, true);
   session.draw();
   const menu = stripAnsi(session.lastFrame.rows.join('\n'));
   assert.match(menu, /<new plan>/);
   session.handleEvent({ type: 'key', key: 'end' });
   session.handleEvent({ type: 'key', key: 'enter' });
-  assert.equal(session.planOpen, false);
+  assert.equal(session.composer.tasks.planOpen, false);
   const created = session.composer.tasks.planName();
   assert.match(created, new RegExp(`^${dateStamp()}-\\d+\\.md$`));
   assert.notEqual(created, name);
@@ -5985,7 +5985,7 @@ test('find import and plan lines select and use the clipboard', () => {
   press(session, 'shift-right');
   assert.equal(session.composer.tasks.planPick.editor.selectedText(), 'pl');
   press(session, 'end');
-  assert.equal(session.planOpen, true);
+  assert.equal(session.composer.tasks.planOpen, true);
 });
 
 test('slash searches paths on the files and diff screens', () => {
