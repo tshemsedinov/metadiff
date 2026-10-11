@@ -6,12 +6,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const update = require('../lib/update.js');
+const update = require('../lib/session/update.js');
 const { isNpmInstall, cacheFile } = update;
 const { readCache, writeCache, isFresh, planUpdate } = update;
 const { checkUpdate, markSkipped } = update;
 const { CHECK_INTERVAL_MS } = update;
-const { parseVersion, cmpVersion } = require('../lib/utilities.js');
+const { parseVersion, cmpVersion } = require('../lib/common/utilities.js');
 const { tempDir } = require('./helpers.js');
 
 const cachePath = () => path.join(tempDir('reslop-cache-'), 'update.json');

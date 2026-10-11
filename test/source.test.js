@@ -3,7 +3,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { selectChangeSource, createLoadedSource } = require('../lib/source.js');
+const {
+  selectChangeSource,
+  createLoadedSource,
+} = require('../lib/source/source.js');
 
 test('selectChangeSource recognizes a GitHub pull request URL', () => {
   const url = 'https://github.com/acme/app/pull/123';
@@ -100,13 +103,13 @@ test('selectChangeSource keeps local paths and commits', () => {
   });
 });
 
-test('createLoadedSource is read only and returns a copy of items', () => {
+test('createLoadedSource is read only and copies its items', async () => {
   const item = { origin: 'pr', file: { newPath: 'a.js' } };
   const loaded = { items: [item], sourceLabel: '#1' };
   const source = createLoadedSource(loaded);
-  const first = source.load();
+  const first = await source.load();
   first.items.push({ origin: 'task' });
-  const second = source.load();
+  const second = await source.load();
   assert.equal(second.items.length, 1);
   assert.equal(typeof source.add, 'undefined');
   assert.equal(typeof source.unstage, 'undefined');

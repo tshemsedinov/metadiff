@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-const { run, errorMessage } = require('../lib/cli.js');
-const { LEAVE_TERM } = require('../lib/session.js');
+const { errorMessage } = require('../lib/common/utilities.js');
 
 const fail = (reason) => {
   try {
+    const { LEAVE_TERM } = require('../lib/session/terminal.js');
     process.stdout.write(LEAVE_TERM);
   } catch {
     // ignore
@@ -17,4 +17,9 @@ const fail = (reason) => {
 process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
 
-run(process).then((code) => process.exit(code), fail);
+const start = () => {
+  if (process.argv[2] !== 't') return require('../lib/cli.js').run(process);
+  return require('../lib/report/run.js').runCapture(process, {});
+};
+
+start().then((code) => process.exit(code), fail);

@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { npmOpts } = require('../lib/utilities.js');
+const { npmOpts } = require('../lib/common/process.js');
 
 test('npmOpts uses a shell only on Windows', () => {
   const win = npmOpts({ cwd: 'C:\\repo' }, 'win32');

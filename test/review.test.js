@@ -6,14 +6,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const review = require('../lib/review.js');
+const review = require('../lib/review/review.js');
 const { ReviewController } = require('../lib/session/review.js');
 const { allocateReviewPath, rankedTemplates } = review;
-const { prefixTemplates, upsertTemplate, createStore } = review;
-const { hasNotes, setFeedback, setCode, noteCounts, rememberTemplate } = review;
-const { addTask, removeTask, setTaskText, setTaskDone } = review;
+const { prefixTemplates, upsertTemplate, ReviewStore } = review;
+const { hasNotes, noteCounts } = review;
 const { serializeReview } = review;
-const { applyImportedNotes, flushReview, loadTemplates, parseReview } = review;
+const { flushReview, loadTemplates, parseReview } = review;
 const { resolveReviewPath, latestReviewName, parseFrontmatterStatus } = review;
 
 test('allocateReviewPath uses 00 then 01 on the same day', () => {
@@ -111,26 +110,26 @@ test('upsertTemplate increments matching text', () => {
 });
 
 test('rememberTemplate skips when the same hunk text is saved again', () => {
-  const store = createStore('/tmp/x.md');
-  rememberTemplate(store, '', 'extract helper');
+  const store = new ReviewStore('/tmp/x.md');
+  store.rememberTemplate('', 'extract helper');
   assert.deepEqual(store.templates, [{ text: 'extract helper', count: 1 }]);
-  rememberTemplate(store, 'extract helper', 'extract helper');
+  store.rememberTemplate('extract helper', 'extract helper');
   assert.equal(store.templates[0].count, 1);
-  rememberTemplate(store, 'extract helper', 'extract helper\n');
+  store.rememberTemplate('extract helper', 'extract helper\n');
   assert.equal(store.templates[0].count, 1);
 });
 
 test('rememberTemplate increments when reused on a new hunk', () => {
-  const store = createStore('/tmp/x.md');
-  rememberTemplate(store, '', 'extract helper');
-  rememberTemplate(store, '', 'extract helper');
+  const store = new ReviewStore('/tmp/x.md');
+  store.rememberTemplate('', 'extract helper');
+  store.rememberTemplate('', 'extract helper');
   assert.equal(store.templates[0].count, 2);
 });
 
 test('serializeReview groups todos then feedback with position', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  addTask(store, 'lib/session.js', 'rewrite the retry loop');
-  setFeedback(store, 'unstaged:lib/session.js:84:84:0', {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.addTask('lib/session.js', 'rewrite the retry loop');
+  store.setFeedback('unstaged:lib/session.js:84:84:0', {
     file: 'lib/session.js',
     oldStart: 84,
     newStart: 84,
@@ -157,9 +156,9 @@ test('serializeReview groups todos then feedback with position', () => {
 });
 
 test('serializeReview writes ready when status is ready', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
   store.status = 'ready';
-  addTask(store, 'a.js', 'follow up');
+  store.addTask('a.js', 'follow up');
   const md = serializeReview(store);
   assert.match(md, /status: ready/);
   assert.match(md, /Execute reviews with `status` `ready, partial, editing`/);
@@ -183,10 +182,10 @@ test('parseFrontmatterStatus maps pending to ready', () => {
 });
 
 test('parseReview restores todos and feedback keys', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  addTask(store, 'lib/session.js', 'rewrite the retry loop');
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.addTask('lib/session.js', 'rewrite the retry loop');
   const key = 'lib/session.js:84:84:0';
-  setFeedback(store, key, {
+  store.setFeedback(key, {
     file: 'lib/session.js',
     oldStart: 84,
     newStart: 84,
@@ -264,13 +263,13 @@ test('parseReview keeps checked todos and feedback', () => {
 
 test('noteCounts counts filled feedback todos and code', () => {
   const empty = { feedback: 0, tasks: 0, tasksDone: 0, code: 0 };
-  const store = createStore('/repo/.plan/x.md');
+  const store = new ReviewStore('/repo/.plan/x.md');
   assert.deepEqual(noteCounts(null), empty);
   assert.deepEqual(noteCounts(store), empty);
-  addTask(store, 'a.js', '');
+  store.addTask('a.js', '');
   assert.deepEqual(noteCounts(store), empty);
-  addTask(store, 'a.js', 'rewrite loop');
-  setFeedback(store, 'a.js:1:1:0', {
+  store.addTask('a.js', 'rewrite loop');
+  store.setFeedback('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -285,7 +284,7 @@ test('noteCounts counts filled feedback todos and code', () => {
   });
   store.tasks[1].done = true;
   assert.equal(noteCounts(store).tasksDone, 1);
-  setCode(store, 'a.js:1:1:0', {
+  store.setCode('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -302,9 +301,9 @@ test('noteCounts counts filled feedback todos and code', () => {
 });
 
 test('empty text is omitted from markdown and hasNotes', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  addTask(store, 'a.js', '   ');
-  setFeedback(store, 'k', {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.addTask('a.js', '   ');
+  store.setFeedback('k', {
     file: 'a.js',
     newStart: 1,
     text: '',
@@ -318,13 +317,13 @@ test('empty text is omitted from markdown and hasNotes', () => {
 });
 
 test('setFeedback keeps one latest note per key', () => {
-  const store = createStore('/tmp/x.md');
-  setFeedback(store, 'k', {
+  const store = new ReviewStore('/tmp/x.md');
+  store.setFeedback('k', {
     file: 'a.js',
     newStart: 1,
     text: 'first draft',
   });
-  setFeedback(store, 'k', {
+  store.setFeedback('k', {
     file: 'a.js',
     newStart: 1,
     text: 'latest',
@@ -340,40 +339,40 @@ test('setFeedback keeps one latest note per key', () => {
 });
 
 test('removeTask drops a todo by id', () => {
-  const store = createStore('/tmp/x.md');
-  const first = addTask(store, 'a.js', 'keep');
-  const second = addTask(store, 'a.js', 'drop');
-  assert.equal(removeTask(store, second.id), true);
+  const store = new ReviewStore('/tmp/x.md');
+  const first = store.addTask('a.js', 'keep');
+  const second = store.addTask('a.js', 'drop');
+  assert.equal(store.removeTask(second.id), true);
   assert.deepEqual(
     store.tasks.map((todo) => todo.id),
     [first.id],
   );
-  assert.equal(removeTask(store, 99), false);
+  assert.equal(store.removeTask(99), false);
   assert.equal(store.tasks.length, 1);
 });
 
 test('setTaskDone keeps the text and round-trips through the file', () => {
-  const store = createStore('/tmp/x.md');
-  const todo = addTask(store, 'a.js', 'ship it');
-  setTaskDone(store, todo.id, true);
+  const store = new ReviewStore('/tmp/x.md');
+  const todo = store.addTask('a.js', 'ship it');
+  store.setTaskDone(todo.id, true);
   assert.equal(store.tasks[0].done, true);
   assert.equal(store.tasks[0].text, 'ship it');
   const loaded = parseReview(serializeReview(store), store.reviewPath);
   assert.equal(loaded.tasks[0].done, true);
   assert.equal(loaded.tasks[0].text, 'ship it');
-  setTaskDone(store, todo.id, false);
+  store.setTaskDone(todo.id, false);
   assert.equal(store.tasks[0].done, false);
 });
 
 test('setTaskText deletes empty todos without template history', () => {
-  const store = createStore('/tmp/x.md');
-  const todo = addTask(store, 'a.js', '');
-  setTaskText(store, todo.id, 'add tests');
-  setTaskText(store, todo.id, 'add tests please');
+  const store = new ReviewStore('/tmp/x.md');
+  const todo = store.addTask('a.js', '');
+  store.setTaskText(todo.id, 'add tests');
+  store.setTaskText(todo.id, 'add tests please');
   assert.equal(store.tasks.length, 1);
   assert.equal(store.tasks[0].text, 'add tests please');
   assert.equal(store.templates.length, 0);
-  setTaskText(store, todo.id, '');
+  store.setTaskText(todo.id, '');
   assert.equal(store.tasks.length, 0);
 });
 
@@ -381,8 +380,8 @@ test('flushReview writes markdown and templates when notes exist', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
     const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
-    const store = createStore(reviewPath);
-    setFeedback(store, 'k', {
+    const store = new ReviewStore(reviewPath);
+    store.setFeedback('k', {
       file: 'a.js',
       newStart: 3,
       blockId: 0,
@@ -434,10 +433,10 @@ test('flushReview merges disk todos instead of overwriting', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
     const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
-    const store = createStore(reviewPath);
-    addTask(store, 'TODOs', 'alpha');
-    const beta = addTask(store, 'TODOs', 'beta');
-    setFeedback(store, 'a.js:1:1:0', {
+    const store = new ReviewStore(reviewPath);
+    store.addTask('TODOs', 'alpha');
+    const beta = store.addTask('TODOs', 'beta');
+    store.setFeedback('a.js:1:1:0', {
       file: 'a.js',
       oldStart: 1,
       newStart: 1,
@@ -451,8 +450,8 @@ test('flushReview merges disk todos instead of overwriting', () => {
       .replace('rename this', 'rename that')
       .replace('- [ ] beta\n', '- [ ] beta\n- [ ] gamma\n');
     fs.writeFileSync(reviewPath, edited);
-    setTaskText(store, beta.id, 'beta two');
-    addTask(store, 'TODOs', 'delta');
+    store.setTaskText(beta.id, 'beta two');
+    store.addTask('TODOs', 'delta');
     assert.equal(flushReview(store), true);
     const loaded = parseReview(fs.readFileSync(reviewPath, 'utf8'), reviewPath);
     const texts = loaded.tasks.map((todo) => {
@@ -472,7 +471,7 @@ test('flushReview skips write when there are no notes', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-review-'));
   try {
     const reviewPath = path.join(dir, '.plan', '2026-09-07-00.md');
-    const store = createStore(reviewPath);
+    const store = new ReviewStore(reviewPath);
     store.dirty = true;
     const wrote = flushReview(store);
     assert.equal(wrote, false);
@@ -519,10 +518,10 @@ test('parseReview reads a legacy TODOs heading as technical debt', () => {
 });
 
 test('serializeReview collects todos under Backlog not file headings', () => {
-  const store = createStore('/tmp/x.md');
-  addTask(store, 'a.js', 'todo a');
-  addTask(store, 'b.js', 'todo b');
-  setFeedback(store, 'k', {
+  const store = new ReviewStore('/tmp/x.md');
+  store.addTask('a.js', 'todo a');
+  store.addTask('b.js', 'todo b');
+  store.setFeedback('k', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -546,11 +545,11 @@ test('serializeReview collects todos under Backlog not file headings', () => {
 });
 
 test('serializeReview keeps each task list under its heading', () => {
-  const store = createStore('/tmp/x.md');
-  addTask(store, 'TODOs', 'later', false, 'backlog');
-  addTask(store, 'TODOs', 'crash', false, 'bugs');
-  addTask(store, 'TODOs', 'dark mode', true, 'features');
-  addTask(store, 'TODOs', 'login', false, 'issues');
+  const store = new ReviewStore('/tmp/x.md');
+  store.addTask('TODOs', 'later', false, 'backlog');
+  store.addTask('TODOs', 'crash', false, 'bugs');
+  store.addTask('TODOs', 'dark mode', true, 'features');
+  store.addTask('TODOs', 'login', false, 'issues');
   const md = serializeReview(store);
   const features = md.indexOf('## Feature requests and Enhancements');
   const bugs = md.indexOf('## Bug Reports and Fixes');
@@ -574,10 +573,10 @@ test('serializeReview keeps each task list under its heading', () => {
 });
 
 test('serializeReview places improvements after feature requests', () => {
-  const store = createStore('/tmp/x.md');
-  addTask(store, 'TODOs', 'dark mode', false, 'features');
-  addTask(store, 'TODOs', 'polish', false, 'improvements');
-  addTask(store, 'TODOs', 'crash', false, 'bugs');
+  const store = new ReviewStore('/tmp/x.md');
+  store.addTask('TODOs', 'dark mode', false, 'features');
+  store.addTask('TODOs', 'polish', false, 'improvements');
+  store.addTask('TODOs', 'crash', false, 'bugs');
   const md = serializeReview(store);
   const features = md.indexOf('## Feature requests and Enhancements');
   const improvements = md.indexOf('## Improvements');
@@ -618,8 +617,8 @@ test('parseReview still reads the previous section titles', () => {
 });
 
 test('applyImportedNotes maps comments onto feedback and todos', () => {
-  const store = createStore('/tmp/x.md');
-  applyImportedNotes(store, {
+  const store = new ReviewStore('/tmp/x.md');
+  store.applyImportedNotes({
     feedback: [
       {
         file: 'lib/parser.js',
@@ -657,26 +656,26 @@ test('applyImportedNotes maps comments onto feedback and todos', () => {
 });
 
 test('applyImportedNotes skips an identical issue and adds an edit', () => {
-  const store = createStore('/tmp/x.md');
+  const store = new ReviewStore('/tmp/x.md');
   const page = 'https://github.com/acme/app/issues/12';
   const same = {
     file: 'issue',
     text: `@alice at github: Add import\n\nfrom the cli\nIssue: ${page}`,
     done: false,
   };
-  applyImportedNotes(store, { tasks: [same, same] });
+  store.applyImportedNotes({ tasks: [same, same] });
   assert.equal(store.tasks.length, 1);
-  applyImportedNotes(store, { tasks: [same] });
+  store.applyImportedNotes({ tasks: [same] });
   assert.equal(store.tasks.length, 1);
   const saved = store.tasks[0].text.trim().replace(/\n/g, ' ');
   store.tasks[0] = { ...store.tasks[0], text: saved };
-  applyImportedNotes(store, { tasks: [same] });
+  store.applyImportedNotes({ tasks: [same] });
   assert.equal(store.tasks.length, 1);
   const edited = {
     ...same,
     text: `@alice at github: Add import\n\nplease\nIssue: ${page}`,
   };
-  applyImportedNotes(store, { tasks: [edited] });
+  store.applyImportedNotes({ tasks: [edited] });
   assert.equal(store.tasks.length, 2);
   assert.match(store.tasks[1].text, /please/);
 });
@@ -690,7 +689,7 @@ test('a resumed plan imports an edited issue and skips the same one', () => {
   };
   const pull = { file: 'pull request', text: 'add tests', done: false };
   const first = new ReviewController();
-  first.store = createStore('/tmp/plan.md');
+  first.store = new ReviewStore('/tmp/plan.md');
   first.didResume = true;
   first.applyImported({ tasks: [same, pull] });
   assert.equal(first.store.tasks.length, 1);
@@ -710,8 +709,8 @@ test('a resumed plan imports an edited issue and skips the same one', () => {
 });
 
 test('applyImportedNotes keeps feedback open if any comment is open', () => {
-  const store = createStore('/tmp/x.md');
-  applyImportedNotes(store, {
+  const store = new ReviewStore('/tmp/x.md');
+  store.applyImportedNotes({
     feedback: [
       {
         file: 'a.js',
@@ -735,8 +734,8 @@ test('applyImportedNotes keeps feedback open if any comment is open', () => {
 });
 
 test('imported feedback serializes reviewer and location once', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  applyImportedNotes(store, {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.applyImportedNotes({
     feedback: [
       {
         file: 'lib/websocket/frameParser.js',
@@ -761,8 +760,8 @@ test('imported feedback serializes reviewer and location once', () => {
 });
 
 test('serializeReview writes fenced code proposals', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  setCode(store, 'a.js:1:1:0', {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.setCode('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -780,8 +779,8 @@ test('serializeReview writes fenced code proposals', () => {
 });
 
 test('code proposal with fence markers uses a longer fence', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  setCode(store, 'a.js:1:1:0', {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.setCode('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,
@@ -795,8 +794,8 @@ test('code proposal with fence markers uses a longer fence', () => {
 });
 
 test('empty code proposal still counts as a note', () => {
-  const store = createStore('/repo/.plan/2026-09-07-00.md');
-  setCode(store, 'a.js:1:1:0', {
+  const store = new ReviewStore('/repo/.plan/2026-09-07-00.md');
+  store.setCode('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
     newStart: 1,

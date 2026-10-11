@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { captureBaseline, mergeReview } = require('../lib/review-merge.js');
+const { captureBaseline, mergeReview } = require('../lib/review/merge.js');
 
 const todo = (id, text, done = false) => ({ id, file: 'TODO', text, done });
 

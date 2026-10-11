@@ -5,14 +5,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { tempDir } = require('./helpers.js');
-const { buildDocument } = require('../lib/report-parse.js');
-const { renderDocument } = require('../lib/report-render.js');
-const { renderReport } = require('../lib/render/report.js');
-const renderNpm = require('../lib/render/npm.js');
-const { paintBodyNpm, logViewRows, expandLogLines } = renderNpm;
-const ansi = require('../lib/ansi.js');
+const { buildDocument } = require('../lib/report/parse.js');
+const report = require('../lib/report/render.js');
+const { renderDocument, renderReport } = report;
+const { paintBodyNpm } = require('../lib/render/npm.js');
+const { logViewRows, expandLogLines } = require('../lib/render/log.js');
+const ansi = require('../lib/term/ansi.js');
 const { stripAnsi, visibleWidth, fg, THEME, CODE_FG } = ansi;
-const { TABLE_KEY, formatTable } = require('../lib/npm-commands.js');
+const { TABLE_KEY, formatTable } = require('../lib/runs/output.js');
 
 const failure = (number) => [
   `not ok ${number} - comparison ${number}`,
@@ -144,7 +144,7 @@ test(prettyView, async () => {
   const root = tempDir();
   try {
     let finish = null;
-    const { NpmController } = require('../lib/session/npm.js');
+    const { NpmController } = require('../lib/session/npm/npm.js');
     const ui = {
       top: root,
       nav: { npmCursor: 0 },

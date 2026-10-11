@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const { spawnBase } = require('../lib/utilities.js');
+const { spawnBase } = require('../lib/common/process.js');
 const paths = require('./install-paths.js');
 const { IS_WIN, MARK_BEGIN, MARK_END, home, destDir, dest } = paths;
 const { stripMarkedBlock } = paths;

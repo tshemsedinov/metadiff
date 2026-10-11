@@ -3,8 +3,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const files = require('../lib/files.js');
-const { fileEntries, fileStatus, itemPath, relativeAge, shortAge } = files;
+const files = require('../lib/common/files.js');
+const { fileEntries, fileStatus, itemPath } = files;
+const format = require('../lib/common/format.js');
+const { relativeAge, shortAge, ageSeconds } = format;
 const { TASKS_FILE, REPO_TASKS_LABEL, isTasksEntry, isTaskItem } = files;
 const { fileTotals, isTotalEntry, TOTAL_LABEL } = files;
 
@@ -212,4 +214,13 @@ test('fileEntries lists lockfile changes under package.json', () => {
   assert.equal(entries[0].status, 'partial');
   assert.equal(entries[1].path, 'packages/app/package.json');
   assert.equal(entries[1].remaining, 1);
+});
+
+test('ageSeconds reads long, short and unknown ages', () => {
+  assert.equal(ageSeconds('5 minutes ago'), 300);
+  assert.equal(ageSeconds('5m ago'), 300);
+  assert.equal(ageSeconds('2h ago'), 7200);
+  assert.equal(ageSeconds('1mo ago'), 2592000);
+  assert.equal(ageSeconds('yesterday'), 86400);
+  assert.equal(ageSeconds('some day'), Number.POSITIVE_INFINITY);
 });

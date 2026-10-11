@@ -6,9 +6,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { tempDir } = require('./helpers.js');
-const { buildDocument } = require('../lib/report-parse.js');
-const { renderDocument } = require('../lib/report-render.js');
-const { renderReport } = require('../lib/render/report.js');
+const { buildDocument } = require('../lib/report/parse.js');
+const report = require('../lib/report/render.js');
+const { renderDocument, renderReport } = report;
 
 const fixture = String.raw`
 'use strict';
@@ -84,7 +84,7 @@ for (const reporter of ['tap', 'spec']) {
       assert.match(preview, /count: 4/);
       assert.match(preview, /omitted: 1/);
       assert.ok(!preview.includes(repeated.key));
-      const npm = require('../lib/session/npm.js');
+      const npm = require('../lib/session/npm/npm.js');
       const ui = {
         top: root,
         nav: { npmCursor: 0 },
@@ -131,7 +131,7 @@ for (const reporter of ['tap', 'spec']) {
 }
 
 test('raw error key keeps types and exact origin coordinates', () => {
-  const model = require('../lib/report-model.js');
+  const model = require('../lib/report/model.js');
   const { errorKey } = model;
   const first = errorKey(
     { message: 'TypeError: same failure' },
@@ -153,7 +153,7 @@ test('raw error key keeps types and exact origin coordinates', () => {
 });
 
 test('raw error key ignores internal frames and calling tests', () => {
-  const model = require('../lib/report-model.js');
+  const model = require('../lib/report/model.js');
   const { errorKey } = model;
   const fields = { message: 'TypeError: same failure' };
   const first = errorKey(

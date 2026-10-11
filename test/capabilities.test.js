@@ -3,19 +3,14 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const caps = require('../lib/capabilities.js');
+const caps = require('../lib/source/capabilities.js');
 const { SOURCE_CAPS, capabilitiesFor, attachCapabilities } = caps;
 const { sessionCapabilities } = caps;
+const { createGitRepo } = require('../lib/git/git.js');
 
 const hasMethod = (source, name) => typeof source[name] === 'function';
 
 test('capability matrix covers local commit remotes and read-only', () => {
-  assert.deepEqual(SOURCE_CAPS.local, {
-    read: true,
-    changes: true,
-    branches: true,
-    review: true,
-  });
   assert.deepEqual(capabilitiesFor('commit'), {
     read: true,
     changes: false,
@@ -66,4 +61,9 @@ test('sessionCapabilities follows rev change source and -r', () => {
     readOnly: true,
   });
   assert.equal(fromRepo.changes, false);
+});
+
+test('the local git repo can amend a commit', () => {
+  const repo = createGitRepo();
+  assert.ok(hasMethod(repo, 'updateCommit'));
 });

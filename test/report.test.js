@@ -5,16 +5,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildDocument } = require('../lib/report-parse.js');
-const render = require('../lib/report-render.js');
+const { buildDocument } = require('../lib/report/parse.js');
+const render = require('../lib/report/render.js');
 
 const { renderDocument, notice, NOTICE_HEAD, displayMessage } = render;
 const { run } = require('../lib/cli.js');
-const { winCommand } = require('../lib/report-run.js');
-const { readRuns } = require('../lib/runs.js');
+const { winCommand } = require('../lib/report/run.js');
+const { readRuns } = require('../lib/runs/runs.js');
 const { sink, tempDir } = require('./helpers.js');
 
-const model = require('../lib/report-model.js');
+const model = require('../lib/report/model.js');
 const { problem, groupReport } = model;
 
 const ROOT = '/repo';

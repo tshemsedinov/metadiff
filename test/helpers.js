@@ -13,6 +13,13 @@ const gitEnv = {
   GIT_COMMITTER_EMAIL: 'test@example.com',
 };
 
+const RM_OPTIONS = {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 100,
+};
+
 const makeRepo = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reslop-'));
   const git = (args, input) => {
@@ -41,14 +48,7 @@ const makeRepo = () => {
   };
   const read = (rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   const exists = (rel) => fs.existsSync(path.join(dir, rel));
-  const cleanup = () => {
-    fs.rmSync(dir, {
-      recursive: true,
-      force: true,
-      maxRetries: 10,
-      retryDelay: 100,
-    });
-  };
+  const cleanup = () => fs.rmSync(dir, RM_OPTIONS);
   return { dir, git, write, read, exists, cleanup };
 };
 
@@ -75,12 +75,6 @@ const uiSink = () => {
 const tempDir = (prefix = 'reslop-') =>
   fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 
-const ttySink = () => {
-  const stream = sink();
-  stream.isTTY = true;
-  return stream;
-};
-
 const sampleHunk = (lines) => ({
   oldStart: 1,
   oldCount: 1,
@@ -90,27 +84,7 @@ const sampleHunk = (lines) => ({
   lines,
 });
 
-const RETRYABLE = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
-
-const wait = (ms) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-const removeTree = async (dir) => {
-  const options = { recursive: true, force: true };
-  const limit = 12;
-  for (let attempt = 0; attempt < limit; attempt++) {
-    try {
-      await fs.promises.rm(dir, options);
-      return;
-    } catch (error) {
-      const locked = RETRYABLE.has(error.code);
-      if (!locked || attempt === limit - 1) throw error;
-      await wait(50 * (attempt + 1));
-    }
-  }
-};
+const removeTree = (dir) => fs.promises.rm(dir, RM_OPTIONS);
 
 const reviewView = (item, extra = {}) => ({
   item,
@@ -128,7 +102,6 @@ module.exports = {
   sink,
   uiSink,
   tempDir,
-  ttySink,
   sampleHunk,
   reviewView,
   removeTree,

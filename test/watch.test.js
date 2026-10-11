@@ -5,10 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { Session } = require('../lib/session.js');
-const { addTask } = require('../lib/review.js');
+const { Session } = require('../lib/session/session.js');
 const { restoredIndex, alignLoadedItems } = require('../lib/session/items.js');
-const watch = require('../lib/session/watch.js');
+const watch = require('../lib/dashboard/watch.js');
 const { ignoredRel, isOwnDirEvent, unchangedSince } = watch;
 const { DiskWatcher, DEBOUNCE_MS } = watch;
 const { uiSink, tempDir } = require('./helpers.js');
@@ -64,7 +63,7 @@ const mockRepo = (initial, top) => {
   };
 };
 
-const openWatched = (list, extra = {}) => {
+const openWatched = async (list, extra = {}) => {
   const cwd = extra.cwd ?? tempDir('reslop-watch-');
   const repo = extra.repo ?? mockRepo(list, cwd);
   const session = new Session({
@@ -75,7 +74,7 @@ const openWatched = (list, extra = {}) => {
     stdout: extra.stdout ?? uiSink(),
     repo,
   });
-  session.load();
+  await session.load();
   return { session, repo, cwd };
 };
 
@@ -239,10 +238,10 @@ test('restoredIndex keeps the same changed lines when headers collide', () => {
   assert.equal(restoredIndex([other, remain], here), 1);
 });
 
-test('ignoreWatch skips the next disk reload', () => {
+test('ignoreWatch skips the next disk reload', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.lifecycle.ignoreWatch();
   repo.setItems([a, b]);
@@ -290,11 +289,11 @@ test('alignLoadedItems keeps order when origin and headers change', () => {
   assert.equal(ordered[1].hunk.oldStart, 8);
 });
 
-test('watch reload keeps item order after origin change', () => {
+test('watch reload keeps item order after origin change', async () => {
   const a = sampleItem('a.js', { text: 'a' });
   const b = sampleItem('b.js', { text: 'b' });
   const c = sampleItem('c.js', { text: 'c' });
-  const { session, repo } = openWatched([a, b, c]);
+  const { session, repo } = await openWatched([a, b, c]);
   session.uiOpen = true;
   session.index = 1;
   repo.setItems([{ ...b, origin: 'staged' }, a, c]);
@@ -315,13 +314,14 @@ test('restoredIndex keeps a shifted hunk on the same file', () => {
   assert.equal(restoredIndex([other, moved], before), 1);
 });
 
-test('disk watch reloads without leaving the current screen', () => {
+test('disk watch reloads without leaving the current screen', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
-  const { session, repo } = openWatched([a, b]);
+  const { session, repo } = await openWatched([a, b]);
   session.uiOpen = true;
   session.dispatch('next');
+  await session.ops.idle();
   session.scroll = 6;
   session.selection = { start: { x: 1, y: 1 }, end: { x: 2, y: 1 } };
   session.dismissed.add('unstaged:gone.js:1:1:0');
@@ -342,11 +342,11 @@ test('disk watch reloads without leaving the current screen', () => {
   assert.equal(session.mode, 'review');
 });
 
-test('disk watch keeps the files pane on the same path', () => {
+test('disk watch keeps the files pane on the same path', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const extra = sampleItem('0.js');
-  const { session, repo } = openWatched([a, b], { startPane: 'files' });
+  const { session, repo } = await openWatched([a, b], { startPane: 'files' });
   session.uiOpen = true;
   session.dispatch('next');
   session.dispatch('prev');
@@ -358,10 +358,10 @@ test('disk watch keeps the files pane on the same path', () => {
   assert.equal(session.busy, '');
 });
 
-test('disk watch follows a hunk whose line numbers moved', () => {
+test('disk watch follows a hunk whose line numbers moved', async () => {
   const before = sampleItem('a.js', { oldStart: 1, newStart: 1 });
   const moved = sampleItem('a.js', { oldStart: 12, newStart: 12, text: 'y' });
-  const { session, repo } = openWatched([before]);
+  const { session, repo } = await openWatched([before]);
   session.uiOpen = true;
   session.scroll = 4;
   repo.setItems([moved]);
@@ -375,7 +375,7 @@ test('disk watch follows a hunk whose line numbers moved', () => {
 test('compose defers disk reload until the editor closes', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.dispatch('feedback');
   repo.setItems([a, b]);
@@ -393,7 +393,7 @@ test('compose defers disk reload until the editor closes', async () => {
 test('busy git work defers disk reload', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.gitBusy = true;
   repo.setItems([a, b]);
@@ -404,10 +404,10 @@ test('busy git work defers disk reload', async () => {
   assert.equal(session.items.length, 2);
 });
 
-test('npm extras do not block a disk reload', () => {
+test('npm extras do not block a disk reload', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.busy = 'checking npm';
   repo.setItems([a, b]);
@@ -481,23 +481,24 @@ test('disk watcher keeps a code change during a review write', async () => {
   }
 });
 
-test('leaving todos reloads the file list', () => {
+test('leaving todos reloads the file list', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.composer.tasks.openTasksPage();
   repo.setItems([a, b]);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   assert.equal(session.tasksOpen, false);
   assert.equal(session.items.length, 2);
 });
 
-test('editing a todo applies a deferred reload on exit', () => {
+test('editing a todo applies a deferred reload on exit', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a]);
+  const { session, repo } = await openWatched([a]);
   session.uiOpen = true;
   session.composer.tasks.openTasksPage();
   session.composer.tasks.editFocusedTask();
@@ -506,20 +507,22 @@ test('editing a todo applies a deferred reload on exit', () => {
   session.lifecycle.onDiskChange();
   assert.equal(session.items.length, 1);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.tasksOpen, true);
   assert.equal(session.items.length, 1);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   assert.equal(session.items.length, 2);
 });
 
-test('review file change merges into the open todo list', () => {
-  const { session } = openWatched([sampleItem('a.js')]);
+test('review file change merges into the open todo list', async () => {
+  const { session } = await openWatched([sampleItem('a.js')]);
   session.uiOpen = true;
   session.dispatch('tasks');
   session.pushInput('alpha');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTask(session.notes, 'TODOs', 'beta');
+  session.notes.addTask('TODOs', 'beta');
   const file = session.notes.reviewPath;
   const md = fs.readFileSync(file, 'utf8');
   const next = md.replace('- [ ] alpha\n', '- [ ] alpha\n- [ ] gamma\n');
@@ -529,13 +532,13 @@ test('review file change merges into the open todo list', () => {
   assert.deepEqual(texts, ['alpha', 'gamma', 'beta']);
 });
 
-test('external todo edits replace the line instead of stacking', () => {
-  const { session } = openWatched([sampleItem('a.js')]);
+test('external todo edits replace the line instead of stacking', async () => {
+  const { session } = await openWatched([sampleItem('a.js')]);
   session.uiOpen = true;
   session.dispatch('tasks');
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'escape' });
-  addTask(session.notes, 'TODOs', 'beta');
+  session.notes.addTask('TODOs', 'beta');
   const edited = session.notes.tasks[0].id;
   const file = session.notes.reviewPath;
   const writeLine = (text) => {
@@ -552,18 +555,19 @@ test('external todo edits replace the line instead of stacking', () => {
   assert.equal(session.notes.tasks[0].id, edited);
 });
 
-test('leaving branches reloads the file list', () => {
+test('leaving branches reloads the file list', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openWatched([a], { startPane: 'branches' });
+  const { session, repo } = await openWatched([a], { startPane: 'branches' });
   session.uiOpen = true;
   repo.setItems([a, b]);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   assert.equal(session.items.length, 2);
 });
 
-test('commits pane reloads when HEAD moves outside reslop', () => {
+test('commits pane reloads when HEAD moves outside reslop', async () => {
   const cwd = tempDir('reslop-watch-');
   fs.mkdirSync(path.join(cwd, '.git', 'logs'), { recursive: true });
   const logHead = path.join(cwd, '.git', 'logs', 'HEAD');
@@ -575,9 +579,10 @@ test('commits pane reloads when HEAD moves outside reslop', () => {
     load: () => ({ top: cwd, items: [], branch: 'main' }),
     listCommits: () => commitList,
   };
-  const { session } = openWatched([], { cwd, repo, startPane: 'files' });
+  const { session } = await openWatched([], { cwd, repo, startPane: 'files' });
   session.uiOpen = true;
   session.pushInput('c');
+  await session.ops.idle();
   assert.equal(session.pane, 'commits');
   assert.equal(session.view().commits[1].subject, 'first');
   commitList = [
@@ -594,11 +599,10 @@ test('async disk watch does not flash a loading state', async () => {
   const b = sampleItem('b.js');
   const cwd = tempDir('reslop-watch-');
   let list = [a];
-  const { session } = openWatched([a], {
+  const { session } = await openWatched([a], {
     cwd,
     repo: {
-      load: () => ({ top: cwd, items: [...list], branch: 'main' }),
-      loadAsync: async () => ({
+      load: async () => ({
         top: cwd,
         items: [...list],
         branch: 'main',
@@ -629,12 +633,11 @@ test('watch reload skips npm extras if package files are same', async () => {
   const cwd = tempDir('reslop-watch-');
   fs.writeFileSync(path.join(cwd, 'package.json'), '{}\n');
   let extras = 0;
-  const { session } = openWatched([gitItem], {
+  const { session } = await openWatched([gitItem], {
     cwd,
     audit: true,
     repo: {
-      load: () => ({ top: cwd, items: [gitItem], branch: 'main' }),
-      loadAsync: async (_dir, _paths, options = {}) => {
+      load: async (_dir, _paths, options = {}) => {
         const loaded = [gitItem];
         if (options.auditMap || options.outdatedMap) loaded.push(extraItem);
         return {
@@ -678,12 +681,11 @@ test('watch reload runs npm extras when package.json changes', async () => {
   const pkg = path.join(cwd, 'package.json');
   fs.writeFileSync(pkg, '{}\n');
   let extras = 0;
-  const { session } = openWatched([gitItem], {
+  const { session } = await openWatched([gitItem], {
     cwd,
     audit: true,
     repo: {
-      load: () => ({ top: cwd, items: [gitItem], branch: 'main' }),
-      loadAsync: async (_dir, _paths, options = {}) => ({
+      load: async (_dir, _paths, options = {}) => ({
         top: cwd,
         items: [gitItem],
         pending: options.deferExtras === true,
@@ -716,8 +718,7 @@ test('watch reload runs npm extras when package.json changes', async () => {
 });
 
 const npmReloadRepo = (cwd, gitItem, extras) => ({
-  load: () => ({ top: cwd, items: [gitItem], branch: 'main' }),
-  loadAsync: async (_dir, _paths, options = {}) => ({
+  load: async (_dir, _paths, options = {}) => ({
     top: cwd,
     items: [gitItem],
     pending: options.deferExtras === true,
@@ -739,7 +740,7 @@ test('source reload skips npm extras when packages are unchanged', async () => {
   const cwd = tempDir('reslop-watch-');
   fs.writeFileSync(path.join(cwd, 'package.json'), '{}\n');
   const extras = { count: 0 };
-  const { session } = openWatched([gitItem], {
+  const { session } = await openWatched([gitItem], {
     cwd,
     audit: true,
     repo: npmReloadRepo(cwd, gitItem, extras),
@@ -768,7 +769,7 @@ test('nested package.json reload runs npm extras', async () => {
   fs.mkdirSync(path.dirname(pkg), { recursive: true });
   fs.writeFileSync(pkg, '{}\n');
   const extras = { count: 0 };
-  const { session } = openWatched([gitItem], {
+  const { session } = await openWatched([gitItem], {
     cwd,
     audit: true,
     repo: npmReloadRepo(cwd, gitItem, extras),

@@ -6,10 +6,9 @@ const { EventEmitter } = require('node:events');
 const { setTimeout: sleep } = require('node:timers/promises');
 
 const { sink } = require('./helpers.js');
-const { watchResize } = require('../lib/utilities.js');
+const { watchResize } = require('../lib/session/terminal.js');
 const terminal = require('../lib/session/terminal.js');
-const { Terminal, ENTER_TERM, LEAVE_TERM } = terminal;
-const { Progress } = require('../lib/session/progress.js');
+const { Terminal, Progress, ENTER_TERM, LEAVE_TERM } = terminal;
 
 const fakeStdin = () => {
   const stdin = new EventEmitter();
@@ -137,22 +136,22 @@ test('repeated listen and close restore listener and timer counts', () => {
   assert.equal(stdin.listenerCount('data'), 1);
   assert.equal(stdout.listenerCount('resize'), 1);
   assert.equal(proc.listenerCount('SIGWINCH'), 1);
-  assert.equal(term.hasTimer('save'), true);
-  assert.equal(term.hasTimer('progress'), true);
+  assert.equal(term.timers.has('save'), true);
+  assert.equal(term.timers.has('progress'), true);
   term.stopListening();
   term.clearTimers();
   assert.equal(stdin.listenerCount('data'), 0);
   assert.equal(stdout.listenerCount('resize'), 0);
   assert.equal(proc.listenerCount('SIGWINCH'), 0);
-  assert.equal(term.hasTimer('save'), false);
-  assert.equal(term.hasTimer('progress'), false);
+  assert.equal(term.timers.has('save'), false);
+  assert.equal(term.timers.has('progress'), false);
   term.enter();
   start();
   term.close();
   assert.equal(stdin.listenerCount('data'), 0);
   assert.equal(stdout.listenerCount('resize'), 0);
   assert.equal(proc.listenerCount('SIGWINCH'), 0);
-  assert.equal(term.hasTimer('save'), false);
+  assert.equal(term.timers.has('save'), false);
   assert.equal(term.disposed, true);
   assert.equal(stdin.raw, false);
 });
@@ -178,7 +177,7 @@ test('startup failure cleanup restores acquired terminal state', () => {
   assert.ok(stdout.dump().includes(LEAVE_TERM));
   assert.equal(stdin.listenerCount('data'), 0);
   assert.equal(proc.listenerCount('SIGWINCH'), 0);
-  assert.equal(term.hasTimer('save'), false);
+  assert.equal(term.timers.has('save'), false);
   assert.equal(term.disposed, true);
 });
 
@@ -217,12 +216,17 @@ test('progress ticks only while an id is active', () => {
   const progress = new Progress(term, () => (ticks += 1), 1000);
   progress.start('busy');
   progress.start('install');
-  assert.equal(term.hasTimer('progress'), true);
+  assert.equal(term.timers.has('progress'), true);
+  progress.tick();
+  assert.equal(ticks, 1);
   progress.stop('busy');
-  assert.equal(term.hasTimer('progress'), true);
+  assert.equal(term.timers.has('progress'), true);
+  progress.tick();
+  assert.equal(ticks, 2);
   progress.stop('install');
-  assert.equal(term.hasTimer('progress'), false);
-  assert.equal(ticks, 0);
+  assert.equal(term.timers.has('progress'), false);
+  progress.tick();
+  assert.equal(ticks, 2);
 });
 
 test('later runs once and can be scheduled again', async () => {
@@ -232,7 +236,7 @@ test('later runs once and can be scheduled again', async () => {
   term.later('save', () => (runs += 10), 5);
   await sleep(30);
   assert.equal(runs, 1);
-  assert.equal(term.hasTimer('save'), false);
+  assert.equal(term.timers.has('save'), false);
   term.later('save', () => (runs += 1), 5);
   await sleep(30);
   assert.equal(runs, 2);

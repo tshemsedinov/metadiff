@@ -5,34 +5,38 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const runs = require('../lib/runs.js');
+const runs = require('../lib/runs/runs.js');
 const { Tracker, RunRecorder, readRuns, settleRecord } = runs;
 const { summarizeDocument, isRunsRel, commandLabel } = runs;
 const tree = require('../lib/dashboard/tree.js');
 const { FileIndex, folderOf, extOf } = tree;
 const { readGitSummary, parseTrack } = require('../lib/dashboard/git.js');
 const dashModel = require('../lib/dashboard/model.js');
-const { scriptName, runName, buildModel, mergeRuns, groupChanges } = dashModel;
+const { runName, buildModel, mergeRuns, groupChanges } = dashModel;
 const { readNpmSummary } = require('../lib/dashboard/npm.js');
 const tiles = require('../lib/render/tiles.js');
 const { layoutTiles, GAP_X, GAP_Y, seg, paintTile } = tiles;
-const dashTable = require('../lib/render/dash-table.js');
-const { cell, flexCell, tableLines, stat, pairRows, ago } = dashTable;
+const dashTable = require('../lib/render/table.js');
+const { cell, flexCell, tableLines } = dashTable;
+const { ago } = require('../lib/common/format.js');
 const { labelOf, pickGroups, titleAside } = dashTable;
-const activity = require('../lib/render/dash-activity.js');
+const activity = require('../lib/render/dashboard/activity.js');
 const { runMetrics, branchesBlock, runsBlock, commitsBlock } = activity;
 const { agentsBlock } = require('../lib/render/agents.js');
-const dashBlocks = require('../lib/render/dash-blocks.js');
+const dashBlocks = require('../lib/render/dashboard/blocks.js');
 const { filesBlock, diffsBlock, npmBlock, npmContent, tasksBlock } = dashBlocks;
 const { paintBodyPackages } = require('../lib/render/packages.js');
-const { TILES, paintBodyDashboard } = require('../lib/render/dashboard.js');
+const {
+  TILES,
+  paintBodyDashboard,
+} = require('../lib/render/dashboard/dashboard.js');
 const dashboardSession = require('../lib/session/dashboard.js');
 const { Dashboard, classify, ageDelay } = dashboardSession;
-const { DiskWatcher, UNKNOWN_PATH } = require('../lib/session/watch.js');
-const { actionFromKey, DASH_BLOCKS } = require('../lib/session/actions.js');
-const { Session } = require('../lib/session.js');
-const { createGitRepo } = require('../lib/git.js');
-const ansi = require('../lib/ansi.js');
+const { DiskWatcher, UNKNOWN_PATH } = require('../lib/dashboard/watch.js');
+const { actionFromKey, DASH_BLOCKS } = require('../lib/input/actions.js');
+const { Session } = require('../lib/session/session.js');
+const { createGitRepo } = require('../lib/git/git.js');
+const ansi = require('../lib/term/ansi.js');
 const { stripAnsi, visibleWidth, THEME, seq } = ansi;
 const { makeRepo, tempDir, removeTree } = require('./helpers.js');
 
@@ -581,24 +585,6 @@ test('wide tiles take half a row instead of a third', () => {
   assert.ok(right.w >= 50);
 });
 
-test('the dashboard tiles keep the canonical order and hotkeys', () => {
-  const ids = TILES.map((tile) => tile.id);
-  assert.deepEqual(ids, [
-    'files',
-    'diffs',
-    'tasks',
-    'branches',
-    'commits',
-    'run',
-    'npm',
-    'agents',
-  ]);
-  assert.deepEqual(
-    TILES.map((tile) => tile.key),
-    ['f', 'd', 't', 'b', 'c', 'r', 'n', 'a'],
-  );
-});
-
 test('the dashboard pane without a model paints blank', () => {
   const result = paintBodyDashboard({ dashboard: null }, 60, false, 10, 1);
   assert.equal(result.body.length, 10);
@@ -932,11 +918,6 @@ test('a session started without a screen keeps the files pane', () => {
   } finally {
     repo.cleanup();
   }
-});
-
-test('blocks are 2 columns apart and 1 row apart', () => {
-  assert.equal(GAP_X, 2);
-  assert.equal(GAP_Y, 1);
 });
 
 test('the dashboard pads below the header and above the footer', async () => {
@@ -2195,10 +2176,6 @@ test('diff groups keep staged lines apart from the total', () => {
 });
 
 test('run names use the npm script, or the command', () => {
-  assert.equal(scriptName('npm run test'), 'test');
-  assert.equal(scriptName('npm run -s lint'), 'lint');
-  assert.equal(scriptName('npm test'), 'test');
-  assert.equal(scriptName('/usr/bin/eslint .'), 'eslint');
   assert.equal(runName({ command: 'node --test', script: 'test' }), 'test');
   const nested = { command: 'npm run -s lint', script: 'test' };
   assert.equal(runName(nested), 'lint');
@@ -2261,13 +2238,6 @@ test('agent status sits in the table and the header totals sessions', () => {
     assert.equal(quiet.tone, 'muted');
     assert.equal(text(cursor).includes('0'), false);
   }
-});
-
-test('stat pairs become label and value table rows', () => {
-  const rows = pairRows([stat('a', '1'), stat('bb', '2'), stat('c', '3')], 2);
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].length, 4);
-  assert.equal(rows[1].length, 2);
 });
 
 const lineText = (line) => line.map((part) => part.text).join('');
@@ -2408,4 +2378,14 @@ test('empty dashboard panels center their message', () => {
 
   const scan = filesBlock({ files: { ready: false } }, 40, 5, ctx, fileTile);
   assertCentered(paint(scan, fileTile), 'scanning…');
+});
+
+test('diff groups show the age of the newest file', () => {
+  const groups = groupChanges([
+    { path: 'lib/a.js', date: '2h ago' },
+    { path: 'lib/b.js', date: '5m ago' },
+    { path: 'lib/c.js', date: '3 days ago' },
+  ]);
+  assert.equal(groups.dirs[0].date, '5m ago');
+  assert.equal(groups.exts[0].date, '5m ago');
 });

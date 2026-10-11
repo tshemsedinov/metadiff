@@ -6,23 +6,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const workspace = require('../lib/workspace.js');
+const workspace = require('../lib/dashboard/workspace.js');
 const { workspaceAt, sumNumstat, readDiffStat } = workspace;
-const { load } = require('../lib/git.js');
-const { fileEntries, fileTotals } = require('../lib/files.js');
+const { load } = require('../lib/git/git.js');
+const { fileEntries, fileTotals } = require('../lib/common/files.js');
 const { countCommits, taskStats, pickRun } = workspace;
 const tiles = require('../lib/render/tiles.js');
 const { equalGrid, pageWindow, placeEqualTiles } = tiles;
-const { size } = require('../lib/render/dash-table.js');
+const { size } = require('../lib/common/format.js');
 const { paintBodyRepos } = require('../lib/render/repos.js');
 const { renderFrame } = require('../lib/render/render.js');
-const ansi = require('../lib/ansi.js');
+const ansi = require('../lib/term/ansi.js');
 const { stripAnsi } = ansi;
-const { actionFromKey } = require('../lib/session/actions.js');
+const { actionFromKey } = require('../lib/input/actions.js');
 const { onEscape } = require('../lib/session/files-pane.js');
 const { run, loadSession, parseArgv } = require('../lib/cli.js');
-const { createStore, addTask, flushReview } = require('../lib/review.js');
-const { RunRecorder } = require('../lib/runs.js');
+const { ReviewStore, flushReview } = require('../lib/review/review.js');
+const { RunRecorder } = require('../lib/runs/runs.js');
 const { sink, tempDir, removeTree } = require('./helpers.js');
 
 const gitEnv = {
@@ -310,9 +310,11 @@ test('opening a folder of repositories starts on repo tiles', async () => {
     initRepo(alpha);
     initRepo(beta);
     fs.appendFileSync(path.join(alpha, 'app.js'), 'next\n');
-    const store = createStore(path.join(alpha, '.plan', '2026-10-02-01.md'));
-    addTask(store, 'TODOs', 'ship tiles', false, 'backlog');
-    addTask(store, 'TODOs', 'check diffs', false, 'issues');
+    const store = new ReviewStore(
+      path.join(alpha, '.plan', '2026-10-02-01.md'),
+    );
+    store.addTask('TODOs', 'ship tiles', false, 'backlog');
+    store.addTask('TODOs', 'check diffs', false, 'issues');
     flushReview(store, true);
     const recorded = new RunRecorder(alpha, 'npm test');
     recorded.finish(0, { tests: 2, failed: 0 });
@@ -359,7 +361,7 @@ test('opening a folder of repositories starts on repo tiles', async () => {
     assert.match(text, /diff: \+0\//);
     assert.equal(actionFromKey('left', 'repos'), 'repoLeft');
     assert.equal(actionFromKey('down', 'repos'), 'repoDown');
-    session.workspace.screen.cols = 2;
+    session.workspace.cols = 2;
     session.workspace.move(1, 0);
     assert.equal(session.workspace.cursor, 1);
     session.workspace.move(-1, 0);

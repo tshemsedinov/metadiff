@@ -5,10 +5,10 @@ const assert = require('node:assert/strict');
 
 const { Composer } = require('../lib/session/compose.js');
 const { Navigation } = require('../lib/session/navigation.js');
-const { createStore } = require('../lib/review.js');
+const { ReviewStore } = require('../lib/review/review.js');
 
 const setup = (extra = {}) => {
-  const notes = extra.notes ?? createStore('/tmp/review.md');
+  const notes = extra.notes ?? new ReviewStore('/tmp/review.md');
   const nav = extra.nav ?? new Navigation({ startPane: 'diff' });
   const flushed = [];
   const ui = {
