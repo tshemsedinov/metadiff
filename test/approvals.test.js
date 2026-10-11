@@ -85,7 +85,7 @@ test('plan edits and test commands are remembered in the cursor config', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const openUi = () => {
+const openUi = async () => {
   const repo = makeRepo();
   repo.write('a.js', 'ok\n');
   repo.git(['add', '.']);
@@ -98,7 +98,7 @@ const openUi = () => {
     startPane: 'dashboard',
   });
   ui.ensureRepo();
-  ui.load();
+  await ui.load();
   ui.agents.authProbe = () => true;
   return { ui, repo };
 };
@@ -117,7 +117,7 @@ test('the agent log answers an approval and remembers it', async () => {
   const config = path.join(configDir, 'cli-config.json');
   const previous = process.env.RESLOP_CURSOR_CONFIG;
   process.env.RESLOP_CURSOR_CONFIG = config;
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   const writes = [];
   try {
     ui.agents.listModels = async () => [];
@@ -170,7 +170,7 @@ test('the agent log answers an approval and remembers it', async () => {
 
 test('a finished cursor agent is closed', async () => {
   const dir = binDir();
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   const writes = [];
   let push = null;
   try {

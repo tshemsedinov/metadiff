@@ -19,7 +19,7 @@ const { Session } = require('../lib/session/session.js');
 const { blockAddText } = require('../lib/diff/diff.js');
 const { makeRepo, sink } = require('./helpers.js');
 
-const sessionFor = (dir) => {
+const sessionFor = async (dir) => {
   const stdout = sink();
   const session = new Session({
     repo: createGitRepo(),
@@ -28,7 +28,7 @@ const sessionFor = (dir) => {
     color: false,
     startPane: 'diff',
   });
-  session.load();
+  await session.load();
   return session;
 };
 
@@ -39,7 +39,7 @@ test('AC4 add stages an unstaged block', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'alpha\nBETA\ngamma\n');
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     assert.equal(loaded.items.length, 1);
     await addItem(loaded.top, loaded.items[0]);
     const cached = repo.git(['diff', '--cached', '--', 'f.txt']);
@@ -58,7 +58,7 @@ test('AC5 revert restores worktree to HEAD', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'alpha\nBETA\ngamma\n');
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     await revertItem(loaded.top, loaded.items[0]);
     assert.equal(repo.read('f.txt'), 'alpha\nbeta\ngamma\n');
     const vsHead = repo.git(['diff', 'HEAD', '--', 'f.txt']);
@@ -75,14 +75,14 @@ test('AC7 untracked add and revert', async () => {
     repo.git(['add', 'keep.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('new.txt', 'hello\n');
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const item = loaded.items.find((entry) => entry.origin === 'untracked');
     assert.ok(item);
     await addItem(loaded.top, item);
     const cached = repo.git(['diff', '--cached', '--name-only']);
     assert.match(cached, /new.txt/);
     repo.git(['reset', 'HEAD', '--', 'new.txt']);
-    const again = load(repo.dir);
+    const again = await load(repo.dir, [], { deferExtras: false });
     const untracked = again.items.find((entry) => entry.origin === 'untracked');
     await revertItem(again.top, untracked);
     assert.equal(repo.exists('new.txt'), false);
@@ -91,7 +91,7 @@ test('AC7 untracked add and revert', async () => {
   }
 });
 
-test('a nested git repository stays out of the worktree load', () => {
+test('a nested git repository stays out of the worktree load', async () => {
   const repo = makeRepo();
   try {
     repo.write('keep.txt', 'k\n');
@@ -105,7 +105,7 @@ test('a nested git repository stays out of the worktree load', () => {
     });
     assert.equal(init.status, 0);
     repo.write('note.txt', 'hello\n');
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const paths = loaded.items.map((item) => item.file.newPath);
     assert.deepEqual(paths, ['note.txt']);
     const names = createGitRepo().listFiles(repo.dir);
@@ -116,7 +116,7 @@ test('a nested git repository stays out of the worktree load', () => {
   }
 });
 
-test('AC8 revert staged restores HEAD', () => {
+test('AC8 revert staged restores HEAD', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'one\n');
@@ -124,7 +124,7 @@ test('AC8 revert staged restores HEAD', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'two\n');
     repo.git(['add', 'f.txt']);
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items[0].origin, 'staged');
     session.dispatch('add');
     assert.equal(session.status, '');
@@ -137,14 +137,14 @@ test('AC8 revert staged restores HEAD', () => {
   }
 });
 
-test('add then unstage a block in a split hunk', () => {
+test('add then unstage a block in a split hunk', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'keep\nAAA\nkeep\nBBB\nkeep\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     session.dispatch('add');
     assert.equal(session.status, 'staged');
@@ -165,7 +165,7 @@ test('add both blocks of a split hunk without reload', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     session.dispatch('add');
     await session.ops.idle();
     assert.equal(session.status, 'staged');
@@ -189,7 +189,7 @@ test('files pane add stages every remaining hunk', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     session.showFiles();
     session.dispatch('add');
@@ -212,7 +212,7 @@ test('files pane unstage restores every staged hunk', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
     repo.git(['add', 'f.txt']);
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     session.showFiles();
     session.dispatch('unstage');
     await session.ops.idle();
@@ -227,14 +227,14 @@ test('files pane unstage restores every staged hunk', async () => {
   }
 });
 
-test('files pane revert restores the whole file', () => {
+test('files pane revert restores the whole file', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'keep\nAAA\nkeep\nBBB\nkeep\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     session.showFiles();
     session.dispatch('revert');
     assert.equal(repo.read('f.txt'), 'keep\nAAA\nkeep\nBBB\nkeep\n');
@@ -255,7 +255,7 @@ test('committing the last staged change does not end the review', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'two\n');
     repo.git(['add', 'f.txt']);
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items[0].origin, 'staged');
     session.showFiles();
     session.pushInput('c');
@@ -284,7 +284,7 @@ test('unstage both blocks of a staged split hunk', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
     repo.git(['add', 'f.txt']);
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     session.dispatch('unstage');
     await session.ops.idle();
@@ -312,7 +312,7 @@ test('add and unstage keep file order', async () => {
     repo.write('a.txt', 'A\n');
     repo.write('b.txt', 'B\n');
     repo.write('c.txt', 'C\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     const paths = () => session.items.map((item) => item.file.newPath);
     assert.deepEqual(paths(), ['a.txt', 'b.txt', 'c.txt']);
     session.index = 1;
@@ -341,7 +341,7 @@ test('staging a later hunk keeps hunk order after reload', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     session.index = 1;
     const before = blockAddText(
@@ -373,7 +373,7 @@ test('staging the current hunk keeps it on screen after reload', async () => {
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'keep\naaa\nkeep\nbbb\nkeep\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     const before = blockAddText(
       session.current().hunk,
@@ -403,7 +403,7 @@ test('AC28 unstage staged keeps worktree', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'two\n');
     repo.git(['add', 'f.txt']);
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     assert.equal(loaded.items[0].origin, 'staged');
     await unstageItem(loaded.top, loaded.items[0]);
     assert.equal(repo.read('f.txt'), 'two\n');
@@ -416,7 +416,7 @@ test('AC28 unstage staged keeps worktree', async () => {
   }
 });
 
-test('AC15 file argv loads only that file', () => {
+test('AC15 file argv loads only that file', async () => {
   const repo = makeRepo();
   try {
     repo.write('keep.txt', 'k\n');
@@ -425,10 +425,10 @@ test('AC15 file argv loads only that file', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('keep.txt', 'K\n');
     repo.write('src/a.txt', 'A\n');
-    const one = load(repo.dir, ['keep.txt']);
+    const one = await load(repo.dir, ['keep.txt'], { deferExtras: false });
     assert.equal(one.items.length, 1);
     assert.equal(one.items[0].file.newPath, 'keep.txt');
-    const folder = load(repo.dir, ['src']);
+    const folder = await load(repo.dir, ['src'], { deferExtras: false });
     assert.equal(folder.items.length, 1);
     assert.equal(folder.items[0].file.newPath, 'src/a.txt');
     const session = new Session({
@@ -439,7 +439,7 @@ test('AC15 file argv loads only that file', () => {
       color: false,
       startPane: 'diff',
     });
-    session.load();
+    await session.load();
     assert.equal(session.pane, 'diff');
     const files = session.fileList();
     assert.equal(files.length, 1);
@@ -450,7 +450,7 @@ test('AC15 file argv loads only that file', () => {
   }
 });
 
-test('AC20 load commit patch ignores dirty worktree', () => {
+test('AC20 load commit patch ignores dirty worktree', async () => {
   const repo = makeRepo();
   try {
     repo.write('keep.txt', 'k\n');
@@ -463,7 +463,10 @@ test('AC20 load commit patch ignores dirty worktree', () => {
     const sha = repo.git(['rev-parse', 'HEAD']).trim();
     repo.write('src/a.txt', 'DIRTY\n');
     repo.write('new.txt', 'untracked\n');
-    const loaded = load(repo.dir, [], { commit: sha });
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
+      commit: sha,
+    });
     assert.ok(loaded.items.length >= 1);
     for (const item of loaded.items) {
       assert.equal(item.origin, 'commit');
@@ -474,12 +477,15 @@ test('AC20 load commit patch ignores dirty worktree', () => {
     const blob = JSON.stringify(loaded.items);
     assert.match(blob, /"text":"A"/);
     assert.equal(blob.includes('DIRTY'), false);
-    const only = load(repo.dir, ['src/a.txt'], { commit: sha });
+    const only = await load(repo.dir, ['src/a.txt'], {
+      deferExtras: false,
+      commit: sha,
+    });
     assert.ok(only.items.length >= 1);
     for (const item of only.items) {
       assert.equal(item.file.newPath, 'src/a.txt');
     }
-    const work = load(repo.dir);
+    const work = await load(repo.dir, [], { deferExtras: false });
     const origins = new Set(work.items.map((item) => item.origin));
     assert.ok(origins.has('unstaged') || origins.has('untracked'));
   } finally {
@@ -487,14 +493,17 @@ test('AC20 load commit patch ignores dirty worktree', () => {
   }
 });
 
-test('load root commit via diff-tree', () => {
+test('load root commit via diff-tree', async () => {
   const repo = makeRepo();
   try {
     repo.write('first.txt', 'hello\n');
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'root']);
     const sha = repo.git(['rev-parse', 'HEAD']).trim();
-    const loaded = load(repo.dir, [], { commit: sha });
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
+      commit: sha,
+    });
     assert.ok(loaded.items.length >= 1);
     assert.equal(loaded.items[0].origin, 'commit');
     assert.equal(loaded.items[0].file.newPath, 'first.txt');
@@ -504,7 +513,7 @@ test('load root commit via diff-tree', () => {
   }
 });
 
-test('load omits files under .plan', () => {
+test('load omits files under .plan', async () => {
   const repo = makeRepo();
   try {
     repo.write('keep.txt', 'k\n');
@@ -513,11 +522,11 @@ test('load omits files under .plan', () => {
     repo.write('keep.txt', 'K\n');
     repo.write('.plan/2026-09-07-00.md', '---\nstatus: editing\n---\n');
     repo.write('.plan/.templates', '[]\n');
-    const dirty = load(repo.dir);
+    const dirty = await load(repo.dir, [], { deferExtras: false });
     const dirtyPaths = dirty.items.map((item) => item.file.newPath);
     assert.deepEqual(dirtyPaths, ['keep.txt']);
     repo.git(['add', '.plan/2026-09-07-00.md']);
-    const mixed = load(repo.dir);
+    const mixed = await load(repo.dir, [], { deferExtras: false });
     for (const item of mixed.items) {
       const rel = item.file.newPath || item.file.oldPath;
       assert.equal(rel.startsWith('.plan'), false);
@@ -525,7 +534,10 @@ test('load omits files under .plan', () => {
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'notes']);
     const sha = repo.git(['rev-parse', 'HEAD']).trim();
-    const committed = load(repo.dir, [], { commit: sha });
+    const committed = await load(repo.dir, [], {
+      deferExtras: false,
+      commit: sha,
+    });
     for (const item of committed.items) {
       const rel = item.file.newPath || item.file.oldPath;
       assert.equal(rel.startsWith('.plan'), false);
@@ -652,13 +664,13 @@ const makeBare = () => {
   return { dir, cleanup };
 };
 
-test('load includes the current branch', () => {
+test('load includes the current branch', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'a\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     assert.equal(loaded.branch, 'main');
     assert.equal(currentBranch(repo.dir), 'main');
   } finally {
@@ -1237,15 +1249,15 @@ test('runProc finish removes abort listener on timeout', async () => {
   assert.equal(signal.listeners.size, 0);
 });
 
-test('loadAsync matches load for a dirty worktree', async () => {
+test('load matches load for a dirty worktree', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'a\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'b\n');
-    const sync = load(repo.dir);
-    const asyncLoaded = await git.loadAsync(repo.dir);
+    const sync = await load(repo.dir, [], { deferExtras: false });
+    const asyncLoaded = await git.load(repo.dir);
     assert.equal(asyncLoaded.items.length, sync.items.length);
     assert.equal(asyncLoaded.items[0].origin, 'unstaged');
     assert.equal(asyncLoaded.branch, sync.branch);
@@ -1254,18 +1266,18 @@ test('loadAsync matches load for a dirty worktree', async () => {
   }
 });
 
-test('editItem writes added lines into the reviewed file', () => {
+test('editItem writes added lines into the reviewed file', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'alpha\nbeta\ngamma\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'alpha\nBETA\ngamma\n');
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     assert.equal(loaded.items.length, 1);
     editItem(loaded.top, loaded.items[0], 'BETA-edited');
     assert.equal(repo.read('f.txt'), 'alpha\nBETA-edited\ngamma\n');
-    const again = load(repo.dir);
+    const again = await load(repo.dir, [], { deferExtras: false });
     const lines = again.items[0].hunk.lines;
     const adds = lines.filter((line) => line.type === 'add');
     assert.equal(adds.length, 1);
@@ -1275,18 +1287,20 @@ test('editItem writes added lines into the reviewed file', () => {
   }
 });
 
-test('e saves added lines to the reviewed file and reloads', () => {
+test('e saves added lines to the reviewed file and reloads', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'alpha\nbeta\ngamma\n');
     repo.git(['add', 'f.txt']);
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'alpha\nBETA\ngamma\n');
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     session.dispatch('code');
+    await session.ops.idle();
     assert.equal(session.composeKind, 'code');
     session.editor.replace('BETA-edited');
     session.handleEvent({ type: 'key', key: 'escape' });
+    await session.ops.idle();
     assert.equal(session.mode, 'review');
     assert.equal(repo.read('f.txt'), 'alpha\nBETA-edited\ngamma\n');
     assert.equal(session.notes.code.size, 0);
@@ -1305,7 +1319,7 @@ test('e saves added lines to the reviewed file and reloads', () => {
   }
 });
 
-test('editItem updates staged added lines in the index', () => {
+test('editItem updates staged added lines in the index', async () => {
   const repo = makeRepo();
   try {
     repo.write('f.txt', 'alpha\nbeta\ngamma\n');
@@ -1313,7 +1327,7 @@ test('editItem updates staged added lines in the index', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('f.txt', 'alpha\nBETA\ngamma\n');
     repo.git(['add', 'f.txt']);
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const item = loaded.items.find((entry) => entry.origin === 'staged');
     assert.ok(item);
     editItem(loaded.top, item, 'STAGED');
@@ -1345,7 +1359,7 @@ test('listFiles includes tracked and untracked paths', () => {
   }
 });
 
-test('file edit save stages the whole file', () => {
+test('file edit save stages the whole file', async () => {
   const repo = makeRepo();
   try {
     repo.write(
@@ -1366,11 +1380,15 @@ test('file edit save stages the whole file', () => {
       color: false,
       startPane: 'files',
     });
-    session.load();
+    await session.load();
     session.dispatch('file');
+    await session.ops.idle();
     session.dispatch('next');
+    await session.ops.idle();
     session.dispatch('open');
+    await session.ops.idle();
     session.dispatch('code');
+    await session.ops.idle();
     session.editor.replace(
       'alpha\nBETA\nkeep1\nkeep2\nkeep3\nkeep4\nkeep5\nGAMMA\n',
     );

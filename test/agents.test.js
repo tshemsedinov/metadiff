@@ -127,7 +127,7 @@ test('buildLaunch passes the review plan model and extra flags', () => {
   assert.equal(rel.command, relCmd);
 });
 
-const openUi = () => {
+const openUi = async () => {
   const repo = makeRepo();
   repo.write('a.js', 'ok\n');
   repo.git(['add', '.']);
@@ -141,14 +141,14 @@ const openUi = () => {
     startPane: 'dashboard',
   });
   ui.ensureRepo();
-  ui.load();
+  await ui.load();
   ui.agents.authProbe = () => true;
   return { ui, repo, stdout };
 };
 
 test('agents screen lists clis and starts with the review plan', async () => {
   const { dir, bins, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -268,7 +268,7 @@ test('agents screen lists clis and starts with the review plan', async () => {
 
 test('agent jobs keep running after leaving the log', async () => {
   const { dir, env } = fakePath('claude', 'cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     const reviewDir = path.join(repo.dir, '.plan');
@@ -326,7 +326,7 @@ test('agent jobs keep running after leaving the log', async () => {
 
 test('r in the agent log repeats the command', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -515,7 +515,7 @@ test('listModels tries the next command after an empty list', async () => {
 
 test('agents screen picks a model from the list', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async (bin, spec) => {
       if (spec.id === 'cursor') return ['auto', 'grok-4.6'];
@@ -552,7 +552,7 @@ test('agents screen picks a model from the list', async () => {
 
 test('start falls back to the latest review file', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -581,7 +581,7 @@ test('start falls back to the latest review file', async () => {
 
 test('agents screen runs the review file chosen in the combo', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -639,7 +639,7 @@ test('agents screen runs the review file chosen in the combo', async () => {
 
 test('plan combo lists plain markdown and aligns columns', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -701,7 +701,7 @@ test('plan combo lists plain markdown and aligns columns', async () => {
 
 test('agents screen logs in before a run when signed out', async () => {
   const { dir, bins, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -759,7 +759,7 @@ test('agents screen logs in before a run when signed out', async () => {
 
 test('agents screen runs cursor login when auth is required', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -918,7 +918,7 @@ test('effort encoded in a model id is chosen separately', () => {
 
 test('model menu omits a fast name that has a plain sibling', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [
       'gpt-5.6-sol-high',
@@ -951,7 +951,7 @@ test('model menu omits a fast name that has a plain sibling', async () => {
 
 test('clicking the model column opens the model list', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [
       'gpt-5.6-sol-high',
@@ -1023,7 +1023,7 @@ test('clicking the model column opens the model list', async () => {
 
 test('clicking another column switches the open combo', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1081,7 +1081,7 @@ test('model menu uses background and a right scroller', async () => {
     startPane: 'dashboard',
   });
   ui.ensureRepo();
-  ui.load();
+  await ui.load();
   try {
     const models = Array.from({ length: 16 }, (_, i) => `model-${i}`);
     ui.agents.listModels = async (bin, spec) =>
@@ -1170,7 +1170,7 @@ test('model menu uses background and a right scroller', async () => {
 
 test('agents screen remembers model and effort in .reslop', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1200,7 +1200,7 @@ test('agents screen remembers model and effort in .reslop', async () => {
 
 test('recorded runs stay listed for the selected cli', async () => {
   const { dir, env } = fakePath('cursor-agent', 'claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     const plan = path.join(repo.dir, '.plan');
     fs.mkdirSync(plan, { recursive: true });
@@ -1285,7 +1285,7 @@ test('recorded runs stay listed for the selected cli', async () => {
 
 test('agents screen lists sessions for the selected cli', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1329,7 +1329,7 @@ test('agents screen lists sessions for the selected cli', async () => {
 
 test('a new agent session is its own run with status', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo, stdout } = openUi();
+  const { ui, repo, stdout } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -1398,7 +1398,7 @@ test('a new agent session is its own run with status', async () => {
 
 test('agents panels scroll past one screen', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1435,7 +1435,7 @@ test('agents panels scroll past one screen', async () => {
 
 test('agents screen blocks a review file that is already running', async () => {
   const { dir, env } = fakePath('claude', 'cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -1488,7 +1488,7 @@ test('agents screen blocks a review file that is already running', async () => {
 
 test('agents screen toggles fast mode with a', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1517,7 +1517,7 @@ test('agents screen toggles fast mode with a', async () => {
 
 test('single click on the fast column toggles it', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1548,7 +1548,7 @@ test('single click on the fast column toggles it', async () => {
 
 test('selecting a model keeps only context sizes it offers', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async (bin, spec) => {
       if (spec.id !== 'cursor') return [];
@@ -1600,7 +1600,7 @@ test('selecting a model keeps only context sizes it offers', async () => {
 
 test('clicking the context column drops the size list', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => {
       const names = ['grok-4.7-high', 'gpt-5.6-sol-high'];
@@ -1651,7 +1651,7 @@ test('clicking the context column drops the size list', async () => {
 
 test('agents screen selects a cursor context size', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1688,7 +1688,7 @@ test('agents screen selects a cursor context size', async () => {
 
 test('agent columns fill the row in proportion to their content', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo, stdout } = openUi();
+  const { ui, repo, stdout } = await openUi();
   try {
     ui.agents.refresh(env);
     await ui.agents.open();
@@ -1720,7 +1720,7 @@ test('agent columns fill the row in proportion to their content', async () => {
 
 test('agent history keeps the launch, output, time, and progress', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo, stdout } = openUi();
+  const { ui, repo, stdout } = await openUi();
   try {
     const reviewDir = path.join(repo.dir, '.plan');
     fs.mkdirSync(reviewDir, { recursive: true });
@@ -1850,7 +1850,7 @@ test('agent output shows a scroller when the log overflows', async () => {
     startPane: 'dashboard',
   });
   ui.ensureRepo();
-  ui.load();
+  await ui.load();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -1906,7 +1906,7 @@ test('dragging the agent output scroller scrolls the log', async () => {
     startPane: 'dashboard',
   });
   ui.ensureRepo();
-  ui.load();
+  await ui.load();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -2017,7 +2017,7 @@ test('buildLaunch continues a previous session', () => {
 
 test('starting an agent uses the selected session', async () => {
   const { dir, env } = fakePath('cursor-agent');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -2064,7 +2064,7 @@ test('starting an agent uses the selected session', async () => {
 
 test('agent raw log keeps terminal escapes', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -2105,7 +2105,7 @@ test('agent raw log keeps terminal escapes', async () => {
 
 test('a session opens on its last run and loads older on scroll', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);
@@ -2172,7 +2172,7 @@ test('run output yields the session, files, and tokens', () => {
 
 test('legacy .reslop runs move into .log', async () => {
   const { dir, env } = fakePath('claude');
-  const { ui, repo } = openUi();
+  const { ui, repo } = await openUi();
   try {
     ui.agents.listModels = async () => [];
     ui.agents.refresh(env);

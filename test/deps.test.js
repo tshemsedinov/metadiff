@@ -145,7 +145,7 @@ const sidesOf = (files) => (origin, rel) => {
   return pair;
 };
 
-const sessionFor = (dir) => {
+const sessionFor = async (dir) => {
   const stdout = sink();
   const session = new Session({
     repo: git.createGitRepo(),
@@ -154,7 +154,7 @@ const sessionFor = (dir) => {
     color: false,
     startPane: 'diff',
   });
-  session.load();
+  await session.load();
   return session;
 };
 
@@ -1175,7 +1175,7 @@ index 1111111..2222222 100644
   assert.ok(!lines.some((line) => line.includes('node_modules')));
 });
 
-test('load folds local dependency files into one review item', () => {
+test('load folds local dependency files into one review item', async () => {
   const repo = makeRepo();
   try {
     const oldDeps = { lodash: '^4.17.20' };
@@ -1187,7 +1187,7 @@ test('load folds local dependency files into one review item', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, { lodash: '4.17.21' }));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const depItems = loaded.items.filter((item) => item.dep);
     assert.equal(depItems.length, 1);
     assert.equal(depItems[0].origin, 'unstaged');
@@ -1200,7 +1200,7 @@ test('load folds local dependency files into one review item', () => {
   }
 });
 
-test('load marks an added dependency that is not imported', () => {
+test('load marks an added dependency that is not imported', async () => {
   const repo = makeRepo();
   try {
     const oldDeps = { lodash: '^4.17.20' };
@@ -1214,7 +1214,7 @@ test('load marks an added dependency that is not imported', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgLib(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, newVers));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const leftpad = depByName(loaded.items, 'leftpad');
     assert.ok(leftpad);
     assert.equal(leftpad.dep.change.unused, true);
@@ -1229,7 +1229,7 @@ test('load marks an added dependency that is not imported', () => {
   }
 });
 
-test('load proposes an unused dependency with no package diffs', () => {
+test('load proposes an unused dependency with no package diffs', async () => {
   const repo = makeRepo();
   try {
     const deps = { lodash: '^4.17.20', leftpad: '1.0.0' };
@@ -1245,7 +1245,8 @@ test('load proposes an unused dependency with no package diffs', () => {
     repo.write('node_modules/leftpad/package.json', libPkg('leftpad'));
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'init']);
-    const loaded = load(repo.dir, [], {
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
       audit: true,
       outdatedMap: null,
       auditMap: null,
@@ -1276,7 +1277,7 @@ test('deferred load shows unused deps after extras', async () => {
     repo.write('node_modules/leftpad/package.json', libPkg('leftpad'));
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'init']);
-    const loaded = load(repo.dir, [], { audit: true, deferExtras: true });
+    const loaded = await load(repo.dir, [], { audit: true, deferExtras: true });
     assert.equal(depByName(loaded.items, 'leftpad'), null);
     assert.equal(loaded.pending, true);
     const extra = await loadExtras(loaded, {
@@ -1292,7 +1293,7 @@ test('deferred load shows unused deps after extras', async () => {
   }
 });
 
-test('load does not propose unused for a dep with no exports', () => {
+test('load does not propose unused for a dep with no exports', async () => {
   const repo = makeRepo();
   try {
     const deps = { lodash: '^4.17.20', metaskills: '^1.0.5' };
@@ -1311,7 +1312,8 @@ test('load does not propose unused for a dep with no exports', () => {
     );
     repo.git(['add', '.']);
     repo.git(['commit', '-m', 'init']);
-    const loaded = load(repo.dir, [], {
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
       audit: true,
       outdatedMap: null,
       auditMap: null,
@@ -1322,7 +1324,7 @@ test('load does not propose unused for a dep with no exports', () => {
   }
 });
 
-test('load proposes an outdated dependency with no package diffs', () => {
+test('load proposes an outdated dependency with no package diffs', async () => {
   const repo = makeRepo();
   try {
     repo.write('package.json', pkgJson({ lodash: '^4.17.20' }));
@@ -1335,7 +1337,8 @@ test('load proposes an outdated dependency with no package diffs', () => {
       latest: '4.17.21',
       type: 'dependencies',
     });
-    const loaded = load(repo.dir, [], {
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
       audit: true,
       outdatedMap: outdated,
       auditMap: null,
@@ -1367,7 +1370,8 @@ test('add on a proposed update writes package.json, runs npm i', async () => {
       latest: '4.17.21',
       type: 'dependencies',
     });
-    const loaded = load(repo.dir, [], {
+    const loaded = await load(repo.dir, [], {
+      deferExtras: false,
       audit: true,
       outdatedMap: outdated,
       auditMap: null,
@@ -1414,7 +1418,7 @@ test('add on an unused dependency runs npm uninstall', async () => {
         leftpad: '1.0.0',
       }),
     );
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const item = depByName(loaded.items, 'leftpad');
     assert.ok(item);
     let removed = '';
@@ -1461,7 +1465,7 @@ test('session add applies a proposed outdated update', async () => {
       outdatedMap: outdated,
       auditMap: null,
     });
-    session.load();
+    await session.load();
     const item = depByName(session.items, 'lodash');
     assert.ok(item);
     item.dep.install = () => {
@@ -1507,7 +1511,7 @@ test('session revert dismisses a proposed outdated update', async () => {
       outdatedMap: outdated,
       auditMap: null,
     });
-    session.load();
+    await session.load();
     assert.ok(depByName(session.items, 'lodash'));
     session.dispatch('revert');
     await session.ops.idle();
@@ -1518,7 +1522,7 @@ test('session revert dismisses a proposed outdated update', async () => {
   }
 });
 
-const proposedLodash = (repo) => {
+const proposedLodash = async (repo) => {
   const oldDeps = { lodash: '^4.17.20' };
   const extra = { description: 'keep me' };
   repo.write('package.json', pkgJson(oldDeps, extra));
@@ -1533,7 +1537,8 @@ const proposedLodash = (repo) => {
     latest: '4.17.21',
     type: 'dependencies',
   });
-  const loaded = load(repo.dir, [], {
+  const loaded = await load(repo.dir, [], {
+    deferExtras: false,
     audit: true,
     outdatedMap: outdated,
     auditMap: null,
@@ -1544,10 +1549,10 @@ const proposedLodash = (repo) => {
   return { loaded, item, pkg, lock };
 };
 
-test('proposedNpmPlan does not write the manifest', () => {
+test('proposedNpmPlan does not write the manifest', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg } = proposedLodash(repo);
+    const { loaded, item, pkg } = await proposedLodash(repo);
     const plan = proposedNpmPlan(loaded.top, item);
     assert.ok(plan);
     assert.deepEqual(plan.npmArgs, ['i']);
@@ -1561,7 +1566,7 @@ test('proposedNpmPlan does not write the manifest', () => {
 test('nonzero npm result restores owned dependency files', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg, lock } = proposedLodash(repo);
+    const { loaded, item, pkg, lock } = await proposedLodash(repo);
     item.dep.install = () => ({ status: 1, stderr: 'npm ERR! boom' });
     await assert.rejects(() => addItem(loaded.top, item), /npm ERR! boom/);
     assert.equal(repo.read('package.json'), pkg);
@@ -1575,7 +1580,7 @@ test('nonzero npm result restores owned dependency files', async () => {
 test('thrown npm runner restores owned dependency files', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg, lock } = proposedLodash(repo);
+    const { loaded, item, pkg, lock } = await proposedLodash(repo);
     item.dep.install = () => {
       throw new Error('install boom');
     };
@@ -1590,7 +1595,7 @@ test('thrown npm runner restores owned dependency files', async () => {
 test('rejected npm runner restores owned dependency files', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg, lock } = proposedLodash(repo);
+    const { loaded, item, pkg, lock } = await proposedLodash(repo);
     item.dep.install = () => Promise.reject(new Error('install nope'));
     await assert.rejects(
       () => git.createGitRepo().add(loaded.top, item),
@@ -1606,7 +1611,7 @@ test('rejected npm runner restores owned dependency files', async () => {
 test('timed out npm result restores owned dependency files', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg, lock } = proposedLodash(repo);
+    const { loaded, item, pkg, lock } = await proposedLodash(repo);
     const error = new Error('timed out');
     error.code = 'ETIMEDOUT';
     item.dep.install = () => ({ status: null, error });
@@ -1621,7 +1626,7 @@ test('timed out npm result restores owned dependency files', async () => {
 test('git staging failure restores owned dependency files', async () => {
   const repo = makeRepo();
   try {
-    const { loaded, item, pkg, lock } = proposedLodash(repo);
+    const { loaded, item, pkg, lock } = await proposedLodash(repo);
     await assert.rejects(
       () =>
         gitDeps.applyProposedUpdate(loaded.top, item, {
@@ -1667,7 +1672,7 @@ test('captureFile distinguishes a missing file from an empty file', () => {
   }
 });
 
-test('load keeps description and keywords as normal diffs', () => {
+test('load keeps description and keywords as normal diffs', async () => {
   const repo = makeRepo();
   try {
     const oldDeps = { lodash: '^4.17.20' };
@@ -1680,7 +1685,7 @@ test('load keeps description and keywords as normal diffs', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps, newExtra));
     repo.write('package-lock.json', lockV3(newDeps, { lodash: '4.17.21' }));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const depItems = loaded.items.filter((item) => item.dep);
     const jsonItems = [];
     for (const item of loaded.items) {
@@ -1703,7 +1708,7 @@ test('load keeps description and keywords as normal diffs', () => {
   }
 });
 
-test('load does not duplicate a dep hunk when other fields change', () => {
+test('load keeps one dep hunk when other fields change', async () => {
   const repo = makeRepo();
   try {
     const pad = {
@@ -1721,7 +1726,7 @@ test('load does not duplicate a dep hunk when other fields change', () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps, { version: '0.1.9', ...pad }));
     repo.write('package-lock.json', lockV3(newDeps, newVers));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const prettier = depByName(loaded.items, 'prettier');
     assert.ok(prettier);
     const jsonItems = loaded.items.filter((item) => {
@@ -1756,7 +1761,7 @@ test('add unstage and revert apply to both dependency files', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, { lodash: '4.17.21' }));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const item = loaded.items[0];
     assert.ok(item.dep);
     await addItem(loaded.top, item);
@@ -1791,7 +1796,7 @@ test('add applies one dependency and leaves the other unstaged', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, newVers));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const lodash = depByName(loaded.items, 'lodash');
     const leftpad = depByName(loaded.items, 'leftpad');
     assert.ok(lodash);
@@ -1826,7 +1831,7 @@ test('revert applies one dependency and leaves the other', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, newVers));
-    const loaded = load(repo.dir);
+    const loaded = await load(repo.dir, [], { deferExtras: false });
     const lodash = depByName(loaded.items, 'lodash');
     await revertItem(loaded.top, lodash);
     const workPkg = JSON.parse(repo.read('package.json'));
@@ -1854,7 +1859,7 @@ test('session a u r act on one dependency', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, { lodash: '4.17.21' }));
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 1);
     assert.ok(session.items[0].dep);
     session.dispatch('add');
@@ -1890,7 +1895,7 @@ test('session add stages only the current dependency', async () => {
     repo.git(['commit', '-m', 'init']);
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, newVers));
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     assert.equal(session.items.length, 2);
     assert.equal(session.items[0].dep.change.name, 'leftpad');
     session.dispatch('add');
@@ -1907,7 +1912,7 @@ test('session add stages only the current dependency', async () => {
   }
 });
 
-test('files pane revert restores both dependency files', () => {
+test('files pane revert restores both dependency files', async () => {
   const repo = makeRepo();
   try {
     const oldDeps = { lodash: '^4.17.20' };
@@ -1920,7 +1925,7 @@ test('files pane revert restores both dependency files', () => {
     repo.write('keep.js', 'OK\n');
     repo.write('package.json', pkgJson(newDeps));
     repo.write('package-lock.json', lockV3(newDeps, { lodash: '4.17.21' }));
-    const session = sessionFor(repo.dir);
+    const session = await sessionFor(repo.dir);
     session.showFiles();
     const files = session.fileList();
     const dep = files.find((entry) => entry.path === 'package.json');
@@ -2062,10 +2067,13 @@ const dependencyFiles = (repo) =>
 test('partial dependency staging leaves the worktree untouched', async (t) => {
   const repo = dependencyStagingRepo(t);
   const before = dependencyFiles(repo);
-  const item = depByName(load(repo.dir).items, 'lodash');
+  const item = depByName(
+    (await load(repo.dir, [], { deferExtras: false })).items,
+    'lodash',
+  );
   await addItem(repo.dir, item);
   assert.deepEqual(dependencyFiles(repo), before);
-  const staged = load(repo.dir).items.find(
+  const staged = (await load(repo.dir, [], { deferExtras: false })).items.find(
     (entry) => entry.origin === 'staged' && entry.dep?.change.name === 'lodash',
   );
   await unstageItem(repo.dir, staged);
@@ -2076,7 +2084,10 @@ test('partial dependency staging leaves the worktree untouched', async (t) => {
 test('failed dependency staging preserves worktree and index', async (t) => {
   const repo = dependencyStagingRepo(t);
   const before = dependencyFiles(repo);
-  const item = depByName(load(repo.dir).items, 'lodash');
+  const item = depByName(
+    (await load(repo.dir, [], { deferExtras: false })).items,
+    'lodash',
+  );
   repo.write('.git/index.lock', 'locked');
   await assert.rejects(() => addItem(repo.dir, item), /index.lock/);
   assert.deepEqual(dependencyFiles(repo), before);
@@ -2088,7 +2099,10 @@ test('partial staging adds new dependency files to empty index', async (t) => {
   t.after(repo.cleanup);
   repo.write('package.json', pkgJson({ lodash: '^4.17.21' }));
   const before = repo.read('package.json');
-  const item = depByName(load(repo.dir).items, 'lodash');
+  const item = depByName(
+    (await load(repo.dir, [], { deferExtras: false })).items,
+    'lodash',
+  );
   assert.ok(item);
   await addItem(repo.dir, item);
   assert.equal(repo.read('package.json'), before);
@@ -2111,7 +2125,10 @@ test('dependency staging respects clean filters, edits no files', async (t) => {
   repo.git(['config', 'filter.dependency.clean', command]);
   repo.write('.gitattributes', 'package.json filter=dependency\n');
   const before = dependencyFiles(repo);
-  const item = depByName(load(repo.dir).items, 'lodash');
+  const item = depByName(
+    (await load(repo.dir, [], { deferExtras: false })).items,
+    'lodash',
+  );
   await addItem(repo.dir, item);
   assert.equal(parseGitJson(repo, ':package.json').name, 'clean');
   assert.deepEqual(dependencyFiles(repo), before);

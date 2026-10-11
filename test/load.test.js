@@ -63,8 +63,7 @@ test('a slow load cannot replace a newer load', async () => {
     color: false,
     startPane: 'files',
     repo: {
-      load: () => ({ top: cwd, items: [newItem] }),
-      loadAsync: async () => {
+      load: async () => {
         calls += 1;
         if (calls === 1) {
           await gateA;
@@ -109,8 +108,7 @@ test('resetState allows a second openLoad after a completed load', async () => {
     color: false,
     startPane: 'files',
     repo: {
-      load: () => ({ top: cwd, items: [item] }),
-      loadAsync: async () => {
+      load: async () => {
         calls += 1;
         return { top: cwd, items: [item] };
       },
@@ -142,8 +140,7 @@ test('openLoad shares one in-flight promise without reset', async () => {
     stdout: uiSink(),
     color: false,
     repo: {
-      load: () => ({ top: cwd, items: [item] }),
-      loadAsync: async () => {
+      load: async () => {
         calls += 1;
         await gate;
         return { top: cwd, items: [item] };
@@ -174,8 +171,7 @@ test('reset rejects a late snapshot that ignores abort', async () => {
     stdout: uiSink(),
     color: false,
     repo: {
-      load: () => ({ top: cwd, items: [newItem] }),
-      loadAsync: async () => {
+      load: async () => {
         calls += 1;
         if (calls === 1) {
           await gateA;
@@ -215,8 +211,7 @@ test('reset ignores extras from a previous load', async () => {
     color: false,
     audit: true,
     repo: {
-      load: () => ({ top: cwd, items: [gitItem] }),
-      loadAsync: async () => {
+      load: async () => {
         calls += 1;
         if (calls === 1) {
           return {
@@ -279,8 +274,7 @@ test('close while loading ignores the late snapshot', async () => {
     stdout: uiSink(),
     color: false,
     repo: {
-      load: () => ({ top: cwd, items: [] }),
-      loadAsync: async () => {
+      load: async () => {
         await gate;
         return { top: cwd, items: [item] };
       },
@@ -299,7 +293,7 @@ const emptySession = (asyncLoad = false, extra = {}) => {
   const cwd = extra.cwd ?? tempDir('reslop-ui-');
   const load = () => ({ top: cwd, items: [] });
   const repo = extra.repo ?? { load };
-  if (asyncLoad && !repo.loadAsync) repo.loadAsync = async () => load();
+  if (asyncLoad && !repo.load) repo.load = async () => load();
   return new Session({
     stdout: uiSink(),
     color: false,
@@ -388,7 +382,7 @@ test('deferred extras keep an empty branch review open', async () => {
   const started = new Promise((resolve) => {
     startExtras = resolve;
   });
-  session.repo.loadAsync = async () => ({
+  session.repo.load = async () => ({
     top: session.cwd,
     items: [],
     pending: true,

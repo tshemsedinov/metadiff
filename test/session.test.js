@@ -250,7 +250,7 @@ const mockRepo = (initial, top) => {
   };
 };
 
-const openSession = (items, extra = {}) => {
+const openSession = async (items, extra = {}) => {
   const stdout = extra.stdout ?? uiSink();
   const cwd = extra.cwd ?? tempDir('reslop-ui-');
   const repo = extra.repo ?? mockRepo(items, cwd);
@@ -262,7 +262,7 @@ const openSession = (items, extra = {}) => {
     stdout,
     repo,
   });
-  session.load();
+  await session.load();
   return { session, repo, stdout, cwd };
 };
 
@@ -336,11 +336,11 @@ const clickAt = (session, x, y) => {
   });
 };
 
-test('prev at first block stays put and next reaches last', () => {
+test('prev at first block stays put and next reaches last', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
-  const { session } = openSession([a, b, c]);
+  const { session } = await openSession([a, b, c]);
   session.dispatch('prev');
   assert.equal(session.current().file.newPath, 'a.js');
   session.dispatch('next');
@@ -351,9 +351,9 @@ test('prev at first block stays put and next reaches last', () => {
   assert.equal(session.current().file.newPath, 'c.js');
 });
 
-test('AC8 add on staged is a no-op', () => {
+test('AC8 add on staged is a no-op', async () => {
   const item = sampleItem('s.js', 'staged');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.dispatch('add');
   assert.equal(session.status, '');
   assert.equal(repo.added.length, 0);
@@ -361,9 +361,9 @@ test('AC8 add on staged is a no-op', () => {
   assert.equal(session.items[0].origin, 'staged');
 });
 
-test('diff screen dims a on staged and u on unstaged', () => {
+test('diff screen dims a on staged and u on unstaged', async () => {
   const stagedItem = sampleItem('s.js', 'staged');
-  const staged = openSession([stagedItem], { color: true });
+  const staged = await openSession([stagedItem], { color: true });
   staged.stdout.columns = 160;
   staged.session.draw();
   const stagedRow = staged.session.lastFrame.rows.at(-1);
@@ -382,7 +382,7 @@ test('diff screen dims a on staged and u on unstaged', () => {
   assert.equal(staged.repo.added.length, 0);
   assert.equal(staged.session.status, '');
 
-  const unstaged = openSession([sampleItem('u.js')], { color: true });
+  const unstaged = await openSession([sampleItem('u.js')], { color: true });
   unstaged.stdout.columns = 160;
   unstaged.session.draw();
   const unstagedRow = unstaged.session.lastFrame.rows.at(-1);
@@ -402,7 +402,7 @@ test('add and unstage keep block order', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
-  const { session, repo } = openSession([a, b, c]);
+  const { session, repo } = await openSession([a, b, c]);
   let loads = 0;
   const inner = repo.load;
   repo.load = () => {
@@ -423,6 +423,7 @@ test('add and unstage keep block order', async () => {
   const stagedFirst = [session.items[1], session.items[0], session.items[2]];
   repo.load = () => ({ top: '/tmp', items: stagedFirst, branch: 'main' });
   session.refreshFromRepo({ keepView: true });
+  await session.ops.idle();
   assert.deepEqual(
     session.items.map((item) => item.file.newPath),
     ['a.js', 'b.js', 'c.js'],
@@ -442,25 +443,25 @@ test('add and unstage keep block order', async () => {
 test('AC28 unstage drops index keeps worktree', async () => {
   const staged = sampleItem('s.js', 'staged');
   const other = sampleItem('a.js');
-  const { session, repo } = openSession([staged, other]);
+  const { session, repo } = await openSession([staged, other]);
   session.dispatch('unstage');
   await session.ops.idle();
   assert.equal(repo.unstageCalls.length, 1);
   assert.equal(session.status, 'unstaged');
 });
 
-test('AC28 unstage on unstaged is a no-op', () => {
+test('AC28 unstage on unstaged is a no-op', async () => {
   const item = sampleItem('a.js');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.dispatch('unstage');
   assert.equal(session.status, '');
   assert.equal(repo.unstageCalls.length, 0);
   assert.equal(session.items.length, 1);
 });
 
-test('AC21 commit add and revert are read only', () => {
+test('AC21 commit add and revert are read only', async () => {
   const item = sampleItem('c.js', 'commit');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.revShort = '7ac260c';
   session.dispatch('add');
   assert.equal(session.status, 'read only');
@@ -481,9 +482,9 @@ test('AC21 commit add and revert are read only', () => {
   assert.equal(repo.added.length, 0);
 });
 
-test('PR add and revert are read only and feedback attaches', () => {
+test('PR add and revert are read only and feedback attaches', async () => {
   const item = sampleItem('lib/a.js', 'pr');
-  const { session, repo } = openSession([item], {
+  const { session, repo } = await openSession([item], {
     sourceLabel: '#12',
     change: {
       source: 'pr',
@@ -524,9 +525,9 @@ test('PR add and revert are read only and feedback attaches', () => {
   assert.equal(view.repoName, 'acme/app');
 });
 
-test('-r blocks add unstage revert and still takes feedback', () => {
+test('-r blocks add unstage revert and still takes feedback', async () => {
   const item = sampleItem('a.js');
-  const { session, repo } = openSession([item], { readOnly: true });
+  const { session, repo } = await openSession([item], { readOnly: true });
   session.dispatch('add');
   assert.equal(session.status, 'read only');
   assert.equal(repo.added.length, 0);
@@ -555,7 +556,7 @@ test('AC9 hotkeys dispatch add revert next prev quit', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
-  const { session, repo } = openSession([a, b, c]);
+  const { session, repo } = await openSession([a, b, c]);
   assert.equal(session.layout, 'unified');
   session.pushInput('j');
   await session.ops.idle();
@@ -589,10 +590,10 @@ test('AC9 hotkeys dispatch add revert next prev quit', async () => {
   assert.equal(session.done, true);
 });
 
-test('j and k move next and prev on the diff', () => {
+test('j and k move next and prev on the diff', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session } = openSession([a, b]);
+  const { session } = await openSession([a, b]);
   session.pushInput('j');
   assert.equal(session.current().file.newPath, 'b.js');
   session.pushInput('k');
@@ -601,10 +602,10 @@ test('j and k move next and prev on the diff', () => {
   assert.equal(session.current().file.newPath, 'a.js');
 });
 
-test('j and k move the files cursor', () => {
+test('j and k move the files cursor', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session } = openSession([a, b], { startPane: 'files' });
+  const { session } = await openSession([a, b], { startPane: 'files' });
   assert.equal(session.fileCursor, 0);
   session.handleEvent({ type: 'key', key: 'right' });
   assert.equal(session.fileCursor, 0);
@@ -618,8 +619,8 @@ test('j and k move the files cursor', () => {
   assert.equal(session.fileCursor, 1);
 });
 
-test('vim ctrl keys scroll the diff by line and page', () => {
-  const { session } = openSession([tallItem('a.js', 80)]);
+test('vim ctrl keys scroll the diff by line and page', async () => {
+  const { session } = await openSession([tallItem('a.js', 80)]);
   session.draw();
   const page = session.lastFrame.bodyH;
   assert.ok(page > 1);
@@ -645,8 +646,8 @@ test('vim ctrl keys scroll the diff by line and page', () => {
   assert.equal(session.scroll, 0);
 });
 
-test('diff up scrolls immediately after the last line', () => {
-  const { session } = openSession([tallItem('a.js', 80)]);
+test('diff up scrolls immediately after the last line', async () => {
+  const { session } = await openSession([tallItem('a.js', 80)]);
   session.draw();
   const max = session.lastFrame.scrollMax;
   assert.ok(max > 1);
@@ -656,10 +657,10 @@ test('diff up scrolls immediately after the last line', () => {
   assert.equal(session.scroll, max - 1);
 });
 
-test('vim ctrl-f pages down the files list', () => {
+test('vim ctrl-f pages down the files list', async () => {
   const items = [];
   for (let i = 0; i < 20; i++) items.push(sampleItem(`f${i}.js`));
-  const { session } = openSession(items, { startPane: 'files' });
+  const { session } = await openSession(items, { startPane: 'files' });
   session.draw();
   const page = session.lastFrame.bodyH;
   assert.equal(session.fileCursor, 0);
@@ -669,10 +670,10 @@ test('vim ctrl-f pages down the files list', () => {
   assert.equal(session.fileCursor, 0);
 });
 
-test('files list up moves the cursor before scrolling', () => {
+test('files list up moves the cursor before scrolling', async () => {
   const items = [];
   for (let i = 0; i < 20; i++) items.push(sampleItem(`f${i}.js`));
-  const { session } = openSession(items, { startPane: 'files' });
+  const { session } = await openSession(items, { startPane: 'files' });
   const last = session.fileList().length - 1;
   for (let i = 0; i < last; i++) session.dispatch('next');
   session.draw();
@@ -703,10 +704,10 @@ test('files list up moves the cursor before scrolling', () => {
   assert.equal(markRow(session.lastFrame), bottomMark - 1);
 });
 
-test('home end and page keys jump the files list', () => {
+test('home end and page keys jump the files list', async () => {
   const items = [];
   for (let i = 0; i < 20; i++) items.push(sampleItem(`f${i}.js`));
-  const { session } = openSession(items, { startPane: 'files' });
+  const { session } = await openSession(items, { startPane: 'files' });
   session.draw();
   const page = session.lastFrame.bodyH;
   const last = session.fileList().length - 1;
@@ -722,7 +723,7 @@ test('home end and page keys jump the files list', () => {
 
 test('AC10 footer Add hitbox dispatches add', async () => {
   const item = sampleItem('c.js');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.draw();
   const hit = session.lastFrame.buttons.find((entry) => entry.id === 'add');
   assert.ok(hit);
@@ -750,9 +751,9 @@ test('AC10 footer Add hitbox dispatches add', async () => {
   assert.equal(repo.added.length, 1);
 });
 
-test('AC13 drag copies selected text', () => {
+test('AC13 drag copies selected text', async () => {
   const item = sampleItem('c.js');
-  const { session, stdout } = openSession([item]);
+  const { session, stdout } = await openSession([item]);
   session.draw();
   session.handleEvent({
     type: 'mouse',
@@ -785,9 +786,9 @@ test('AC13 drag copies selected text', () => {
   assert.equal(session.status, 'copied');
 });
 
-test('draw writes once for an unchanged frame', () => {
+test('draw writes once for an unchanged frame', async () => {
   const item = sampleItem('c.js');
-  const { session, stdout } = openSession([item]);
+  const { session, stdout } = await openSession([item]);
   session.draw();
   const first = stdout.dump();
   session.draw();
@@ -803,8 +804,11 @@ test('draw writes once for an unchanged frame', () => {
   assert.ok(!extra.includes('[2J'));
 });
 
-test('escape from diff opens the file list, then quits', () => {
-  const { session } = openSession([sampleItem('a.js'), sampleItem('b.js')]);
+test('escape from diff opens the file list, then quits', async () => {
+  const { session } = await openSession([
+    sampleItem('a.js'),
+    sampleItem('b.js'),
+  ]);
   assert.equal(session.pane, 'diff');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
@@ -813,8 +817,8 @@ test('escape from diff opens the file list, then quits', () => {
   assert.equal(session.done, true);
 });
 
-test('escape from files with notes quits and keeps the status', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('escape from files with notes quits and keeps the status', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('feedback');
   session.pushInput('nits');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -828,8 +832,10 @@ test('escape from files with notes quits and keeps the status', () => {
   assert.equal(session.notes.status, 'partial');
 });
 
-test('starts on the file list', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('starts on the file list', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   assert.equal(session.pane, 'files');
   assert.equal(session.fileCursor, 0);
   assert.equal(session.fileList()[0].path, 'a.js');
@@ -838,10 +844,10 @@ test('starts on the file list', () => {
   assert.equal(session.current().file.newPath, 'a.js');
 });
 
-test('AC14 files pane lists paths and enter opens', () => {
+test('AC14 files pane lists paths and enter opens', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, stdout } = openSession([a, b], { startPane: 'files' });
+  const { session, stdout } = await openSession([a, b], { startPane: 'files' });
   assert.equal(session.pane, 'files');
   session.draw();
   const text = stdout.dump();
@@ -858,11 +864,13 @@ test('AC14 files pane lists paths and enter opens', () => {
   assert.equal(session.fileCursor, 0);
 });
 
-test('enter on a partial file opens the first unstaged hunk', () => {
+test('enter on a partial file opens the first unstaged hunk', async () => {
   const staged = sampleItem('a.js', 'staged');
   const unstaged = sampleItem('a.js');
   unstaged.blockId = 1;
-  const { session } = openSession([staged, unstaged], { startPane: 'files' });
+  const { session } = await openSession([staged, unstaged], {
+    startPane: 'files',
+  });
   session.dispatch('next');
   session.dispatch('open');
   assert.equal(session.pane, 'diff');
@@ -870,8 +878,8 @@ test('enter on a partial file opens the first unstaged hunk', () => {
   assert.equal(session.index, 1);
 });
 
-test('files pane add moves to the next file', () => {
-  const { session } = openSession(
+test('files pane add moves to the next file', async () => {
+  const { session } = await openSession(
     [sampleItem('a.js'), sampleItem('b.js'), sampleItem('c.js')],
     { startPane: 'files' },
   );
@@ -885,8 +893,8 @@ test('files pane add moves to the next file', () => {
   assert.equal(session.items[0].origin, 'unstaged');
 });
 
-test('files pane add on last file keeps the cursor', () => {
-  const { session } = openSession(
+test('files pane add on last file keeps the cursor', async () => {
+  const { session } = await openSession(
     [sampleItem('a.js'), sampleItem('b.js'), sampleItem('c.js')],
     { startPane: 'files' },
   );
@@ -915,7 +923,7 @@ test('files pane add unstage revert apply to the whole file', async () => {
     blockId: 1,
   };
   const other = sampleItem('b.js');
-  const { session, repo } = openSession([first, second, other], {
+  const { session, repo } = await openSession([first, second, other], {
     startPane: 'files',
   });
   session.dispatch('add');
@@ -946,8 +954,8 @@ test('files pane add unstage revert apply to the whole file', async () => {
   assert.equal(session.fileList()[0].path, 'b.js');
 });
 
-test('files pane i appends the path to gitignore and npmignore', () => {
-  const { session, cwd } = openSession([sampleItem('noise.log')], {
+test('files pane i appends the path to gitignore and npmignore', async () => {
+  const { session, cwd } = await openSession([sampleItem('noise.log')], {
     startPane: 'files',
   });
   fs.writeFileSync(path.join(cwd, '.npmignore'), 'dist/\n');
@@ -962,8 +970,8 @@ test('files pane i appends the path to gitignore and npmignore', () => {
   assert.equal(session.status, 'already ignored');
 });
 
-test('files pane disables mode and feedback', () => {
-  const { session } = openSession([sampleItem('a.js')], {
+test('files pane disables mode and feedback', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.dispatch('layout');
@@ -977,8 +985,8 @@ test('files pane disables mode and feedback', () => {
   assert.equal(session.composeKind, 'file');
 });
 
-test('files pane lists paths without a tasks row', () => {
-  const { session } = openSession([sampleItem('a.js')], {
+test('files pane lists paths without a tasks row', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   assert.equal(session.fileCursor, 0);
@@ -991,12 +999,13 @@ test('files pane lists paths without a tasks row', () => {
   assert.equal(session.status, 'staged');
 });
 
-test('reload picks up disk changes and keeps the current hunk', () => {
+test('reload picks up disk changes and keeps the current hunk', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
   const c = sampleItem('c.js');
-  const { session, repo } = openSession([a, b]);
+  const { session, repo } = await openSession([a, b]);
   session.dispatch('next');
+  await session.ops.idle();
   assert.equal(session.current().file.newPath, 'b.js');
   session.notes.feedback.set('b.js:1:1:0', {
     file: 'b.js',
@@ -1007,6 +1016,7 @@ test('reload picks up disk changes and keeps the current hunk', () => {
   });
   repo.load = () => ({ top: '/tmp', items: [a, b, c] });
   session.dispatch('reload');
+  await session.ops.idle();
   assert.equal(session.status, 'reloaded');
   assert.equal(session.pane, 'diff');
   assert.equal(session.current().file.newPath, 'b.js');
@@ -1014,35 +1024,37 @@ test('reload picks up disk changes and keeps the current hunk', () => {
   assert.equal(session.notes.feedback.get('b.js:1:1:0').text, 'keep me');
 });
 
-test('reload brings back dismissed hunks', () => {
+test('reload brings back dismissed hunks', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session } = openSession([a, b], { startPane: 'files' });
+  const { session } = await openSession([a, b], { startPane: 'files' });
   session.dismissed.add('unstaged:a.js:1:1:0');
   session.items = session.items.filter((item) => item.file.newPath !== 'a.js');
   session.index = 0;
   assert.equal(session.current().file.newPath, 'b.js');
   session.dispatch('reload');
+  await session.ops.idle();
   assert.equal(session.status, 'reloaded');
   assert.equal(session.dismissed.size, 0);
   assert.equal(session.items.length, 2);
   assert.equal(session.current().file.newPath, 'b.js');
 });
 
-test('reload from the file list still refreshes', () => {
+test('reload from the file list still refreshes', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openSession([a], { startPane: 'files' });
+  const { session, repo } = await openSession([a], { startPane: 'files' });
   repo.load = () => ({ top: '/tmp', items: [a, b] });
   session.dispatch('reload');
+  await session.ops.idle();
   assert.equal(session.status, 'reloaded');
   assert.equal(session.pane, 'files');
   assert.equal(session.items.length, 2);
 });
 
-test('compose r inserts a letter and does not reload', () => {
+test('compose r inserts a letter and does not reload', async () => {
   const a = sampleItem('a.js');
-  const { session, repo } = openSession([a]);
+  const { session, repo } = await openSession([a]);
   let loads = 0;
   const orig = repo.load;
   repo.load = (...args) => {
@@ -1056,10 +1068,12 @@ test('compose r inserts a letter and does not reload', () => {
   assert.equal(loads, 0);
 });
 
-test('files pane add on a staged file still moves down', () => {
+test('files pane add on a staged file still moves down', async () => {
   const item = sampleItem('a.js', 'staged');
   const next = sampleItem('b.js');
-  const { session, repo } = openSession([item, next], { startPane: 'files' });
+  const { session, repo } = await openSession([item, next], {
+    startPane: 'files',
+  });
   session.dispatch('add');
   assert.equal(session.status, 'already staged');
   assert.equal(repo.added.length, 0);
@@ -1067,8 +1081,8 @@ test('files pane add on a staged file still moves down', () => {
   assert.equal(session.fileList()[1].path, 'b.js');
 });
 
-test('files pane unstage on an unstaged file still moves down', () => {
-  const { session, repo } = openSession(
+test('files pane unstage on an unstaged file still moves down', async () => {
+  const { session, repo } = await openSession(
     [sampleItem('a.js'), sampleItem('b.js')],
     { startPane: 'files' },
   );
@@ -1079,11 +1093,11 @@ test('files pane unstage on an unstaged file still moves down', () => {
   assert.equal(session.fileList()[1].path, 'b.js');
 });
 
-test('q quotes a diff and insert adds an npm command', () => {
-  const diff = openSession([sampleItem('a.js')]);
+test('q quotes a diff and insert adds an npm command', async () => {
+  const diff = await openSession([sampleItem('a.js')]);
   diff.session.handleEvent({ type: 'key', key: 'q' });
   assert.equal(diff.session.composeKind, 'feedback');
-  const npm = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const npm = await openSession([sampleItem('a.js')], { startPane: 'files' });
   fs.writeFileSync(
     path.join(npm.cwd, 'package.json'),
     `${JSON.stringify({ scripts: { test: 'node --test' } })}\n`,
@@ -1094,9 +1108,9 @@ test('q quotes a diff and insert adds an npm command', () => {
   assert.equal(npm.session.npm.editField, 'name');
 });
 
-test('f maps feedback to the hunk location', () => {
+test('f maps feedback to the hunk location', async () => {
   const item = sampleItem('a.js');
-  const { session } = openSession([item]);
+  const { session } = await openSession([item]);
   session.dispatch('feedback');
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'feedback');
@@ -1112,10 +1126,10 @@ test('f maps feedback to the hunk location', () => {
   assert.equal(session.composer.idleNoteText(), '[ ] extract helper');
 });
 
-test('compose arrows move by visual wrap rows', () => {
+test('compose arrows move by visual wrap rows', async () => {
   const stdout = uiSink();
   stdout.columns = 10;
-  const { session } = openSession([sampleItem('a.js')], { stdout });
+  const { session } = await openSession([sampleItem('a.js')], { stdout });
   session.dispatch('feedback');
   session.pushInput('hello world');
   session.handleEvent({ type: 'key', key: 'up' });
@@ -1124,9 +1138,9 @@ test('compose arrows move by visual wrap rows', () => {
   assert.equal(session.editor.cursor, 11);
 });
 
-test('compose cursor uses the terminal blinking cursor', () => {
+test('compose cursor uses the terminal blinking cursor', async () => {
   const item = sampleItem('a.js');
-  const { session, stdout } = openSession([item]);
+  const { session, stdout } = await openSession([item]);
   session.dispatch('feedback');
   session.draw();
   const on = stdout.dump();
@@ -1137,9 +1151,9 @@ test('compose cursor uses the terminal blinking cursor', () => {
   assert.equal(stdout.dump(), on);
 });
 
-test('enter and escape save feedback and return to browse', () => {
+test('enter and escape save feedback and return to browse', async () => {
   const item = sampleItem('a.js');
-  const { session } = openSession([item]);
+  const { session } = await openSession([item]);
   session.dispatch('feedback');
   session.pushInput('note');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -1156,9 +1170,9 @@ test('enter and escape save feedback and return to browse', () => {
   assert.equal(session.status, 'saved');
 });
 
-test('editing feedback keeps one latest version', () => {
+test('editing feedback keeps one latest version', async () => {
   const item = sampleItem('a.js');
-  const { session } = openSession([item]);
+  const { session } = await openSession([item]);
   session.dispatch('feedback');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -1176,10 +1190,10 @@ test('editing feedback keeps one latest version', () => {
   assert.ok(!view.compose.text.includes('\n1 '));
 });
 
-test('feedback templates count reuse on another hunk not a re-save', () => {
+test('feedback templates count reuse on another hunk, not a save', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session } = openSession([a, b]);
+  const { session } = await openSession([a, b]);
   session.dispatch('feedback');
   session.pushInput('extract helper');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -1196,8 +1210,11 @@ test('feedback templates count reuse on another hunk not a re-save', () => {
   assert.equal(session.notes.templates[0].count, 2);
 });
 
-test('feedback templates are picked with tab arrows enter and click', () => {
-  const { session } = openSession([sampleItem('a.js'), sampleItem('b.js')]);
+test('feedback templates pick with tab arrows enter and click', async () => {
+  const { session } = await openSession([
+    sampleItem('a.js'),
+    sampleItem('b.js'),
+  ]);
   session.notes.templates = [
     { text: 'extract helper', count: 2 },
     { text: 'add tests', count: 1 },
@@ -1248,8 +1265,8 @@ test('feedback templates are picked with tab arrows enter and click', () => {
   assert.equal(session.notes.feedback.get(feedKey).text, 'add tests');
 });
 
-test('feedback templates filter by prefix and hide if none match', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('feedback templates filter by prefix and hide if none match', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.notes.templates = [
     { text: 'extract helper', count: 2 },
     { text: 'add tests', count: 1 },
@@ -1290,8 +1307,8 @@ test('feedback templates filter by prefix and hide if none match', () => {
   assert.match(body, /add tests/);
 });
 
-test('exact template text hides the template list', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('exact template text hides the template list', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.notes.templates = [
     { text: 'extract helper', count: 2 },
     { text: 'add tests', count: 1 },
@@ -1306,8 +1323,8 @@ test('exact template text hides the template list', () => {
   assert.deepEqual(session.composer.templates.shownTemplates(), []);
 });
 
-test('existing unique feedback hides the template list', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('existing unique feedback hides the template list', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.notes.templates = [
     { text: 'extract helper', count: 2 },
     { text: 'add tests', count: 1 },
@@ -1328,9 +1345,9 @@ test('existing unique feedback hides the template list', () => {
   assert.equal(session.lastFrame.templateHits.length, 0);
 });
 
-test('e edits added lines in the reviewed file', () => {
+test('e edits added lines in the reviewed file', async () => {
   const item = sampleItem('a.js');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.pushInput('e');
   assert.equal(session.mode, 'compose');
   assert.equal(session.composeKind, 'code');
@@ -1355,9 +1372,9 @@ test('e edits added lines in the reviewed file', () => {
   assert.deepEqual(repo.stagedPaths, ['a.js']);
 });
 
-test('e on a read-only commit keeps a code proposal', () => {
+test('e on a read-only commit keeps a code proposal', async () => {
   const item = sampleItem('a.js', 'commit');
-  const { session, repo } = openSession([item], { rev: 'abc1234' });
+  const { session, repo } = await openSession([item], { rev: 'abc1234' });
   session.pushInput('e');
   session.pushInput('2');
   session.handleEvent({ type: 'key', key: 'escape' });
@@ -1367,9 +1384,9 @@ test('e on a read-only commit keeps a code proposal', () => {
   assert.equal(session.view().counts.code, 1);
 });
 
-test('code save equal to original drops the proposal', () => {
+test('code save equal to original drops the proposal', async () => {
   const item = sampleItem('a.js');
-  const { session, repo } = openSession([item]);
+  const { session, repo } = await openSession([item]);
   session.dispatch('code');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.notes.code.size, 0);
@@ -1377,8 +1394,8 @@ test('code save equal to original drops the proposal', () => {
   assert.equal(repo.stagedPaths.length, 0);
 });
 
-test('todos screen ignores commit and todo hotkeys', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todos screen ignores commit and todo hotkeys', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.tasksOpen, true);
@@ -1389,8 +1406,8 @@ test('todos screen ignores commit and todo hotkeys', () => {
   assert.equal(session.mode, 'review');
 });
 
-test('todo list scrolls the focused row into view', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('todo list scrolls the focused row into view', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   stdout.rows = 12;
   for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
@@ -1426,8 +1443,8 @@ test('todo list scrolls the focused row into view', () => {
   assert.ok(!/item 0(?!\d)/.test(paged));
 });
 
-test('scrolling back to the top shows the first header and blank line', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('scrolling to the top shows the first header and blank line', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   stdout.rows = 12;
   for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
@@ -1444,8 +1461,8 @@ test('scrolling back to the top shows the first header and blank line', () => {
   assert.match(rows[2], /Feature requests and Enhancements/);
 });
 
-test('tasks list shows a blank line after the blocks at the scroll end', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('tasks list ends with a blank line after the blocks', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   stdout.rows = 12;
   for (let i = 0; i < 30; i++) session.notes.addTask('a.js', `item ${i}`);
   session.composer.tasks.openTasksPage();
@@ -1466,16 +1483,16 @@ test('tasks list shows a blank line after the blocks at the scroll end', () => {
   assert.notEqual(plain()[statusAt - 1].trim(), '');
 });
 
-test('a short tasks list does not scroll for a trailing blank', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('a short tasks list does not scroll for a trailing blank', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   stdout.rows = 40;
   session.composer.tasks.openTasksPage();
   session.draw();
   assert.equal(session.lastFrame.scrollMax, 0);
 });
 
-test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('ctrl+up and ctrl+down reorder tasks and stay inside a file', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -1542,8 +1559,8 @@ test('ctrl+up and ctrl+down reorder tasks and stay inside a file', () => {
   assert.equal(body.includes('ctrl+down'), false);
 });
 
-test('quoted feedback can be edited from the tasks screen', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('quoted feedback can be edited from the tasks screen', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.notes.setFeedback('a.js:1:1:0', {
     file: 'a.js',
     oldStart: 1,
@@ -1563,8 +1580,8 @@ test('quoted feedback can be edited from the tasks screen', () => {
   assert.equal(session.notes.feedback.get('a.js:1:1:0').done, true);
 });
 
-test('tasks status switches plan files and defaults to the last one', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')]);
+test('tasks status switches plan files, defaults to the last', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')]);
   const dir = path.join(cwd, REVIEW_DIR);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
@@ -1624,8 +1641,10 @@ test('tasks status switches plan files and defaults to the last one', () => {
   assert.equal(session.notes.tasks[0].text, 'from older');
 });
 
-test('tasks plan combo filters in place and keeps the agent menu', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], { color: true });
+test('tasks plan combo filters in place and keeps the agent menu', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
+    color: true,
+  });
   const dir = path.join(cwd, REVIEW_DIR);
   fs.mkdirSync(dir, { recursive: true });
   for (let i = 0; i < 12; i++) {
@@ -1684,8 +1703,8 @@ test('tasks plan combo filters in place and keeps the agent menu', () => {
   assert.equal(session.composer.tasks.planName(), 'beta-plan.md');
 });
 
-test('tasks plan hotkey opens the combo and can start a new plan', () => {
-  const { session } = openSession([sampleItem('a.js')], { color: true });
+test('tasks plan hotkey opens the combo and can start a new plan', async () => {
+  const { session } = await openSession([sampleItem('a.js')], { color: true });
   session.dispatch('tasks');
   session.handleEvent({ type: 'key', key: 'escape' });
   session.draw();
@@ -1738,8 +1757,8 @@ test('tasks plan hotkey opens the combo and can start a new plan', () => {
   assert.notEqual(created, name);
 });
 
-test('import url closes when focus leaves the field', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('import url closes when focus leaves the field', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   const begin = () => {
     session.dispatch('tasks');
     session.handleEvent({ type: 'key', key: 'escape' });
@@ -1772,7 +1791,7 @@ test('import url closes when focus leaves the field', () => {
 });
 
 test('tasks import asks for a url and applies the pull request', async () => {
-  const { session } = openSession([sampleItem('a.js')], {
+  const { session } = await openSession([sampleItem('a.js')], {
     loadPullRequest: async () => ({
       imported: {
         feedback: [],
@@ -1810,7 +1829,7 @@ test('tasks import asks for a url and applies the pull request', async () => {
 });
 
 test('tasks import accepts a github or gitlab issue url', async () => {
-  const { session } = openSession([sampleItem('a.js')], {
+  const { session } = await openSession([sampleItem('a.js')], {
     loadGithubIssue: async () => ({
       imported: {
         feedback: [],
@@ -1855,7 +1874,7 @@ test('tasks import accepts a github or gitlab issue url', async () => {
 test('tasks import accepts a github or gitlab issue list', async () => {
   let githubTarget = null;
   let gitlabTarget = null;
-  const { session } = openSession([sampleItem('a.js')], {
+  const { session } = await openSession([sampleItem('a.js')], {
     loadGithubIssue: async (issue) => {
       githubTarget = issue;
       return {
@@ -1909,8 +1928,8 @@ test('tasks import accepts a github or gitlab issue list', async () => {
   assert.match(session.notes.tasks[1].text, /@bob at gitlab:/);
 });
 
-test('todo edits in the list not the note line', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('todo edits in the list not the note line', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   stdout.rows = 24;
   session.dispatch('tasks');
   session.pushInput('in the list');
@@ -1930,10 +1949,13 @@ test('todo edits in the list not the note line', () => {
   assert.equal(session.lastFrame.cursor.y, hit.y);
 });
 
-test('t from any file adds a repo todo and starts editing', () => {
-  const { session } = openSession([sampleItem('a.js'), sampleItem('b.js')], {
-    startPane: 'files',
-  });
+test('t from any file adds a repo todo and starts editing', async () => {
+  const { session } = await openSession(
+    [sampleItem('a.js'), sampleItem('b.js')],
+    {
+      startPane: 'files',
+    },
+  );
   session.dispatch('scrollDown');
   assert.equal(session.fileCursor, 1);
   session.dispatch('tasks');
@@ -1953,10 +1975,10 @@ test('t from any file adds a repo todo and starts editing', () => {
   assert.equal(session.editor.text, '');
 });
 
-test('t opens the repo todo page and lets you edit it', () => {
+test('t opens the repo todo page and lets you edit it', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session } = openSession([a, b]);
+  const { session } = await openSession([a, b]);
   const files = session.fileList();
   assert.equal(files[0].path, 'a.js');
   assert.equal(
@@ -2012,8 +2034,8 @@ test('t opens the repo todo page and lets you edit it', () => {
   assert.equal(session.current().file.newPath, 'a.js');
 });
 
-test('todo list keeps a blank row to start a new item', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo list keeps a blank row to start a new item', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2061,8 +2083,8 @@ test('todo list keeps a blank row to start a new item', () => {
   assert.equal(session.editor.text, '');
 });
 
-test('enter and click edit the focused todo', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('enter and click edit the focused todo', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2128,8 +2150,8 @@ test('enter and click edit the focused todo', () => {
   assert.equal(session.editor.text, 'second note');
 });
 
-test('todo list stays on screen while composing', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo list stays on screen while composing', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2165,8 +2187,8 @@ test('todo list stays on screen while composing', () => {
   assert.equal(session.notes.tasks[1].text, 'draft two');
 });
 
-test('delete and backspace remove the selected todo', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('delete and backspace remove the selected todo', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first note');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2184,8 +2206,8 @@ test('delete and backspace remove the selected todo', () => {
   assert.equal(session.current().origin, 'task');
 });
 
-test('empty autosave does not persist a draft todo', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('empty autosave does not persist a draft todo', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   assert.equal(session.composeTaskId, null);
   session.autosave();
@@ -2199,8 +2221,8 @@ test('empty autosave does not persist a draft todo', () => {
   assert.equal(session.current().origin, 'task');
 });
 
-test('todo autosave updates one draft instead of duplicating', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo autosave updates one draft instead of duplicating', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('keep this');
   session.autosave();
@@ -2222,8 +2244,8 @@ test('todo autosave updates one draft instead of duplicating', () => {
   );
 });
 
-test('typing a todo starts editing at the end of the line', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('typing a todo starts editing at the end of the line', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'escape' });
@@ -2235,8 +2257,8 @@ test('typing a todo starts editing at the end of the line', () => {
   assert.equal(session.editor.cursor, 'first+more'.length);
 });
 
-test('home end and page keys jump the todo list', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('home end and page keys jump the todo list', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('one');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2256,8 +2278,8 @@ test('home end and page keys jump the todo list', () => {
   assert.equal(session.tasksFocus, 0);
 });
 
-test('todo edit arrows move across todos without leaving edit', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo edit arrows move across todos without leaving edit', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2288,8 +2310,8 @@ test('todo edit arrows move across todos without leaving edit', () => {
   );
 });
 
-test('todo edit arrows move inside a multiline todo', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo edit arrows move inside a multiline todo', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2318,8 +2340,8 @@ test('todo edit arrows move inside a multiline todo', () => {
   assert.equal(session.editor.text, '');
 });
 
-test('todo list arrows skip over multiline items', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo list arrows skip over multiline items', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2337,8 +2359,8 @@ test('todo list arrows skip over multiline items', () => {
   assert.equal(session.tasksFocus, 2);
 });
 
-test('todo edit arrows move across wrapped lines', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo edit arrows move across wrapped lines', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2357,8 +2379,8 @@ test('todo edit arrows move across wrapped lines', () => {
   assert.equal(session.tasksFocus, 2);
 });
 
-test('todo edit page keys jump across todos', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo edit page keys jump across todos', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2374,8 +2396,8 @@ test('todo edit page keys jump across todos', () => {
   assert.equal(session.editor.text, '');
 });
 
-test('enter edits the next todo and escape stays on it', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('enter edits the next todo and escape stays on it', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('first');
   session.handleEvent({ type: 'key', key: 'enter' });
@@ -2392,8 +2414,8 @@ test('enter edits the next todo and escape stays on it', () => {
   );
 });
 
-test('todo save recovers if the stub was dropped', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('todo save recovers if the stub was dropped', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.notes.tasks = [];
   session.pushInput('still here');
@@ -2403,9 +2425,9 @@ test('todo save recovers if the stub was dropped', () => {
   assert.equal(session.current().origin, 'task');
 });
 
-test('quit with notes keeps the review status', () => {
+test('quit with notes keeps the review status', async () => {
   const item = sampleItem('a.js');
-  const { session } = openSession([item]);
+  const { session } = await openSession([item]);
   session.dispatch('feedback');
   session.pushInput('nits');
   session.handleEvent({ type: 'key', key: 'ctrl-s' });
@@ -2419,8 +2441,8 @@ test('quit with notes keeps the review status', () => {
   assert.match(md, /status: ready/);
 });
 
-test('quit warns before terminating a running test or agent', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('quit warns before terminating a running test or agent', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   let testsKilled = false;
   let agentsKilled = false;
   session.npm.runs.push({
@@ -2468,7 +2490,7 @@ test('quit warns before terminating a running test or agent', () => {
   assert.equal(session.notes.status, 'editing');
 });
 
-test('initReview resumes latest editing file', () => {
+test('initReview resumes latest editing file', async () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
@@ -2476,7 +2498,7 @@ test('initReview resumes latest editing file', () => {
   draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
-  const { session } = openSession([sampleItem('a.js')], { cwd });
+  const { session } = await openSession([sampleItem('a.js')], { cwd });
   assert.equal(session.notes.reviewPath, reviewPath);
   assert.equal(session.notes.status, 'editing');
   assert.equal(session.notes.tasks[0].text, 'rewrite loop');
@@ -2486,7 +2508,7 @@ test('initReview resumes latest editing file', () => {
   );
 });
 
-test('initReview starts a new file when latest is ready', () => {
+test('initReview starts a new file when latest is ready', async () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
@@ -2495,7 +2517,7 @@ test('initReview starts a new file when latest is ready', () => {
   draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
-  const { session } = openSession([sampleItem('a.js')], { cwd });
+  const { session } = await openSession([sampleItem('a.js')], { cwd });
   assert.equal(
     session.notes.reviewPath,
     path.join(cwd, REVIEW_DIR, `${dateStamp()}-01.md`),
@@ -2503,7 +2525,7 @@ test('initReview starts a new file when latest is ready', () => {
   assert.equal(session.notes.tasks.length, 0);
 });
 
-test('newReview starts a new file even if latest is editing', () => {
+test('newReview starts a new file even if latest is editing', async () => {
   const cwd = tempDir('reslop-ui-');
   const name = `${dateStamp()}-00.md`;
   const reviewPath = path.join(cwd, REVIEW_DIR, name);
@@ -2511,7 +2533,7 @@ test('newReview starts a new file even if latest is editing', () => {
   draft.addTask('a.js', 'rewrite loop');
   fs.mkdirSync(path.dirname(reviewPath), { recursive: true });
   fs.writeFileSync(reviewPath, serializeReview(draft), 'utf8');
-  const { session } = openSession([sampleItem('a.js')], {
+  const { session } = await openSession([sampleItem('a.js')], {
     cwd,
     newReview: true,
   });
@@ -2523,7 +2545,7 @@ test('newReview starts a new file even if latest is editing', () => {
 });
 
 test('files pane c lists commits and c commits the message', async () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2561,7 +2583,7 @@ test('files pane c lists commits and c commits the message', async () => {
 });
 
 test('dashboard p pulls and s pushes', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'dashboard',
   });
   session.pushInput('p');
@@ -2575,35 +2597,45 @@ test('dashboard p pulls and s pushes', async () => {
   assert.equal(session.status, 'pushed');
 });
 
-test('escape from a commit diff returns to the dashboard', () => {
-  const { session } = openSession([sampleItem('a.js', 'staged')], {
+test('escape from a commit diff returns to the dashboard', async () => {
+  const { session } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'dashboard',
   });
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.pane, 'diff');
   assert.equal(session.rev.startsWith('aaa1111'), true);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'dashboard');
   assert.equal(session.rev, '');
   assert.equal(session.revShort, '');
 });
 
-test('enter on uncommitted changes leaves a viewed commit', () => {
-  const { session } = openSession([sampleItem('a.js', 'staged')], {
+test('enter on uncommitted changes leaves a viewed commit', async () => {
+  const { session } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   const sha = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   session.pushInput('c');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.pane, 'diff');
   assert.equal(session.rev, sha);
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   session.pushInput('c');
+  await session.ops.idle();
   assert.equal(session.commitCursor, 0);
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.rev, '');
   assert.equal(session.revShort, '');
   assert.equal(session.mode, 'review');
@@ -2611,8 +2643,8 @@ test('enter on uncommitted changes leaves a viewed commit', () => {
   assert.notEqual(session.items[0].origin, 'commit');
 });
 
-test('enter on uncommitted changes opens the commit editor', () => {
-  const { session } = openSession([sampleItem('a.js', 'staged')], {
+test('enter on uncommitted changes opens the commit editor', async () => {
+  const { session } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2623,8 +2655,8 @@ test('enter on uncommitted changes opens the commit editor', () => {
   assert.equal(session.commitCursor, 0);
 });
 
-test('c commits, amends the latest commit, or fixups an older one', () => {
-  const { session } = openSession([sampleItem('a.js', 'staged')], {
+test('c commits, amends the latest, or fixups an older commit', async () => {
+  const { session } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2645,9 +2677,9 @@ test('c commits, amends the latest commit, or fixups an older one', () => {
   assert.equal(session.commitKind, 'fixup');
 });
 
-test('click commit footer chooses commit amend or fixup', () => {
-  const clickKind = (steps, kind) => {
-    const { session } = openSession([sampleItem('a.js', 'staged')], {
+test('click commit footer chooses commit amend or fixup', async () => {
+  const clickKind = async (steps, kind) => {
+    const { session } = await openSession([sampleItem('a.js', 'staged')], {
       startPane: 'files',
     });
     session.pushInput('c');
@@ -2659,13 +2691,13 @@ test('click commit footer chooses commit amend or fixup', () => {
     assert.equal(session.mode, 'compose');
     assert.equal(session.commitKind, kind);
   };
-  clickKind(0, 'commit');
-  clickKind(1, 'amend');
-  clickKind(2, 'fixup');
+  await clickKind(0, 'commit');
+  await clickKind(1, 'amend');
+  await clickKind(2, 'fixup');
 });
 
-test('commits pane v toggles brief on and off', () => {
-  const { session } = openSession([sampleItem('a.js')], {
+test('commits pane v toggles brief on and off', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2678,8 +2710,8 @@ test('commits pane v toggles brief on and off', () => {
   assert.equal(session.status, 'brief');
 });
 
-test('full mode commit enter inserts a newline', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('full mode commit enter inserts a newline', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2696,8 +2728,8 @@ test('full mode commit enter inserts a newline', () => {
   assert.equal(session.commitCursor, 0);
 });
 
-test('full mode ctrl-s saves the message', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('full mode ctrl-s saves the message', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2712,8 +2744,8 @@ test('full mode ctrl-s saves the message', () => {
   assert.equal(repo.commits[0].message, 'one\ntwo');
 });
 
-test('full mode enter keeps the blank line after the subject', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('full mode enter keeps the blank line after the subject', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2735,8 +2767,8 @@ test('full mode enter keeps the blank line after the subject', () => {
   assert.equal(repo.commits[0].message, 'ship it\n\nexplain');
 });
 
-test('full mode enter three times saves a one-line message', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('full mode enter three times saves a one-line message', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2752,8 +2784,8 @@ test('full mode enter three times saves a one-line message', () => {
   assert.equal(repo.commits[0].message, 'ship it');
 });
 
-test('saving a commit trims spaces and surrounding newlines', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('saving a commit trims spaces and surrounding newlines', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2765,10 +2797,13 @@ test('saving a commit trims spaces and surrounding newlines', () => {
   assert.equal(repo.commits[0].message, 'ship it\n\nexplain');
 });
 
-test('editing a commit ignores clicks and scrolls on other commits', () => {
-  const { session, stdout } = openSession([sampleItem('a.js', 'staged')], {
-    startPane: 'files',
-  });
+test('editing a commit ignores clicks and scrolls elsewhere', async () => {
+  const { session, stdout } = await openSession(
+    [sampleItem('a.js', 'staged')],
+    {
+      startPane: 'files',
+    },
+  );
   stdout.rows = 32;
   session.pushInput('c');
   session.pushInput('v');
@@ -2814,7 +2849,7 @@ test('editing a commit ignores clicks and scrolls on other commits', () => {
 });
 
 test('brief reword edits the first line and keeps the body', async () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   repo.setCommits([
@@ -2847,7 +2882,7 @@ test('brief reword edits the first line and keeps the body', async () => {
 });
 
 test('brief amend edits the first line and keeps the body', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.lastMessage = () => 'land the change\n\nexplain the change';
@@ -2869,8 +2904,8 @@ test('brief amend edits the first line and keeps the body', async () => {
   assert.equal(repo.commits[0].message, 'ship it\n\nexplain the change');
 });
 
-test('full mode reword edits the whole message', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('full mode reword edits the whole message', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   repo.setCommits([
@@ -2898,7 +2933,7 @@ test('full mode reword edits the whole message', () => {
 });
 
 test('commits pane a amends with the previous message', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2921,7 +2956,7 @@ test('commits pane a amends with the previous message', async () => {
 });
 
 test('commits pane r rewords the selected commit', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2950,7 +2985,7 @@ test('commits pane r rewords the selected commit', async () => {
 });
 
 test('commits pane a applies a selected fixup', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -2987,7 +3022,7 @@ test('commits pane a applies a selected fixup', async () => {
 });
 
 test('click apply footer squashes the selected fixup', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3020,7 +3055,7 @@ test('click apply footer squashes the selected fixup', async () => {
 });
 
 test('c on an older commit writes a fixup', async () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3041,8 +3076,8 @@ test('c on an older commit writes a fixup', async () => {
   assert.equal(repo.commits[0].message, 'fixup! init');
 });
 
-test('escape from commit message does not run git', () => {
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+test('escape from commit message does not run git', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3053,8 +3088,8 @@ test('escape from commit message does not run git', () => {
   assert.equal(repo.commits.length, 0);
 });
 
-test('compose c inserts a letter and does not open commit', () => {
-  const { session, repo } = openSession([sampleItem('a.js')]);
+test('compose c inserts a letter and does not open commit', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')]);
   session.dispatch('feedback');
   session.pushInput('c');
   assert.equal(session.mode, 'compose');
@@ -3063,15 +3098,15 @@ test('compose c inserts a letter and does not open commit', () => {
   assert.equal(repo.commits.length, 0);
 });
 
-test('diff pane c opens commits', () => {
-  const { session } = openSession([sampleItem('a.js', 'staged')]);
+test('diff pane c opens commits', async () => {
+  const { session } = await openSession([sampleItem('a.js', 'staged')]);
   session.pushInput('c');
   assert.equal(session.mode, 'review');
   assert.equal(session.pane, 'commits');
 });
 
-test('commits pane skips commit when nothing is staged', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('commits pane skips commit when nothing is staged', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3086,51 +3121,71 @@ test('commits pane skips commit when nothing is staged', () => {
   assert.equal(repo.commits.length, 0);
 });
 
-test('commits pane opens on the viewed revision', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('commits pane opens on the viewed revision', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.pushInput('c');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'end' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 2);
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   session.draw();
   assert.equal(session.pane, 'diff');
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   assert.equal(session.pane, 'files');
   session.pushInput('c');
+  await session.ops.idle();
   assert.equal(session.pane, 'commits');
   assert.equal(session.commitCursor, 2);
 });
 
-test('commits pane lists newest first', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('commits pane lists newest first', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.pushInput('c');
+  await session.ops.idle();
   const listed = session.view().commits.map((entry) => entry.subject);
   assert.deepEqual(listed, ['uncommitted changes', 'land the change', 'init']);
   session.handleEvent({ type: 'key', key: 'right' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 0);
   session.handleEvent({ type: 'key', key: 'down' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 1);
   session.handleEvent({ type: 'key', key: 'up' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 0);
   session.pushInput('j');
+  await session.ops.idle();
   assert.equal(session.commitCursor, 1);
   session.handleEvent({ type: 'key', key: 'home' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 0);
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.pane, 'commits');
   assert.equal(session.mode, 'review');
   assert.equal(session.status, 'nothing to commit');
   session.handleEvent({ type: 'key', key: 'escape' });
+  await session.ops.idle();
   session.pushInput('c');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'end' });
+  await session.ops.idle();
   assert.equal(session.commitCursor, 2);
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(session.pane, 'diff');
   assert.equal(session.rev, 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
 });
 
 test('commits pane delete asks to delete the selected commit', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3163,8 +3218,10 @@ test('commits pane delete asks to delete the selected commit', async () => {
   assert.equal(session.view().commits[1].subject, 'init');
 });
 
-test('click commit row selects it', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('click commit row selects it', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.pushInput('c');
   session.draw();
   const hit = session.lastFrame.fileHits.find((entry) => entry.cursor === 1);
@@ -3174,9 +3231,12 @@ test('click commit row selects it', () => {
   assert.equal(session.pane, 'commits');
 });
 
-test('double click commit row opens its diff', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('double click commit row opens its diff', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.pushInput('c');
+  await session.ops.idle();
   session.draw();
   const hit = session.lastFrame.fileHits.find((entry) => entry.cursor === 2);
   assert.ok(hit);
@@ -3189,20 +3249,22 @@ test('double click commit row opens its diff', () => {
 });
 
 test('files pane a and d stay add and revert', async () => {
-  const added = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const added = await openSession([sampleItem('a.js')], { startPane: 'files' });
   added.session.handleEvent({ type: 'key', key: 'down' });
   added.session.pushInput('a');
   await added.session.ops.idle();
   assert.equal(added.repo.added.length, 1);
-  const reverted = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const reverted = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   reverted.session.handleEvent({ type: 'key', key: 'down' });
   reverted.session.pushInput('d');
   await reverted.session.ops.idle();
   assert.equal(reverted.repo.reverted.length, 1);
 });
 
-test('files pane p and s do not pull or push', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('files pane p and s do not pull or push', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('p');
@@ -3212,8 +3274,8 @@ test('files pane p and s do not pull or push', () => {
   assert.equal(session.pane, 'files');
 });
 
-test('commits pane p applies and s does not push', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('commits pane p applies and s does not push', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -3225,15 +3287,15 @@ test('commits pane p applies and s does not push', () => {
   assert.equal(session.pane, 'commits');
 });
 
-test('quit without notes does not write a review file', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('quit without notes does not write a review file', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   const reviewPath = session.notes.reviewPath;
   session.dispatch('quit');
   assert.equal(session.done, true);
   assert.equal(fs.existsSync(reviewPath), false);
 });
 
-test('load applies imported GitHub notes on a new review', () => {
+test('load applies imported GitHub notes on a new review', async () => {
   const item = sampleItem('lib/parser.js', 'pr');
   const cwd = tempDir('reslop-ui-');
   const imported = {
@@ -3268,7 +3330,7 @@ test('load applies imported GitHub notes on a new review', () => {
     unstage: () => {},
     revert: () => {},
   };
-  const { session } = openSession([item], { cwd, repo });
+  const { session } = await openSession([item], { cwd, repo });
   const notes = [...session.notes.feedback.values()];
   assert.equal(notes.length, 1);
   assert.match(notes[0].text, /use const/);
@@ -3278,11 +3340,11 @@ test('load applies imported GitHub notes on a new review', () => {
     session.fileList().some((entry) => entry.kind === 'tasks'),
     false,
   );
-  session.load();
+  await session.load();
   assert.equal(session.notes.tasks.length, 1);
 });
 
-test('load skips imported GitHub notes when resuming a review', () => {
+test('load skips imported GitHub notes when resuming a review', async () => {
   const cwd = tempDir('reslop-ui-');
   const reviewPath = path.join(cwd, REVIEW_DIR, `${dateStamp()}-00.md`);
   const draft = new ReviewStore(reviewPath);
@@ -3294,7 +3356,7 @@ test('load skips imported GitHub notes when resuming a review', () => {
     feedback: [],
     todos: [{ file: 'pull request', text: 'from github', done: false }],
   };
-  const { session } = openSession([item], {
+  const { session } = await openSession([item], {
     cwd,
     repo: {
       load: () => ({ top: cwd, items: [item], imported }),
@@ -3318,7 +3380,7 @@ test('openLoad paints git items before npm extras arrive', async () => {
   });
   let extrasStarted = false;
   const repo = {
-    loadAsync: async () => ({
+    load: async () => ({
       top: cwd,
       items: [gitItem],
       parsed: [gitItem],
@@ -3333,7 +3395,6 @@ test('openLoad paints git items before npm extras arrive', async () => {
         pending: false,
       };
     },
-    load: () => ({ top: cwd, items: [gitItem] }),
     add: () => {},
     unstage: () => {},
     revert: () => {},
@@ -3372,7 +3433,7 @@ test('openLoad paints git items before npm extras arrive', async () => {
   assert.equal(session.busy, '');
 });
 
-const openUpdating = (extra = {}) => {
+const openUpdating = async (extra = {}) => {
   const cacheFile = path.join(tempDir('reslop-cache-'), 'update.json');
   const installed = [];
   let fetchResolve;
@@ -3401,17 +3462,20 @@ const openUpdating = (extra = {}) => {
         installed.push(version);
       }),
   };
-  const { session } = openSession([sampleItem('a.js'), sampleItem('b.js')], {
-    startPane: 'files',
-    update,
-    ...extra.session,
-  });
+  const { session } = await openSession(
+    [sampleItem('a.js'), sampleItem('b.js')],
+    {
+      startPane: 'files',
+      update,
+      ...extra.session,
+    },
+  );
   session.uiOpen = true;
   return { session, installed, fetchResolve, cacheFile, update };
 };
 
 test('update check does not block loading', async () => {
-  const { session, fetchResolve, installed } = openUpdating({
+  const { session, fetchResolve, installed } = await openUpdating({
     gateFetch: true,
     latest: '0.1.6',
   });
@@ -3426,7 +3490,7 @@ test('update check does not block loading', async () => {
 });
 
 test('patch update installs in the background', async () => {
-  const { session, installed } = openUpdating({ latest: '0.1.6' });
+  const { session, installed } = await openUpdating({ latest: '0.1.6' });
   await session.openUpdate();
   assert.deepEqual(installed, ['0.1.6']);
   assert.equal(session.status, 'updated');
@@ -3434,7 +3498,7 @@ test('patch update installs in the background', async () => {
 });
 
 test('major update asks y or n on the loaded status line', async () => {
-  const { session, installed } = openUpdating({ latest: '1.0.0' });
+  const { session, installed } = await openUpdating({ latest: '1.0.0' });
   await session.openUpdate();
   session.draw();
   assert.equal(session.mode, 'confirmUpdate');
@@ -3451,13 +3515,13 @@ test('major update asks y or n on the loaded status line', async () => {
 });
 
 test('click update prompt y and n', async () => {
-  const declined = openUpdating({ latest: '1.0.0' });
+  const declined = await openUpdating({ latest: '1.0.0' });
   await declined.session.openUpdate();
   clickStatusChoice(declined.session, 'n');
   assert.equal(declined.session.mode, 'review');
   assert.deepEqual(declined.installed, []);
 
-  const accepted = openUpdating({ latest: '1.0.0' });
+  const accepted = await openUpdating({ latest: '1.0.0' });
   await accepted.session.openUpdate();
   clickStatusChoice(accepted.session, 'y');
   await accepted.session.updater.installPromise;
@@ -3494,7 +3558,7 @@ test('major prompt waits until the UI has loaded', async () => {
 });
 
 test('major update y installs the new version', async () => {
-  const { session, installed } = openUpdating({ latest: '1.0.0' });
+  const { session, installed } = await openUpdating({ latest: '1.0.0' });
   await session.openUpdate();
   session.draw();
   session.handleEvent({ type: 'key', key: 'y' });
@@ -3505,21 +3569,25 @@ test('major update y installs the new version', async () => {
 });
 
 test('declined major update is not asked again from cache', async () => {
-  const { session, cacheFile, update } = openUpdating({ latest: '1.0.0' });
+  const { session, cacheFile, update } = await openUpdating({
+    latest: '1.0.0',
+  });
   await session.openUpdate();
   session.draw();
   session.handleEvent({ type: 'key', key: 'n' });
   let fetched = 0;
-  const again = openSession([sampleItem('a.js')], {
-    startPane: 'files',
-    update: {
-      ...update,
-      fetch: async () => {
-        fetched += 1;
-        return { ok: true, json: async () => ({ version: '1.0.0' }) };
+  const again = (
+    await openSession([sampleItem('a.js')], {
+      startPane: 'files',
+      update: {
+        ...update,
+        fetch: async () => {
+          fetched += 1;
+          return { ok: true, json: async () => ({ version: '1.0.0' }) };
+        },
       },
-    },
-  }).session;
+    })
+  ).session;
   again.uiOpen = true;
   await again.openUpdate();
   again.draw();
@@ -3529,23 +3597,27 @@ test('declined major update is not asked again from cache', async () => {
 });
 
 test('declined major still auto-installs a later patch', async () => {
-  const { session, installed, update } = openUpdating({ latest: '1.0.0' });
+  const { session, installed, update } = await openUpdating({
+    latest: '1.0.0',
+  });
   await session.openUpdate();
   session.draw();
   session.handleEvent({ type: 'key', key: 'n' });
-  const next = openSession([sampleItem('a.js')], {
-    startPane: 'files',
-    update: {
-      ...update,
-      interval: 0,
-      fetch: async () => ({
-        ok: true,
-        json: async () => ({
-          versions: { '0.1.5': {}, '0.1.6': {}, '1.0.0': {} },
+  const next = (
+    await openSession([sampleItem('a.js')], {
+      startPane: 'files',
+      update: {
+        ...update,
+        interval: 0,
+        fetch: async () => ({
+          ok: true,
+          json: async () => ({
+            versions: { '0.1.5': {}, '0.1.6': {}, '1.0.0': {} },
+          }),
         }),
-      }),
-    },
-  }).session;
+      },
+    })
+  ).session;
   next.uiOpen = true;
   await next.openUpdate();
   assert.deepEqual(installed, ['0.1.6']);
@@ -3554,23 +3626,27 @@ test('declined major still auto-installs a later patch', async () => {
 });
 
 test('declined major asks again when 1.0.1 appears', async () => {
-  const { session, installed, update } = openUpdating({ latest: '1.0.0' });
+  const { session, installed, update } = await openUpdating({
+    latest: '1.0.0',
+  });
   await session.openUpdate();
   session.draw();
   session.handleEvent({ type: 'key', key: 'n' });
-  const next = openSession([sampleItem('a.js')], {
-    startPane: 'files',
-    update: {
-      ...update,
-      interval: 0,
-      fetch: async () => ({
-        ok: true,
-        json: async () => ({
-          versions: { '0.1.5': {}, '1.0.0': {}, '1.0.1': {} },
+  const next = (
+    await openSession([sampleItem('a.js')], {
+      startPane: 'files',
+      update: {
+        ...update,
+        interval: 0,
+        fetch: async () => ({
+          ok: true,
+          json: async () => ({
+            versions: { '0.1.5': {}, '1.0.0': {}, '1.0.1': {} },
+          }),
         }),
-      }),
-    },
-  }).session;
+      },
+    })
+  ).session;
   next.uiOpen = true;
   await next.openUpdate();
   next.draw();
@@ -3579,8 +3655,10 @@ test('declined major asks again when 1.0.1 appears', async () => {
   assert.equal(next.updater.to, '1.0.1');
 });
 
-test('click status branch opens the branch list', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('click status branch opens the branch list', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.draw();
   const hit = session.lastFrame.statusHits[0];
   assert.ok(hit);
@@ -3605,8 +3683,10 @@ test('click status branch opens the branch list', () => {
   assert.equal(session.pane, 'branches');
 });
 
-test('list screens hint 🢐esc and the button goes back', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('list screens hint 🢐esc and the button goes back', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   const footer = () => {
     session.draw();
     return stripAnsi(session.lastFrame.rows.at(-1));
@@ -3642,7 +3722,7 @@ test('list screens hint 🢐esc and the button goes back', () => {
 test('files pane b lists branches and enter checks out', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openSession([a, b], { startPane: 'files' });
+  const { session, repo } = await openSession([a, b], { startPane: 'files' });
   assert.equal(session.branch, 'main');
   session.pushInput('b');
   await session.ops.idle();
@@ -3680,7 +3760,7 @@ test('files pane b lists branches and enter checks out', async () => {
 test('branch list p pulls and s pushes', async () => {
   const a = sampleItem('a.js');
   const b = sampleItem('b.js');
-  const { session, repo } = openSession([a, b], { startPane: 'files' });
+  const { session, repo } = await openSession([a, b], { startPane: 'files' });
   session.pushInput('b');
   await session.ops.idle();
   assert.equal(repo.listed.length, 1);
@@ -3711,7 +3791,7 @@ test('branch list p pulls and s pushes', async () => {
 });
 
 test('rejected push asks f to force or escape to cancel', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.repo.push = (top, force) => {
@@ -3745,8 +3825,8 @@ test('rejected push asks f to force or escape to cancel', async () => {
   assert.equal(session.status, 'force pushed');
 });
 
-test('click force push prompt', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('click force push prompt', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.repo.push = (top, force) => {
@@ -3770,7 +3850,7 @@ test('pull shows progress until git finishes', async () => {
   const pending = new Promise((resolve) => {
     finish = resolve;
   });
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.repo.pull = () => pending;
@@ -3796,7 +3876,7 @@ test('npm i shows progress until install finishes', async () => {
   const pending = new Promise((resolve) => {
     finish = resolve;
   });
-  const { session } = openSession([sampleItem('a.js')], {
+  const { session } = await openSession([sampleItem('a.js')], {
     startPane: 'diff',
   });
   session.uiOpen = true;
@@ -3831,7 +3911,7 @@ test('stage moves on while npm install is still running', async () => {
     files: ['package.json'],
   };
   const other = sampleItem('b.js');
-  const { session, repo } = openSession([proposed, other]);
+  const { session, repo } = await openSession([proposed, other]);
   session.uiOpen = true;
   let installs = 0;
   session.repo.add = (top, item) => {
@@ -3870,8 +3950,7 @@ test('openLoad shows progress while a remote change loads', async () => {
     color: false,
     startPane: 'files',
     repo: {
-      load: () => ({ items: [] }),
-      loadAsync: async () => {
+      load: async () => {
         await pending;
         return {
           items: [item],
@@ -3903,7 +3982,7 @@ test('checkout shows progress until git finishes', async () => {
   const pending = new Promise((resolve) => {
     finish = resolve;
   });
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.uiOpen = true;
@@ -3912,8 +3991,11 @@ test('checkout shows progress until git finishes', async () => {
     repo.checkouts.push(name);
   };
   session.pushInput('b');
+  await session.ops.idle();
   session.pushInput('j');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(repo.checkouts.length, 0);
   assert.equal(session.busy, 'checking out');
   session.tickProgress();
@@ -3932,7 +4014,7 @@ test('commit shows progress until git finishes', async () => {
   const pending = new Promise((resolve) => {
     finish = resolve;
   });
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.uiOpen = true;
@@ -3941,9 +4023,13 @@ test('commit shows progress until git finishes', async () => {
     repo.commits.push({ top, kind, message });
   };
   session.pushInput('c');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'insert' });
+  await session.ops.idle();
   session.pushInput('land the change');
+  await session.ops.idle();
   session.handleEvent({ type: 'key', key: 'enter' });
+  await session.ops.idle();
   assert.equal(repo.commits.length, 0);
   assert.equal(session.busy, 'committing');
   session.tickProgress();
@@ -3958,7 +4044,7 @@ test('commit shows progress until git finishes', async () => {
 
 test('files pane u unstages', async () => {
   const item = sampleItem('a.js', 'staged');
-  const { session, repo } = openSession([item], { startPane: 'files' });
+  const { session, repo } = await openSession([item], { startPane: 'files' });
   session.dispatch('next');
   await session.ops.idle();
   session.pushInput('u');
@@ -3967,9 +4053,9 @@ test('files pane u unstages', async () => {
   assert.equal(session.status, 'unstaged');
 });
 
-test('files pane f opens file scope and d drops', () => {
+test('files pane f opens file scope and d drops', async () => {
   const item = sampleItem('a.js', 'staged');
-  const { session, repo } = openSession([item], { startPane: 'files' });
+  const { session, repo } = await openSession([item], { startPane: 'files' });
   session.dispatch('next');
   session.pushInput('f');
   assert.equal(session.fileScope, 'file');
@@ -3980,8 +4066,8 @@ test('files pane f opens file scope and d drops', () => {
   assert.equal(repo.reverted.length, 1);
 });
 
-test('unit scope lists every file sorted by path', () => {
-  const { session, repo } = openSession([sampleItem('b.js')], {
+test('unit scope lists every file sorted by path', async () => {
+  const { session, repo } = await openSession([sampleItem('b.js')], {
     startPane: 'files',
   });
   repo.extraFiles.push('a.js', 'z.js');
@@ -3990,7 +4076,7 @@ test('unit scope lists every file sorted by path', () => {
   assert.deepEqual(names, ['a.js', 'b.js', 'z.js']);
 });
 
-test('unit view shows the file with current block marks', () => {
+test('unit view shows the file with current block marks', async () => {
   const first = sampleItem('a.js');
   const second = sampleItem('a.js');
   second.blockId = 1;
@@ -4005,7 +4091,7 @@ test('unit view shows the file with current block marks', () => {
       { type: 'add', text: 'd', noNl: false, blockId: 1 },
     ],
   };
-  const { session, repo } = openSession([first, second], {
+  const { session, repo } = await openSession([first, second], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'b\nkeep\nd\n';
@@ -4031,7 +4117,7 @@ test('unit view shows the file with current block marks', () => {
 
 test('unit view marks every block in the current hunk', async () => {
   const [first, second] = hunkPair('a.js');
-  const { session, repo } = openSession([first, second], {
+  const { session, repo } = await openSession([first, second], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'A\nmid\nC\n';
@@ -4054,7 +4140,7 @@ test('unit view marks every block in the current hunk', async () => {
   assert.equal(session.items[1].origin, 'staged');
 });
 
-test('file scope next scrolls the whole block into view', () => {
+test('file scope next scrolls the whole block into view', async () => {
   const first = sampleItem('a.js');
   const second = sampleItem('a.js');
   second.blockId = 1;
@@ -4074,7 +4160,7 @@ test('file scope next scrolls the whole block into view', () => {
   for (let i = 2; i < 40; i++) rows.push(`keep${i}`);
   for (let i = 0; i < 5; i++) rows.push(`chg${i}`);
   rows.push('tail');
-  const { session, repo } = openSession([first, second], {
+  const { session, repo } = await openSession([first, second], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = `${rows.join('\n')}\n`;
@@ -4093,7 +4179,7 @@ test('file scope next scrolls the whole block into view', () => {
   assert.match(body, /tail/);
 });
 
-test('file scope next pins an oversized block at its start', () => {
+test('file scope next pins an oversized block at its start', async () => {
   const first = sampleItem('a.js');
   const second = sampleItem('a.js');
   second.blockId = 1;
@@ -4113,7 +4199,7 @@ test('file scope next pins an oversized block at its start', () => {
   for (let i = 2; i < 40; i++) rows.push(`keep${i}`);
   for (let i = 0; i < 40; i++) rows.push(`chg${i}`);
   rows.push('tail');
-  const { session, repo } = openSession([first, second], {
+  const { session, repo } = await openSession([first, second], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = `${rows.join('\n')}\n`;
@@ -4129,15 +4215,19 @@ test('file scope next pins an oversized block at its start', () => {
   assert.equal(session.scroll, 41);
 });
 
-test('unit view e edits the whole file and autosaves', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('unit view e edits the whole file and autosaves', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'b\n';
   session.dispatch('file');
+  await session.ops.idle();
   session.dispatch('next');
+  await session.ops.idle();
   session.dispatch('open');
+  await session.ops.idle();
   session.dispatch('code');
+  await session.ops.idle();
   assert.equal(session.composeKind, 'file');
   session.editor.replace('edited\n');
   session.autosave();
@@ -4150,8 +4240,8 @@ test('unit view e edits the whole file and autosaves', () => {
   assert.equal(session.status, 'staged');
 });
 
-test('file compose keeps del and add highlighting', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('file compose keeps del and add highlighting', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'b\nkeep\n';
@@ -4174,8 +4264,8 @@ test('file compose keeps del and add highlighting', () => {
   assert.deepEqual(after, ['del:a', 'add:xb', 'ctx:keep', 'ctx:']);
 });
 
-test('file compose cursor stays on a trailing empty line', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('file compose cursor stays on a trailing empty line', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'b\nkeep\n';
@@ -4192,8 +4282,8 @@ test('file compose cursor stays on a trailing empty line', () => {
   assert.equal(last.editLast, true);
 });
 
-test('file compose scroll follows the editor cursor', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('file compose scroll follows the editor cursor', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   const rows = [];
@@ -4214,8 +4304,8 @@ test('file compose scroll follows the editor cursor', () => {
   assert.ok(session.unitLine + 1 >= session.scroll);
 });
 
-test('unit view reloads disk text in view and edit', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('unit view reloads disk text in view and edit', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   repo.fileBodies['a.js'] = 'b\n';
@@ -4231,13 +4321,15 @@ test('unit view reloads disk text in view and edit', () => {
   assert.equal(session.editor.text, 'later\n');
 });
 
-test('insert creates a branch, or commits, amends, or fixups', () => {
-  const branch = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('insert creates a branch, or commits, amends, or fixups', async () => {
+  const branch = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   branch.session.pushInput('b');
   branch.session.handleEvent({ type: 'key', key: 'insert' });
   assert.equal(branch.session.mode, 'compose');
   assert.equal(branch.session.composeKind, 'branch');
-  const commits = openSession([sampleItem('a.js', 'staged')], {
+  const commits = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   commits.session.pushInput('c');
@@ -4292,7 +4384,7 @@ test('insert creates a branch, or commits, amends, or fixups', () => {
 test('insert update keeps the commit and takes staged changes', async () => {
   const head = 'aaa1111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const older = 'bbb2222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-  const { session, repo } = openSession([sampleItem('a.js', 'staged')], {
+  const { session, repo } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -4318,7 +4410,7 @@ test('insert update keeps the commit and takes staged changes', async () => {
   await session.ops.idle();
   clickStatusChoice(session, 'u');
   assert.deepEqual(repo.updates, [head, older, older]);
-  const bare = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const bare = await openSession([sampleItem('a.js')], { startPane: 'files' });
   bare.session.pushInput('c');
   bare.session.dispatch('next');
   bare.session.handleEvent({ type: 'key', key: 'insert' });
@@ -4328,7 +4420,7 @@ test('insert update keeps the commit and takes staged changes', async () => {
 });
 
 test('new branch action asks for a name', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
@@ -4350,7 +4442,7 @@ test('new branch action asks for a name', async () => {
 });
 
 test('branch list r rebases current onto selected', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
@@ -4369,7 +4461,7 @@ test('branch list r rebases current onto selected', async () => {
 });
 
 test('branch list delete asks to delete the selected branch', async () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
@@ -4403,8 +4495,8 @@ test('branch list delete asks to delete the selected branch', async () => {
   assert.equal(session.pane, 'branches');
 });
 
-test('click drop prompt y and n', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('click drop prompt y and n', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   session.pushInput('b');
@@ -4418,16 +4510,18 @@ test('click drop prompt y and n', () => {
   assert.deepEqual(repo.drops, ['feat']);
 });
 
-test('escape from branch list returns to files', () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+test('escape from branch list returns to files', async () => {
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.pushInput('b');
   assert.equal(session.pane, 'branches');
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
 });
 
-test('read only blocks branch pull and push', () => {
-  const { session, repo } = openSession([sampleItem('a.js')], {
+test('read only blocks branch pull and push', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
     readOnly: true,
   });
@@ -4500,7 +4594,7 @@ test('partial file add reloads after a later hunk fails', async () => {
     revert: () => {},
     revertFile: () => {},
   };
-  const { session } = openSession([first, second, other], {
+  const { session } = await openSession([first, second, other], {
     startPane: 'files',
     repo,
   });
@@ -4514,8 +4608,8 @@ test('partial file add reloads after a later hunk fails', async () => {
   assert.equal(session.items[1].blockId, 1);
 });
 
-test('x and a checkbox click toggle a todo and the file keeps it', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('x and a checkbox click toggle a todo and the file keeps it', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('tasks');
   session.pushInput('ship it');
   session.handleEvent({ type: 'key', key: 'escape' });
@@ -4557,8 +4651,8 @@ test('x and a checkbox click toggle a todo and the file keeps it', () => {
   assert.equal(session.notes.tasks[0].done, true);
 });
 
-test('l toggles the theme and is typed as text while composing', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('l toggles the theme and is typed as text while composing', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   try {
     session.pushInput('l');
     assert.equal(themeName(), 'light');
@@ -4580,7 +4674,7 @@ test('packages screen manages dependencies', async () => {
   const stdout = uiSink();
   stdout.columns = 160;
   stdout.rows = 24;
-  const { session, repo } = openSession([sampleItem('a.js')], {
+  const { session, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
     stdout,
     outdatedMap: new Map([
@@ -4688,7 +4782,9 @@ test('packages screen manages dependencies', async () => {
 });
 
 test('delete refuses a transitive package', async () => {
-  const { session } = openSession([sampleItem('a.js')], { startPane: 'files' });
+  const { session } = await openSession([sampleItem('a.js')], {
+    startPane: 'files',
+  });
   session.dashboard.npm = {
     ready: true,
     hasManifest: true,
@@ -4726,9 +4822,12 @@ test('delete refuses a transitive package', async () => {
 });
 
 test('files pane r opens npm scripts and bins', async () => {
-  const { session, cwd, repo, stdout } = openSession([sampleItem('a.js')], {
-    startPane: 'files',
-  });
+  const { session, cwd, repo, stdout } = await openSession(
+    [sampleItem('a.js')],
+    {
+      startPane: 'files',
+    },
+  );
   stdout.columns = 120;
   fs.writeFileSync(
     path.join(cwd, 'package.json'),
@@ -4827,10 +4926,13 @@ test('files pane r opens npm scripts and bins', async () => {
   assert.equal(session.done, true);
 });
 
-test('npm output v toggles raw text until the screen closes', () => {
-  const { session, cwd, repo, stdout } = openSession([sampleItem('a.js')], {
-    startPane: 'files',
-  });
+test('npm output v toggles raw text until the screen closes', async () => {
+  const { session, cwd, repo, stdout } = await openSession(
+    [sampleItem('a.js')],
+    {
+      startPane: 'files',
+    },
+  );
   stdout.columns = 400;
   fs.writeFileSync(
     path.join(cwd, 'package.json'),
@@ -4885,8 +4987,8 @@ const frameBody = (session) => {
   return rows.map((row) => stripAnsi(row));
 };
 
-test('esc leaves a running npm command in the background', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+test('esc leaves a running npm command in the background', async () => {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -4998,7 +5100,7 @@ test('esc leaves a running npm command in the background', () => {
 });
 
 test('npm sessions survive a restart', async () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5017,7 +5119,7 @@ test('npm sessions survive a restart', async () => {
   session.handleEvent({ type: 'key', key: 'enter' });
   await written;
   session.handleEvent({ type: 'key', key: 'escape' });
-  const again = openSession([sampleItem('a.js')], {
+  const again = await openSession([sampleItem('a.js')], {
     cwd,
     repo,
     startPane: 'files',
@@ -5038,8 +5140,8 @@ test('npm sessions survive a restart', async () => {
   assert.match(body, /hello from test/);
 });
 
-test('npm history keeps the newest 50 runs', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('npm history keeps the newest 50 runs', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5069,8 +5171,8 @@ test('npm history keeps the newest 50 runs', () => {
   assert.ok(rows[0].when);
 });
 
-test('npm history shows a command when it has no script name', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('npm history shows a command when it has no script name', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5130,8 +5232,8 @@ test('npm history shows a command when it has no script name', () => {
   assert.ok(!history.includes('……'));
 });
 
-test('a history row opens the captured log when its file is missing', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('a history row opens the captured log if the file is gone', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5188,8 +5290,8 @@ test('a history row opens the captured log when its file is missing', () => {
   assert.match(session.npm.output, /not ok 1 npm history caption/);
 });
 
-test('the run screen follows an outside reslop t', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('the run screen follows an outside reslop t', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   const dir = path.join(cwd, '.log');
@@ -5253,8 +5355,8 @@ test('the run screen follows an outside reslop t', () => {
   assert.equal(rows[0].total, '10');
 });
 
-test('a finished outside run drops the running line', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('a finished outside run drops the running line', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   const dir = path.join(cwd, '.log');
@@ -5307,8 +5409,8 @@ test('a finished outside run drops the running line', () => {
   assert.ok(!text.includes('running'));
 });
 
-test('chained steps of one script share a history row', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('chained steps of one script share a history row', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   const dir = path.join(cwd, '.log');
@@ -5355,7 +5457,7 @@ test('chained steps of one script share a history row', () => {
 });
 
 test('npm test from the ui keeps the two reslop t runs', async () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5451,8 +5553,8 @@ test('npm test from the ui keeps the two reslop t runs', async () => {
   assert.equal(saved.length, 3);
 });
 
-test('npm history counts tests and stays on the run screen', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+test('npm history counts tests and stays on the run screen', async () => {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5482,8 +5584,8 @@ test('npm history counts tests and stays on the run screen', () => {
   assert.equal(session.view().npmView, false);
 });
 
-test('npm output scrolls with the editor hotkeys', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+test('npm output scrolls with the editor hotkeys', async () => {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5546,8 +5648,8 @@ test('npm output scrolls with the editor hotkeys', () => {
   assert.match(body[1], /^ {2}row /);
 });
 
-test('npm output animates progress until the command exits', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+test('npm output animates progress until the command exits', async () => {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5587,8 +5689,8 @@ test('npm output animates progress until the command exits', () => {
   assert.ok(!text.includes('running'));
 });
 
-test('npm screen refuses edits when read only', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('npm screen refuses edits when read only', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
     readOnly: true,
   });
@@ -5609,8 +5711,8 @@ test('npm screen refuses edits when read only', () => {
   assert.equal(session.mode, 'review');
 });
 
-test('double click runs the selected npm command', () => {
-  const { session, cwd, repo } = openSession([sampleItem('a.js')], {
+test('double click runs the selected npm command', async () => {
+  const { session, cwd, repo } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5637,8 +5739,8 @@ test('double click runs the selected npm command', () => {
   assert.equal(session.view().npmView, false);
 });
 
-test('delete removes the selected npm script after confirmation', () => {
-  const { session, cwd, stdout } = openSession([sampleItem('a.js')], {
+test('delete removes the selected npm script after confirmation', async () => {
+  const { session, cwd, stdout } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   stdout.columns = 160;
@@ -5675,8 +5777,8 @@ const daysAgoStamp = (ago) => {
   return `${y}-${m}-${d}`;
 };
 
-test('npm screen deletes logs older than 5 days', () => {
-  const { session, cwd } = openSession([sampleItem('a.js')], {
+test('npm screen deletes logs older than 5 days', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js')], {
     startPane: 'files',
   });
   fs.writeFileSync(
@@ -5719,8 +5821,8 @@ const clickCaret = (session, dx, dy) => {
   clickAt(session, caret.x + dx, caret.y + dy);
 };
 
-test('click moves the caret in the code and file editors', () => {
-  const { session, repo } = openSession([sampleItem('a.js')]);
+test('click moves the caret in the code and file editors', async () => {
+  const { session, repo } = await openSession([sampleItem('a.js')]);
   session.pushInput('e');
   session.editor.replace('ab\ncd');
   session.draw();
@@ -5748,8 +5850,8 @@ test('click moves the caret in the code and file editors', () => {
   assert.equal(session.editor.cursor, 3);
 });
 
-test('click moves the caret in feedback and todo editors', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('click moves the caret in feedback and todo editors', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   session.dispatch('feedback');
   session.editor.replace('ab\ncd');
   session.draw();
@@ -5774,8 +5876,8 @@ test('click moves the caret in feedback and todo editors', () => {
   assert.equal(session.editor.cursor, 1);
 });
 
-test('click moves the caret in commit, branch, and npm editors', () => {
-  const { session, cwd } = openSession([sampleItem('a.js', 'staged')], {
+test('click moves the caret in commit, branch, and npm editors', async () => {
+  const { session, cwd } = await openSession([sampleItem('a.js', 'staged')], {
     startPane: 'files',
   });
   session.pushInput('c');
@@ -5833,10 +5935,13 @@ const editRow = (session) => {
 
 const longValue = (head, tail) => `${head}${'m'.repeat(120)}${tail}`;
 
-test('table editors scroll long lines horizontally', () => {
-  const { session, stdout, cwd } = openSession([sampleItem('a.js', 'staged')], {
-    startPane: 'files',
-  });
+test('table editors scroll long lines horizontally', async () => {
+  const { session, stdout, cwd } = await openSession(
+    [sampleItem('a.js', 'staged')],
+    {
+      startPane: 'files',
+    },
+  );
   stdout.columns = 80;
   stdout.rows = 24;
   fs.writeFileSync(
@@ -5896,7 +6001,7 @@ const press = (session, name) => {
   session.handleEvent({ type: 'key', key: name });
 };
 
-test('line numbers persist in .reslop', () => {
+test('line numbers persist in .reslop', async () => {
   const cwd = tempDir('reslop-ui-');
   const file = path.join(cwd, '.reslop');
   fs.writeFileSync(
@@ -5904,14 +6009,14 @@ test('line numbers persist in .reslop', () => {
     `${JSON.stringify({ agents: { claude: { model: 'sonnet' } } })}\n`,
   );
   try {
-    const { session } = openSession([sampleItem('a.js')], { cwd });
+    const { session } = await openSession([sampleItem('a.js')], { cwd });
     assert.equal(session.lineNumbers, false);
     press(session, 'ctrl-l');
     const on = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(on.editor.lineNumbers, true);
     assert.equal(on.lineNumbers, undefined);
     assert.deepEqual(on.agents.claude, { model: 'sonnet' });
-    const again = openSession([sampleItem('a.js')], { cwd });
+    const again = await openSession([sampleItem('a.js')], { cwd });
     assert.equal(again.session.lineNumbers, true);
     press(again.session, 'ctrl-l');
     const off = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -5923,13 +6028,13 @@ test('line numbers persist in .reslop', () => {
   }
 });
 
-test('editor general and commits settings persist in .reslop', () => {
+test('editor general and commits settings persist in .reslop', async () => {
   const cwd = tempDir('reslop-ui-');
   const file = path.join(cwd, '.reslop');
   const legacy = { lineNumbers: true, agents: { claude: { model: 'sonnet' } } };
   fs.writeFileSync(file, `${JSON.stringify(legacy)}\n`);
   try {
-    const { session } = openSession([sampleItem('a.js')], { cwd });
+    const { session } = await openSession([sampleItem('a.js')], { cwd });
     assert.equal(session.lineNumbers, true);
     assert.equal(session.layout, 'unified');
     assert.equal(themeName(), 'dark');
@@ -5945,7 +6050,7 @@ test('editor general and commits settings persist in .reslop', () => {
     assert.equal(saved.commits.view, 'full');
     assert.deepEqual(saved.agents.claude, { model: 'sonnet' });
     setTheme('dark');
-    const again = openSession([sampleItem('a.js')], { cwd });
+    const again = await openSession([sampleItem('a.js')], { cwd });
     assert.equal(again.session.lineNumbers, true);
     assert.equal(again.session.layout, 'mixed');
     assert.equal(again.session.commits.commitView, 'full');
@@ -5956,8 +6061,8 @@ test('editor general and commits settings persist in .reslop', () => {
   }
 });
 
-test('ctrl-l toggles line numbers on a diff and while editing', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('ctrl-l toggles line numbers on a diff and while editing', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   assert.equal(session.lineNumbers, false);
   press(session, 'ctrl-l');
   assert.equal(session.lineNumbers, true);
@@ -5984,14 +6089,14 @@ test('ctrl-l toggles line numbers on a diff and while editing', () => {
   assert.equal(session.editor.text, before);
 });
 
-test('ctrl-c quits outside an editor', () => {
-  const { session } = openSession([sampleItem('a.js')]);
+test('ctrl-c quits outside an editor', async () => {
+  const { session } = await openSession([sampleItem('a.js')]);
   press(session, 'ctrl-c');
   assert.equal(session.done, true);
 });
 
-test('editors select with shift and copy cut paste', () => {
-  const { session, stdout } = openSession([sampleItem('a.js')]);
+test('editors select with shift and copy cut paste', async () => {
+  const { session, stdout } = await openSession([sampleItem('a.js')]);
   session.dispatch('feedback');
   session.editor.replace('hello');
   session.color = true;
@@ -6053,13 +6158,13 @@ test('editors select with shift and copy cut paste', () => {
   assert.equal(session.composeKind, 'tasks');
 });
 
-test('find import and plan lines select and use the clipboard', () => {
+test('find import and plan lines select and use the clipboard', async () => {
   const items = [
     sampleItem('src/app.js'),
     sampleItem('lib/find.js'),
     sampleItem('lib/files.js'),
   ];
-  const { session, stdout } = openSession(items);
+  const { session, stdout } = await openSession(items);
   session.handleEvent({ type: 'key', key: 'escape' });
   session.handleEvent({ type: 'key', key: '/' });
   session.pushInput('lib/f');
@@ -6110,13 +6215,13 @@ test('find import and plan lines select and use the clipboard', () => {
   assert.equal(session.composer.tasks.planOpen, true);
 });
 
-test('slash searches paths on the files and diff screens', () => {
+test('slash searches paths on the files and diff screens', async () => {
   const items = [
     sampleItem('src/app.js'),
     sampleItem('lib/find.js'),
     sampleItem('lib/files.js'),
   ];
-  const { session } = openSession(items);
+  const { session } = await openSession(items);
   session.handleEvent({ type: 'key', key: 'escape' });
   assert.equal(session.pane, 'files');
   session.handleEvent({ type: 'key', key: '/' });
