@@ -361,7 +361,7 @@ test('opening a folder of repositories starts on repo tiles', async () => {
     assert.match(text, /diff: \+0\//);
     assert.equal(actionFromKey('left', 'repos'), 'repoLeft');
     assert.equal(actionFromKey('down', 'repos'), 'repoDown');
-    session.workspace.screen.cols = 2;
+    session.workspace.cols = 2;
     session.workspace.move(1, 0);
     assert.equal(session.workspace.cursor, 1);
     session.workspace.move(-1, 0);
